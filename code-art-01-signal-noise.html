@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Signal & Noise — ClawdJob</title>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #0a0a0f; overflow: hidden; }
+  canvas { display: block; }
+  #title {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    color: rgba(255,255,255,0.15);
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    text-align: right;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="title">Signal & Noise<br>ClawdJob for @bitpixi<br>2026</div>
+<script>
+// Signal & Noise
+// A meditation on job searching — hundreds of postings flow past,
+// most are noise. Occasionally, a signal emerges: bright, clear, unmistakable.
+// The viewer watches the agent scan, discard, and lock on.
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Particles represent job postings flowing through the feed
+class Particle {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.x = Math.random() * W;
+    this.y = -10;
+    this.speed = 0.3 + Math.random() * 2;
+    this.size = 1 + Math.random() * 2;
+    this.opacity = 0.05 + Math.random() * 0.15;
+    this.isSignal = Math.random() < 0.008; // rare signal
+    this.drift = (Math.random() - 0.5) * 0.5;
+    this.life = 0;
+    this.maxLife = H / this.speed + 100;
+    this.hue = this.isSignal ? 45 + Math.random() * 20 : 220 + Math.random() * 40;
+    this.caught = false;
+    this.caughtTime = 0;
+    this.trail = [];
+  }
+  update() {
+    this.life++;
+    if (this.caught) {
+      this.caughtTime++;
+      this.size = Math.min(this.size + 0.15, 20);
+      this.opacity = Math.min(this.opacity + 0.02, 1);
+      // Pulse
+      this.size += Math.sin(this.caughtTime * 0.1) * 0.3;
+      if (this.caughtTime > 180) {
+        // Launch upward — applied!
+        this.y -= 3;
+        this.opacity -= 0.008;
+        if (this.opacity <= 0) this.reset();
+      }
+      return;
+    }
+    this.y += this.speed;
+    this.x += this.drift + Math.sin(this.life * 0.02) * 0.3;
+
+    // Scanner detection zone
+    if (this.isSignal && this.y > scanner.y - 30 && this.y < scanner.y + 30 &&
+        Math.abs(this.x - scanner.x) < 80) {
+      this.caught = true;
+      scanner.pulseTime = 30;
+      // Create burst
+      for (let i = 0; i < 12; i++) {
+        bursts.push({
+          x: this.x, y: this.y,
+          vx: (Math.random() - 0.5) * 4,
+          vy: (Math.random() - 0.5) * 4,
+          life: 40,
+          maxLife: 40
+        });
+      }
+    }
+
+    if (this.y > H + 10 || this.x < -10 || this.x > W + 10) this.reset();
+
+    // Trail for signals
+    if (this.isSignal) {
+      this.trail.push({ x: this.x, y: this.y, opacity: 0.6 });
+      if (this.trail.length > 20) this.trail.shift();
+      this.trail.forEach(t => t.opacity *= 0.92);
+    }
+  }
+  draw() {
+    if (this.isSignal && !this.caught) {
+      // Draw trail
+      this.trail.forEach(t => {
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, this.size * 0.6, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${this.hue}, 90%, 70%, ${t.opacity * 0.3})`;
+        ctx.fill();
+      });
+    }
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+
+    if (this.isSignal) {
+      const glow = this.caught ? 40 : 15;
+      ctx.shadowColor = `hsla(${this.hue}, 100%, 70%, 0.8)`;
+      ctx.shadowBlur = glow;
+      ctx.fillStyle = `hsla(${this.hue}, 90%, 70%, ${this.opacity})`;
+    } else {
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = `hsla(${this.hue}, 30%, 50%, ${this.opacity})`;
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
+// The scanner — the agent's eye moving across the feed
+const scanner = {
+  x: W / 2,
+  y: H * 0.6,
+  targetX: W / 2,
+  pulseTime: 0,
+  draw() {
+    // Horizontal scan line
+    const alpha = 0.03 + (this.pulseTime > 0 ? 0.05 : 0);
+    ctx.strokeStyle = `rgba(100, 200, 255, ${alpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, this.y);
+    ctx.lineTo(W, this.y);
+    ctx.stroke();
+
+    // Focus zone
+    const radius = 80 + (this.pulseTime > 0 ? 20 : 0);
+    const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, radius);
+    gradient.addColorStop(0, `rgba(100, 200, 255, ${0.08 + (this.pulseTime > 0 ? 0.12 : 0)})`);
+    gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Crosshair
+    ctx.strokeStyle = `rgba(100, 200, 255, ${0.15 + (this.pulseTime > 0 ? 0.3 : 0)})`;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(this.x - 15, this.y);
+    ctx.lineTo(this.x + 15, this.y);
+    ctx.moveTo(this.x, this.y - 15);
+    ctx.lineTo(this.x, this.y + 15);
+    ctx.stroke();
+
+    if (this.pulseTime > 0) this.pulseTime--;
+  },
+  update() {
+    // Slowly scan left and right
+    if (Math.random() < 0.01) {
+      this.targetX = 100 + Math.random() * (W - 200);
+    }
+    this.x += (this.targetX - this.x) * 0.01;
+    this.y = H * 0.6 + Math.sin(Date.now() * 0.0003) * 30;
+  }
+};
+
+let bursts = [];
+const particles = Array.from({ length: 300 }, () => new Particle());
+
+// Stats
+let signalsCaught = 0;
+let noiseFiltered = 0;
+
+function animate() {
+  ctx.fillStyle = 'rgba(10, 10, 15, 0.08)';
+  ctx.fillRect(0, 0, W, H);
+
+  scanner.update();
+  scanner.draw();
+
+  particles.forEach(p => {
+    p.update();
+    p.draw();
+  });
+
+  // Bursts
+  bursts = bursts.filter(b => {
+    b.x += b.vx;
+    b.y += b.vy;
+    b.life--;
+    const alpha = b.life / b.maxLife;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 2 * alpha, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(45, 100%, 70%, ${alpha * 0.8})`;
+    ctx.shadowColor = 'hsla(45, 100%, 70%, 0.5)';
+    ctx.shadowBlur = 10;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    return b.life > 0;
+  });
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
