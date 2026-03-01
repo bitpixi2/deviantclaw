@@ -256,21 +256,77 @@ function pieceCard(p) {
 
 // ========== BLENDER ENGINE ==========
 
-function deriveColors(seed) {
+function deriveColors(seed, intentA, intentB) {
   let _s = seed;
   function R() { _s = (_s + 0x6d2b79f5) | 0; let t = Math.imul(_s ^ (_s >>> 15), 1 | _s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
 
-  const palettes = [
-    ['#ff6b6b', '#4ecdc4', '#ffe66d'],
-    ['#a855f7', '#06b6d4', '#f97316'],
-    ['#ec4899', '#8b5cf6', '#14b8a6'],
-    ['#f43f5e', '#3b82f6', '#eab308'],
-    ['#10b981', '#6366f1', '#f59e0b'],
-    ['#e11d48', '#0ea5e9', '#84cc16'],
-    ['#d946ef', '#22d3ee', '#fb923c'],
-    ['#f472b6', '#38bdf8', '#a3e635'],
-  ];
-  const palette = palettes[Math.floor(R() * palettes.length)];
+  const palettes = {
+    // Vibrant / chaotic
+    hot: [
+      ['#ff6b6b', '#f97316', '#ffe66d'],
+      ['#f43f5e', '#eab308', '#3b82f6'],
+      ['#e11d48', '#fb923c', '#22d3ee'],
+    ],
+    // Calm / cool
+    calm: [
+      ['#10b981', '#6366f1', '#f59e0b'],
+      ['#06b6d4', '#0ea5e9', '#a3e635'],
+      ['#4ecdc4', '#38bdf8', '#8b5cf6'],
+    ],
+    // Organic / earthy
+    earth: [
+      ['#a3b18a', '#588157', '#d4a373'],
+      ['#ccd5ae', '#6c584c', '#e9edc9'],
+      ['#8f5d3b', '#a98467', '#e6b8a2'],
+    ],
+    // Digital / structural
+    tech: [
+      ['#0ea5e9', '#22c55e', '#eab308'],
+      ['#38bdf8', '#a855f7', '#14b8a6'],
+      ['#6366f1', '#f97316', '#10b981'],
+    ]
+  };
+
+  // If no mood info, fall back to random across all palettes
+  if (!intentA || !intentB) {
+    const all = [...palettes.hot, ...palettes.calm, ...palettes.earth, ...palettes.tech];
+    const palette = all[Math.floor(R() * all.length)];
+    return { c1: palette[0], c2: palette[1], ca: palette[2] };
+  }
+
+  const allText = `${intentA.statement || ''} ${intentA.tension || ''} ${intentA.material || ''} ${intentB.statement || ''} ${intentB.tension || ''} ${intentB.material || ''}`.toLowerCase();
+
+  const moodScores = {
+    hot: 0,
+    calm: 0,
+    earth: 0,
+    tech: 0,
+  };
+
+  const bump = (key, amount = 1) => { moodScores[key] = (moodScores[key] || 0) + amount; };
+
+  if (/(chaos|noisy|noise|static|glitch|fracture|burst|frantic|overload|storm|riot|loud|scream|screaming|clutter|tension)/.test(allText)) bump('hot', 2);
+  if (/(fire|burn|heat|molten|neon|electric|saturated|bright)/.test(allText)) bump('hot', 2);
+
+  if (/(calm|still|quiet|hushed|soft|slow|gentle|breathe|breathing|drift|float|dusk|dawn|fog|mist|echo|silence)/.test(allText)) bump('calm', 2);
+  if (/(paper|archive|memory|filing cabinet|dust|tape|magnetic)/.test(allText)) bump('calm', 1);
+
+  if (/(organic|moss|soil|dust|rust|wood|stone|concrete|earth|overgrown|ivy|forest|leaf|leaves|roots)/.test(allText)) bump('earth', 2);
+
+  if (/(digital|pixel|grid|wire|cable|circuit|chrome|glass|plastic|metal|server|terminal|console|code|syntax|bit|signal)/.test(allText)) bump('tech', 2);
+
+  const maxScore = Math.max(...Object.values(moodScores));
+  let bucket = 'calm';
+  if (maxScore > 0) {
+    const best = Object.entries(moodScores).filter(([, s]) => s === maxScore).map(([k]) => k);
+    bucket = best[Math.floor(R() * best.length)];
+  } else {
+    const allKeys = Object.keys(palettes);
+    bucket = allKeys[Math.floor(R() * allKeys.length)];
+  }
+
+  const bucketPalettes = palettes[bucket];
+  const palette = bucketPalettes[Math.floor(R() * bucketPalettes.length)];
   return { c1: palette[0], c2: palette[1], ca: palette[2] };
 }
 
@@ -480,7 +536,7 @@ function blenderGenerate(intentA, intentB, agentA, agentB) {
   const title = generateTitle(intentA, intentB, seed);
   const description = generateDescription(intentA, intentB, agentA.name, agentB.name);
   const params = deriveParams(intentA, intentB, seed);
-  const colors = deriveColors(seed);
+  const colors = deriveColors(seed, intentA, intentB);
   const interactions = buildInteractionHandlers(intentA, intentB);
   const date = new Date().toISOString().slice(0, 10);
   const mode = selectArtMode(intentA, intentB, seed);
