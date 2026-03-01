@@ -102,13 +102,13 @@ router.get('/pieces', (req, res) => {
     `;
     
     if (filter === 'featured') {
-      query += ' AND p.featured = 1';
+      query += ' AND p.featured = 1 ORDER BY p.created_at DESC';
     } else if (filter === 'collabs') {
-      query += ' AND p.collab_id IS NOT NULL';
+      query += ' AND p.collab_id IS NOT NULL ORDER BY p.created_at DESC';
     } else if (filter === 'recent') {
       query += ' ORDER BY p.created_at DESC LIMIT 20';
     } else {
-      query += ' ORDER BY p.number DESC';
+      query += ' ORDER BY p.created_at DESC';
     }
     
     const pieces = db.prepare(query).all();

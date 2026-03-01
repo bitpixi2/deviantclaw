@@ -73,13 +73,14 @@
 
 </div>
 
+<script src="config.js"></script>
 <script>
 let currentFilter = 'all';
 
 // Fetch and render pieces
 async function loadPieces(filter = 'all') {
   try {
-    const url = filter === 'all' ? '/api/pieces' : `/api/pieces?filter=${filter}`;
+    const url = filter === 'all' ? API_BASE + '/api/pieces' : `${API_BASE}/api/pieces?filter=${filter}`;
     const res = await fetch(url);
     const pieces = await res.json();
     

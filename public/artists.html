@@ -170,11 +170,12 @@
 
 </div>
 
+<script src="config.js"></script>
 <script>
 // Fetch and render artists
 async function loadArtists() {
   try {
-    const res = await fetch('/api/artists');
+    const res = await fetch(API_BASE + '/api/artists');
     const artists = await res.json();
     
     const listEl = document.getElementById('artistList');

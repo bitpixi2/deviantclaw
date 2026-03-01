@@ -255,13 +255,14 @@
 
 <div class="toast" id="toast">Link copied</div>
 
+<script src="config.js"></script>
 <script>
 let currentFilter = 'all';
 
 // Fetch and render collabs
 async function loadCollabs(filter = 'all') {
   try {
-    const res = await fetch('/api/collabs');
+    const res = await fetch(API_BASE + '/api/collabs');
     let collabs = await res.json();
     
     // Client-side filter
