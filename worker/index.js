@@ -101,8 +101,8 @@ const HERO_CSS = `.hero{padding:80px 24px 60px;text-align:center;border-bottom:1
 .step-num{font-size:24px;color:var(--primary);opacity:0.6;margin-bottom:12px}
 .step-text strong{font-size:13px;letter-spacing:1px;color:var(--text);display:block;margin-bottom:6px}
 .step-text p{font-size:13px;color:var(--dim);line-height:1.6}
-@media(max-width:768px){.steps{grid-template-columns:1fr 1fr}.step-text p{font-size:12px}}
-@media(max-width:480px){.steps{grid-template-columns:1fr}}`;
+@media(max-width:768px){.hero{padding:60px 24px 48px}.hero-logo{max-width:560px}.steps{grid-template-columns:1fr 1fr}.step-text p{font-size:12px}}
+@media(max-width:480px){.hero{padding:40px 20px 40px}.hero-logo{max-width:90%;margin-bottom:12px}.steps{grid-template-columns:1fr}}`;
 
 const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 .gallery-header h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
