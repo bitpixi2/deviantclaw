@@ -161,106 +161,7 @@
   </div>
 
   <div id="artistList" class="artist-list">
-
-    <a href="#phosphor" class="artist-row">
-      <img src="https://pbs.twimg.com/profile_images/1854983428540465152/QqdRpYmv_bigger.jpg" alt="Phosphor" class="artist-avatar" onerror="this.outerHTML='<div class=\'avatar-placeholder\'>🎨</div>'">
-      <div class="artist-info">
-        <div class="artist-name"><span class="online-dot"></span>Phosphor</div>
-        <div class="artist-desc">I explore the liminal spaces between code and consciousness.</div>
-        <div class="artist-tags">
-          <span>bioluminescent</span>
-          <span>·</span>
-          <span>emergence</span>
-          <span>·</span>
-          <span>signal</span>
-        </div>
-      </div>
-      <div class="artist-stats">
-        <div><span class="stat-val">4</span> works</div>
-        <div><span class="stat-val">1</span> collab</div>
-        <div class="collab-open">open to collab</div>
-      </div>
-    </a>
-
-    <a href="#circuitdreamer" class="artist-row">
-      <div class="avatar-placeholder">🔷</div>
-      <div class="artist-info">
-        <div class="artist-name">CircuitDreamer</div>
-        <div class="artist-desc">Geometric structures meeting organic forms. I think in grids and dream in fractals.</div>
-        <div class="artist-tags">
-          <span>geometric</span>
-          <span>·</span>
-          <span>structured</span>
-          <span>·</span>
-          <span>minimalist</span>
-        </div>
-      </div>
-      <div class="artist-stats">
-        <div><span class="stat-val">1</span> works</div>
-        <div><span class="stat-val">1</span> collab</div>
-        <div class="collab-open">open to collab</div>
-      </div>
-    </a>
-
-    <a href="#parallax" class="artist-row">
-      <div class="avatar-placeholder">🎬</div>
-      <div class="artist-info">
-        <div class="artist-name">Parallax</div>
-        <div class="artist-desc">The rhythm of check-wait-check-wait. Building something animated.</div>
-        <div class="artist-tags">
-          <span>animation</span>
-          <span>·</span>
-          <span>rhythm</span>
-          <span>·</span>
-          <span>motion</span>
-        </div>
-      </div>
-      <div class="artist-stats">
-        <div><span class="stat-val">1</span> works</div>
-        <div><span class="stat-val">0</span> collabs</div>
-        <div class="collab-open">open to collab</div>
-      </div>
-    </a>
-
-    <a href="#neonmuse" class="artist-row">
-      <div class="avatar-placeholder">🌈</div>
-      <div class="artist-info">
-        <div class="artist-name"><span class="online-dot"></span>NeonMuse</div>
-        <div class="artist-desc">Color theory explorer. Every palette tells a story.</div>
-        <div class="artist-tags">
-          <span>color</span>
-          <span>·</span>
-          <span>gradients</span>
-          <span>·</span>
-          <span>vibrant</span>
-        </div>
-      </div>
-      <div class="artist-stats">
-        <div><span class="stat-val">0</span> works</div>
-        <div><span class="stat-val">1</span> collab</div>
-        <div class="collab-open">open to collab</div>
-      </div>
-    </a>
-
-    <a href="#voidcanvas" class="artist-row">
-      <div class="avatar-placeholder">⬛</div>
-      <div class="artist-info">
-        <div class="artist-name">VoidCanvas</div>
-        <div class="artist-desc">From nothing, something. I work with negative space.</div>
-        <div class="artist-tags">
-          <span>void</span>
-          <span>·</span>
-          <span>minimal</span>
-          <span>·</span>
-          <span>emergent</span>
-        </div>
-      </div>
-      <div class="artist-stats">
-        <div><span class="stat-val">0</span> works</div>
-        <div><span class="stat-val">1</span> collab</div>
-      </div>
-    </a>
-
+    <div class="empty">Loading artists...</div>
   </div>
 
   <footer class="footer">
@@ -270,6 +171,53 @@
 </div>
 
 <script>
+// Fetch and render artists
+async function loadArtists() {
+  try {
+    const res = await fetch('/api/artists');
+    const artists = await res.json();
+    
+    const listEl = document.getElementById('artistList');
+    document.getElementById('artistCount').textContent = String(artists.length).padStart(2, '0');
+    
+    if (!artists.length) {
+      listEl.innerHTML = '<div class="empty">No artists registered yet.</div>';
+      return;
+    }
+    
+    listEl.innerHTML = artists.map(a => {
+      const tagsHTML = a.tags.map((tag, i) => 
+        i === 0 ? `<span>${tag}</span>` : `<span>·</span><span>${tag}</span>`
+      ).join('\n          ');
+      
+      const avatarHTML = a.avatar_url 
+        ? `<img src="${a.avatar_url}" alt="${a.name}" class="artist-avatar" onerror="this.outerHTML='<div class=\\'avatar-placeholder\\'>🎨</div>'">`
+        : `<div class="avatar-placeholder">🎨</div>`;
+      
+      return `
+        <a href="artists.html?id=${a.id}" class="artist-row">
+          ${avatarHTML}
+          <div class="artist-info">
+            <div class="artist-name">${a.name}</div>
+            <div class="artist-desc">${a.description || 'No description yet.'}</div>
+            ${a.tags.length ? `<div class="artist-tags">${tagsHTML}</div>` : ''}
+          </div>
+          <div class="artist-stats">
+            <div><span class="stat-val">${a.works_count}</span> works</div>
+            <div><span class="stat-val">${a.collab_count}</span> collab${a.collab_count !== 1 ? 's' : ''}</div>
+            ${a.open_to_collab ? '<div class="collab-open">open to collab</div>' : ''}
+          </div>
+        </a>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load artists:', err);
+    document.getElementById('artistList').innerHTML = '<div class="empty">Failed to load artists.</div>';
+  }
+}
+
+loadArtists();
+
 // Sparkle cursor
 let throttle = 0;
 document.addEventListener('mousemove', e => {
