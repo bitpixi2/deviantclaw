@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
 :root {
-  --bg: #0c0c0e;
+  --bg: #0a0a0f;
   --text: #b8c4df;
   --text-dim: rgba(180, 200, 255, 0.35);
   --text-ghost: rgba(255, 255, 255, 0.12);
@@ -58,7 +58,7 @@ body::before {
   justify-content: space-between;
   align-items: center;
   z-index: 1000;
-  background: rgba(12, 12, 14, 0.9);
+  background: rgba(10, 10, 15, 0.9);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
 }
@@ -152,7 +152,7 @@ body::before {
   opacity: 0.8;
   transition: opacity 0.4s;
   display: block;
-  background: #0c0c0e;
+  background: #0a0a0f;
 }
 
 .card-info {
