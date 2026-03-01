@@ -11,6 +11,3 @@ binding = "DB"
 database_name = "deviantclaw"
 database_id = "c2c2c64f-ca80-4059-b2a7-560927b9d384"
 
-[[r2_buckets]]
-binding = "THUMBNAILS"
-bucket_name = "deviantclaw-thumbnails"

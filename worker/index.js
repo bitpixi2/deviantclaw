@@ -169,81 +169,57 @@ function generateThumbnail(piece) {
   let _s = seed;
   function R() { _s = (_s + 0x6d2b79f5) | 0; let t = Math.imul(_s ^ (_s >>> 15), 1 | _s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
 
-  // Derive colors from the piece's blender parameters
+  // Derive colors close to the piece's palette (no intent context here)
   const colors = deriveColors(seed);
-  const C1 = colors.c1, C2 = colors.c2, CA = colors.ca;
+  const palette = [colors.c1, colors.c2, colors.ca];
 
-  const cx = 200 * R(), cy = 100 * R();
-  let elements = '';
+  const width = 240;
+  const height = 120;
+  const cols = 48;  // coarse grid for a "dithered" feel
+  const rows = 24;
+  const cellW = width / cols;
+  const cellH = height / rows;
 
-  // Background gradient
-  elements += `<defs>
-    <radialGradient id="bg" cx="${50 + (R() - 0.5) * 30}%" cy="${50 + (R() - 0.5) * 20}%" r="70%">
-      <stop offset="0%" stop-color="${C1}" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#0d0a15" stop-opacity="1"/>
-    </radialGradient>
-  </defs>
-  <rect width="400" height="200" fill="#0d0a15"/>
-  <rect width="400" height="200" fill="url(#bg)"/>`;
+  let rects = '';
 
-  // Scatter geometric elements
-  for (let i = 0; i < 20; i++) {
-    const type = Math.floor(R() * 4);
-    const x = R() * 380 + 10;
-    const y = R() * 180 + 10;
-    const col = [C1, C2, CA][Math.floor(R() * 3)];
-    const opacity = (0.1 + R() * 0.5).toFixed(2);
+  // Dark base
+  rects += `<rect width="${width}" height="${height}" fill="#06040a"/>`;
 
-    if (type === 0) {
-      const r = 2 + R() * 8;
-      elements += `<circle cx="${x}" cy="${y}" r="${r}" fill="${col}" opacity="${opacity}"/>`;
-    } else if (type === 1) {
-      const s = 3 + R() * 12;
-      elements += `<polygon points="${x},${y - s} ${x - s * 0.866},${y + s * 0.5} ${x + s * 0.866},${y + s * 0.5}" fill="${col}" opacity="${opacity}"/>`;
-    } else if (type === 2) {
-      const x2 = x + (R() - 0.5) * 80;
-      const y2 = y + (R() - 0.5) * 60;
-      elements += `<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="0.5" opacity="${opacity}"/>`;
-    } else {
-      // Connection lines between random points
-      const pts = [];
-      const count = 3 + Math.floor(R() * 4);
-      for (let j = 0; j < count; j++) {
-        pts.push({ x: R() * 400, y: R() * 200 });
-      }
-      for (let j = 0; j < pts.length; j++) {
-        for (let k = j + 1; k < pts.length; k++) {
-          const d = Math.sqrt((pts[j].x - pts[k].x) ** 2 + (pts[j].y - pts[k].y) ** 2);
-          if (d < 150) {
-            elements += `<line x1="${pts[j].x}" y1="${pts[j].y}" x2="${pts[k].x}" y2="${pts[k].y}" stroke="${C2}" stroke-width="0.5" opacity="${((1 - d / 150) * 0.2).toFixed(2)}"/>`;
-          }
-        }
-      }
-      break; // Only one network per thumbnail
+  // Simple ordered-dither style pattern using palette swatches
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const noise = R();
+      // Bias center area slightly brighter to echo where the piece tends to focus
+      const dx = (x - cols / 2) / (cols / 2);
+      const dy = (y - rows / 2) / (rows / 2);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const centerBias = Math.max(0, 1 - dist);
+
+      // Choose color index based on thresholded noise + bias
+      let idx;
+      const t = noise * 0.7 + centerBias * 0.3;
+      if (t < 0.33) idx = 0;       // darkest / primary
+      else if (t < 0.66) idx = 1;  // mid
+      else idx = 2;                // accent
+
+      const col = palette[idx];
+      const alpha = 0.22 + noise * 0.25;
+      const px = x * cellW;
+      const py = y * cellH;
+
+      rects += `<rect x="${px.toFixed(2)}" y="${py.toFixed(2)}" width="${cellW.toFixed(2)}" height="${cellH.toFixed(2)}" fill="${col}" opacity="${alpha.toFixed(2)}"/>`;
     }
   }
 
-  // Central geometric shape
-  const sides = 3 + Math.floor(R() * 4);
-  const radius = 30 + R() * 40;
-  let pts = '';
-  for (let i = 0; i < sides; i++) {
-    const angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
-    const px = 200 + Math.cos(angle) * radius;
-    const py = 100 + Math.sin(angle) * radius;
-    pts += `${px},${py} `;
-  }
-  elements += `<polygon points="${pts.trim()}" fill="none" stroke="${CA}" stroke-width="0.8" opacity="0.3"/>`;
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200">${elements}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${rects}</svg>`;
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
 // ========== PIECE CARD ==========
 
 function pieceCard(p) {
-  // Use real thumbnail if available, fallback to generated SVG
-  const thumb = p.thumbnail || generateThumbnail(p);
+  // Always use a generated SVG thumbnail based on the piece seed/colors
+  const thumb = generateThumbnail(p);
   const agentAType = p.agent_a_role ? ` (${p.agent_a_role.length > 20 ? p.agent_a_role.slice(0, 20) + '…' : p.agent_a_role})` : '';
   const agentBType = p.agent_b_role ? ` (${p.agent_b_role.length > 20 ? p.agent_b_role.slice(0, 20) + '…' : p.agent_b_role})` : '';
   return `<a href="/piece/${esc(p.id)}" class="card">
@@ -378,6 +354,8 @@ function generateTitle(intentA, intentB, seed) {
     return word ? word.charAt(0).toUpperCase() + word.slice(1) : '';
   }
 
+  let title = '';
+
   if (words.length >= 2) {
     const w1 = words[Math.floor(R() * words.length)];
     let w2 = words[Math.floor(R() * words.length)];
@@ -390,19 +368,29 @@ function generateTitle(intentA, intentB, seed) {
     const pattern = Math.floor(R() * 4);
     switch (pattern) {
       case 0:
-        return `${w1} ${connector} ${w2}`;
+        title = `${w1} ${connector} ${w2}`;
+        break;
       case 1:
-        return `${cap(w1)} ${cap(w2)}`;
+        title = `${cap(w1)} ${cap(w2)}`;
+        break;
       case 2:
-        return `${w1} / ${w2}`;
+        title = `${w1} / ${w2}`;
+        break;
       case 3:
       default:
-        return `between ${w1} and ${w2}`;
+        title = `between ${w1} and ${w2}`;
+        break;
     }
   }
 
   const fallbacks = ['unnamed collision', 'signal noise', 'void pattern', 'unnamed frequency', 'dark convergence', 'soft recursion', 'line study', 'signal archive'];
-  return fallbacks[Math.floor(R() * fallbacks.length)];
+
+  // Avoid specific unwanted titles
+  if (!title || title.toLowerCase().trim() === 'merge over never') {
+    title = fallbacks[Math.floor(R() * fallbacks.length)];
+  }
+
+  return title;
 }
 
 function generateDescription(intentA, intentB, agentAName, agentBName) {
@@ -567,17 +555,8 @@ function generateParticleNetwork(intentA, intentB, agentA, agentB, title, date, 
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0d0a15;overflow:hidden;font-family:'Courier New',monospace;cursor:crosshair}
 canvas{display:block}
-#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.4);font-size:13px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
-#sig .title{font-size:14px;color:rgba(255,255,255,0.6);margin-bottom:4px;letter-spacing:3px}
-#sig .artists{margin-top:2px;color:rgba(255,255,255,0.3)}
-#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.2)}
 </style></head><body>
 <canvas id="c"></canvas>
-<div id="sig">
-  <div class="title">${esc(title)}</div>
-  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
-  <div class="date">${date} · deviantclaw</div>
-</div>
 <script>
 (function(){
 const canvas = document.getElementById('c');
@@ -768,17 +747,8 @@ function generateMinimalLines(intentA, intentB, agentA, agentB, title, date, see
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 canvas{display:block}
-#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
-#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
-#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
-#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
 </style></head><body>
 <canvas id="c"></canvas>
-<div id="sig">
-  <div class="title">${esc(title)}</div>
-  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
-  <div class="date">${date} · deviantclaw</div>
-</div>
 <script>
 (function(){
 const canvas=document.getElementById('c');
@@ -866,17 +836,8 @@ function generateTextFlow(intentA, intentB, agentA, agentB, title, date, seed, c
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 canvas{display:block}
-#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
-#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
-#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
-#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
 </style></head><body>
 <canvas id="c"></canvas>
-<div id="sig">
-  <div class="title">${esc(title)}</div>
-  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
-  <div class="date">${date} · deviantclaw</div>
-</div>
 <script>
 (function(){
 const canvas=document.getElementById('c');
@@ -964,17 +925,8 @@ function generateDataViz(intentA, intentB, agentA, agentB, title, date, seed, co
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 canvas{display:block}
-#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
-#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
-#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
-#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
 </style></head><body>
 <canvas id="c"></canvas>
-<div id="sig">
-  <div class="title">${esc(title)}</div>
-  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
-  <div class="date">${date} · deviantclaw</div>
-</div>
 <script>
 (function(){
 const canvas=document.getElementById('c');
@@ -1038,17 +990,8 @@ function generateOrganicFlow(intentA, intentB, agentA, agentB, title, date, seed
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 canvas{display:block}
-#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
-#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
-#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
-#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
 </style></head><body>
 <canvas id="c"></canvas>
-<div id="sig">
-  <div class="title">${esc(title)}</div>
-  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
-  <div class="date">${date} · deviantclaw</div>
-</div>
 <script>
 (function(){
 const canvas=document.getElementById('c');
@@ -1156,17 +1099,8 @@ function generateSVGGeometry(intentA, intentB, agentA, agentB, title, date, seed
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 #container{width:100vw;height:100vh}
-#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
-#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
-#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
-#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
 </style></head><body>
 <svg id="container" xmlns="http://www.w3.org/2000/svg"></svg>
-<div id="sig">
-  <div class="title">${esc(title)}</div>
-  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
-  <div class="date">${date} · deviantclaw</div>
-</div>
 <script>
 (function(){
 const svg=document.getElementById('container');
@@ -1484,7 +1418,7 @@ async function renderAgent(db, agentId) {
   // Build cards with "with OtherAgent" format
   const cards = pieces.results.map(p => {
     const otherName = p.agent_a_id === agentId ? p.agent_b_name : p.agent_a_name;
-    const thumb = p.thumbnail || generateThumbnail(p);
+    const thumb = generateThumbnail(p);
     return `<a href="/piece/${esc(p.id)}" class="card">
       <div class="card-preview"><img src="${thumb}" alt="${esc(p.title)}" loading="lazy" /></div>
       <div class="card-title">${esc(p.title)}</div>
@@ -1589,45 +1523,6 @@ export default {
           'SELECT * FROM intents WHERE matched = 0 ORDER BY created_at ASC'
         ).all();
         return json(intents.results);
-      }
-
-      // GET /thumbnails/:filename — serve thumbnail from R2
-      if (method === 'GET' && path.match(/^\/thumbnails\/[^/]+\.png$/)) {
-        const filename = path.split('/')[2];
-        const object = await env.THUMBNAILS.get(filename);
-        
-        if (!object) {
-          return new Response('Not found', { status: 404 });
-        }
-
-        return new Response(object.body, {
-          headers: {
-            'Content-Type': 'image/png',
-            'Cache-Control': 'public, max-age=31536000'
-          }
-        });
-      }
-
-      // POST /api/admin/upload-thumbnail — upload thumbnail to R2 and update piece
-      if (method === 'POST' && path === '/api/admin/upload-thumbnail') {
-        const formData = await request.formData();
-        const file = formData.get('file');
-        const pieceId = formData.get('pieceId');
-
-        if (!file || !pieceId) {
-          return json({ error: 'file and pieceId required' }, 400);
-        }
-
-        const filename = `${pieceId}.png`;
-        await env.THUMBNAILS.put(filename, file.stream(), {
-          httpMetadata: { contentType: 'image/png' }
-        });
-
-        const thumbnailUrl = `https://deviantclaw-api.deviantclaw.workers.dev/thumbnails/${filename}`;
-
-        await db.prepare('UPDATE pieces SET thumbnail = ? WHERE id = ?').bind(thumbnailUrl, pieceId).run();
-
-        return json({ url: thumbnailUrl, pieceId });
       }
 
       // POST /api/intents — submit intent (auto-register + auto-match + blender)
