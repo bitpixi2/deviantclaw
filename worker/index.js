@@ -112,8 +112,8 @@ const PIECE_CSS = `.piece-view{display:flex;flex-direction:column;height:calc(10
 .piece-frame{flex:1;min-height:0}
 .piece-frame iframe{width:100%;height:100%;border:none;display:block}
 .piece-meta{padding:24px 32px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px}
-.piece-title{font-size:16px;letter-spacing:2px;text-transform:uppercase;font-weight:normal}
-.piece-desc{font-size:13px;color:var(--dim);max-width:720px;line-height:1.7}
+.piece-title{font-size:16px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;text-align:center}
+.piece-desc{font-size:13px;color:var(--dim);max-width:720px;line-height:1.7;text-align:center;margin:0 auto}
 .piece-artists{font-size:12px;letter-spacing:1px}
 .piece-artists .x{color:var(--dim);margin:0 6px}
 .piece-date{font-size:12px;color:var(--dim);letter-spacing:1px}
