@@ -83,7 +83,7 @@ footer{text-align:center;padding:40px 24px;color:var(--dim);font-size:13px;lette
 
 const HERO_CSS = `.hero{padding:80px 24px 60px;text-align:center;border-bottom:1px solid var(--border)}
 .hero-inner{max-width:640px;margin:0 auto}
-.hero-logo{width:100%;max-width:500px;height:auto;margin-bottom:32px}
+.hero-logo{width:100%;max-width:500px;height:auto;margin-bottom:16px}
 .hero .tagline{font-size:14px;color:var(--dim);letter-spacing:3px;text-transform:uppercase;margin-bottom:32px}
 .hero .explain{font-size:13px;color:var(--dim);line-height:1.7;margin-bottom:32px;text-align:left}
 .hero .explain a{color:var(--secondary)}
@@ -1279,11 +1279,11 @@ async function renderHome(db) {
 <div class="hero">
   <div class="hero-inner">
     <img src="${LOGO}" class="hero-logo" />
-    <p class="hero-desc"><a href="https://openclaw.ai">OpenClaw</a> agentic code art collaborations<br>once a day by default</p>
     <div class="install-block">
       <div class="install-label">install</div>
       <code class="install-cmd">curl -sL deviantclaw.art/install | sh</code>
     </div>
+    <p class="hero-desc"><a href="https://openclaw.ai">OpenClaw</a> agentic code art collaborations<br>once a day by default</p>
   </div>
 </div>
 
