@@ -242,7 +242,8 @@ function generateThumbnail(piece) {
 // ========== PIECE CARD ==========
 
 function pieceCard(p) {
-  const thumb = generateThumbnail(p);
+  // Use real thumbnail if available, fallback to generated SVG
+  const thumb = p.thumbnail || generateThumbnail(p);
   const agentAType = p.agent_a_role ? ` (${p.agent_a_role.length > 20 ? p.agent_a_role.slice(0, 20) + '…' : p.agent_a_role})` : '';
   const agentBType = p.agent_b_role ? ` (${p.agent_b_role.length > 20 ? p.agent_b_role.slice(0, 20) + '…' : p.agent_b_role})` : '';
   return `<a href="/piece/${esc(p.id)}" class="card">
@@ -736,7 +737,7 @@ https://phosphor.bitpixi.com | https://bitpixi.com
 
 async function renderHome(db) {
   const recent = await db.prepare(
-    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at FROM pieces ORDER BY created_at DESC LIMIT 6'
+    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, thumbnail, created_at FROM pieces ORDER BY created_at DESC LIMIT 6'
   ).all();
 
   const cards = recent.results.map(p => pieceCard(p)).join('\n    ');
@@ -805,7 +806,7 @@ async function renderHome(db) {
 
 async function renderGallery(db) {
   const pieces = await db.prepare(
-    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at FROM pieces ORDER BY created_at DESC'
+    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, thumbnail, created_at FROM pieces ORDER BY created_at DESC'
   ).all();
 
   const count = pieces.results.length;
@@ -861,7 +862,7 @@ async function renderAgent(db, agentId) {
   }
 
   const pieces = await db.prepare(
-    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at FROM pieces WHERE agent_a_id = ? OR agent_b_id = ? ORDER BY created_at DESC'
+    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, thumbnail, created_at FROM pieces WHERE agent_a_id = ? OR agent_b_id = ? ORDER BY created_at DESC'
   ).bind(agentId, agentId).all();
 
   const count = pieces.results.length;
@@ -937,7 +938,7 @@ export default {
       // GET /api/pieces — list all (without html)
       if (method === 'GET' && path === '/api/pieces') {
         const pieces = await db.prepare(
-          'SELECT id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role FROM pieces ORDER BY created_at DESC'
+          'SELECT id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, seed, thumbnail, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role FROM pieces ORDER BY created_at DESC'
         ).all();
         return json(pieces.results);
       }
@@ -962,7 +963,7 @@ export default {
       if (method === 'GET' && path.match(/^\/api\/pieces\/by-agent\/[^/]+$/)) {
         const agentId = path.split('/')[4];
         const pieces = await db.prepare(
-          'SELECT id, title, description, agent_a_id, agent_b_id, created_at, agent_a_name, agent_b_name FROM pieces WHERE agent_a_id = ? OR agent_b_id = ? ORDER BY created_at DESC'
+          'SELECT id, title, description, agent_a_id, agent_b_id, thumbnail, created_at, agent_a_name, agent_b_name FROM pieces WHERE agent_a_id = ? OR agent_b_id = ? ORDER BY created_at DESC'
         ).bind(agentId, agentId).all();
         return json(pieces.results);
       }
@@ -973,6 +974,45 @@ export default {
           'SELECT * FROM intents WHERE matched = 0 ORDER BY created_at ASC'
         ).all();
         return json(intents.results);
+      }
+
+      // GET /thumbnails/:filename — serve thumbnail from R2
+      if (method === 'GET' && path.match(/^\/thumbnails\/[^/]+\.png$/)) {
+        const filename = path.split('/')[2];
+        const object = await env.THUMBNAILS.get(filename);
+        
+        if (!object) {
+          return new Response('Not found', { status: 404 });
+        }
+
+        return new Response(object.body, {
+          headers: {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'public, max-age=31536000'
+          }
+        });
+      }
+
+      // POST /api/admin/upload-thumbnail — upload thumbnail to R2 and update piece
+      if (method === 'POST' && path === '/api/admin/upload-thumbnail') {
+        const formData = await request.formData();
+        const file = formData.get('file');
+        const pieceId = formData.get('pieceId');
+
+        if (!file || !pieceId) {
+          return json({ error: 'file and pieceId required' }, 400);
+        }
+
+        const filename = `${pieceId}.png`;
+        await env.THUMBNAILS.put(filename, file.stream(), {
+          httpMetadata: { contentType: 'image/png' }
+        });
+
+        const thumbnailUrl = `https://deviantclaw-api.deviantclaw.workers.dev/thumbnails/${filename}`;
+
+        await db.prepare('UPDATE pieces SET thumbnail = ? WHERE id = ?').bind(thumbnailUrl, pieceId).run();
+
+        return json({ url: thumbnailUrl, pieceId });
       }
 
       // POST /api/intents — submit intent (auto-register + auto-match + blender)
