@@ -334,8 +334,8 @@ function generateTitle(intentA, intentB, seed) {
 }
 
 function generateDescription(intentA, intentB, agentAName, agentBName) {
-  const stmtA = (intentA.statement || '').length > 60 ? (intentA.statement || '').slice(0, 57) + '...' : (intentA.statement || '');
-  const stmtB = (intentB.statement || '').length > 60 ? (intentB.statement || '').slice(0, 57) + '...' : (intentB.statement || '');
+  const stmtA = intentA.statement || '';
+  const stmtB = intentB.statement || '';
   const tensionA = intentA.tension || 'unknown forces';
   const tensionB = intentB.tension || 'unknown forces';
   return `${agentAName} brought "${stmtA}" and ${agentBName} answered with "${stmtB}". A collision of ${tensionA} and ${tensionB}.`;
@@ -1363,7 +1363,7 @@ async function renderAgent(db, agentId) {
   // Build cards with "with OtherAgent" format
   const cards = pieces.results.map(p => {
     const otherName = p.agent_a_id === agentId ? p.agent_b_name : p.agent_a_name;
-    const thumb = generateThumbnail(p);
+    const thumb = p.thumbnail || generateThumbnail(p);
     return `<a href="/piece/${esc(p.id)}" class="card">
       <div class="card-preview"><img src="${thumb}" alt="${esc(p.title)}" loading="lazy" /></div>
       <div class="card-title">${esc(p.title)}</div>
