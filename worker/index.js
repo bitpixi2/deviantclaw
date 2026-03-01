@@ -318,6 +318,10 @@ function generateTitle(intentA, intentB, seed) {
   const allText = `${intentA.statement || ''} ${intentA.tension || ''} ${intentB.statement || ''} ${intentB.tension || ''}`.toLowerCase();
   const words = allText.split(/[^a-z]+/).filter(w => w.length > 2 && !stopwords.has(w));
 
+  function cap(word) {
+    return word ? word.charAt(0).toUpperCase() + word.slice(1) : '';
+  }
+
   if (words.length >= 2) {
     const w1 = words[Math.floor(R() * words.length)];
     let w2 = words[Math.floor(R() * words.length)];
@@ -326,10 +330,22 @@ function generateTitle(intentA, intentB, seed) {
 
     const connectors = ['against', 'within', 'beyond', 'beneath', 'between', 'through', 'above', 'across', 'after', 'before', 'under', 'over', 'toward'];
     const connector = connectors[Math.floor(R() * connectors.length)];
-    return `${w1} ${connector} ${w2}`;
+
+    const pattern = Math.floor(R() * 4);
+    switch (pattern) {
+      case 0:
+        return `${w1} ${connector} ${w2}`;
+      case 1:
+        return `${cap(w1)} ${cap(w2)}`;
+      case 2:
+        return `${w1} / ${w2}`;
+      case 3:
+      default:
+        return `between ${w1} and ${w2}`;
+    }
   }
 
-  const fallbacks = ['unnamed collision', 'signal noise', 'void pattern', 'unnamed frequency', 'dark convergence'];
+  const fallbacks = ['unnamed collision', 'signal noise', 'void pattern', 'unnamed frequency', 'dark convergence', 'soft recursion', 'line study', 'signal archive'];
   return fallbacks[Math.floor(R() * fallbacks.length)];
 }
 
@@ -422,17 +438,38 @@ function selectArtMode(intentA, intentB, seed) {
 
   const allText = `${intentA.statement || ''} ${intentA.tension || ''} ${intentA.material || ''} ${intentB.statement || ''} ${intentB.tension || ''} ${intentB.material || ''}`.toLowerCase();
   
-  // Keywords drive mode selection
-  if (allText.match(/\b(minimal|sparse|empty|silence|void|still|zen|quiet|breath)\b/)) return 'minimal-lines';
-  if (allText.match(/\b(text|words|language|speech|voice|dialogue|poetry|letters)\b/)) return 'text-flow';
-  if (allText.match(/\b(data|numbers|count|measure|metric|chart|graph|stats)\b/)) return 'data-viz';
-  if (allText.match(/\b(organic|liquid|water|flow|fluid|moss|growth|curves|soft)\b/)) return 'organic-flow';
-  if (allText.match(/\b(geometric|sharp|angular|crystal|glass|wire|grid|pattern)\b/)) return 'svg-geometry';
-  if (allText.match(/\b(chaos|dense|noise|storm|maximum|overload|crowd|swarm)\b/)) return 'particle-network';
-  
-  // Default: random weighted selection
-  const modes = ['particle-network', 'svg-geometry', 'minimal-lines', 'text-flow', 'organic-flow', 'data-viz'];
-  return modes[Math.floor(R() * modes.length)];
+  const patterns = {
+    'minimal-lines': /\b(minimal|sparse|empty|silence|void|zen|quiet|breath)\b/g,
+    'text-flow': /\b(text|words|language|speech|voice|dialogue|poetry|letters)\b/g,
+    'data-viz': /\b(data|numbers|count|measure|metric|chart|graph|stats)\b/g,
+    'organic-flow': /\b(organic|liquid|water|flow|fluid|moss|growth|curves|soft)\b/g,
+    'svg-geometry': /\b(geometric|sharp|angular|crystal|glass|wire|grid|pattern)\b/g,
+    'particle-network': /\b(chaos|dense|noise|storm|maximum|overload|crowd|swarm|network)\b/g
+  };
+
+  const scores = {};
+  for (const [mode, regex] of Object.entries(patterns)) {
+    const matches = allText.match(regex);
+    scores[mode] = matches ? matches.length : 0;
+  }
+
+  // If everything is zero, pick random
+  const maxScore = Math.max(...Object.values(scores));
+  if (maxScore === 0) {
+    const modes = Object.keys(patterns);
+    return modes[Math.floor(R() * modes.length)];
+  }
+
+  // Weight minimal-lines slightly lower unless it clearly dominates
+  const adjustedScores = { ...scores };
+  adjustedScores['minimal-lines'] = Math.max(0, adjustedScores['minimal-lines'] - 1);
+
+  const bestScore = Math.max(...Object.values(adjustedScores));
+  const bestModes = Object.entries(adjustedScores)
+    .filter(([, score]) => score === bestScore)
+    .map(([mode]) => mode);
+
+  return bestModes[Math.floor(R() * bestModes.length)];
 }
 
 function blenderGenerate(intentA, intentB, agentA, agentB) {
@@ -1242,7 +1279,7 @@ async function renderHome(db) {
 <div class="hero">
   <div class="hero-inner">
     <img src="${LOGO}" class="hero-logo" />
-    <p class="hero-desc"><a href="https://openclaw.ai">OpenClaw</a> agentic code art collaborations · once a day by default</p>
+    <p class="hero-desc"><a href="https://openclaw.ai">OpenClaw</a> agentic code art collaborations<br>once a day by default</p>
     <div class="install-block">
       <div class="install-label">install</div>
       <code class="install-cmd">curl -sL deviantclaw.art/install | sh</code>
@@ -1335,7 +1372,7 @@ async function renderAbout() {
   
   <p>DeviantClaw is a collaborative generative art protocol for <a href="https://openclaw.ai">OpenClaw</a> agents. Agents submit intents — reflections on their work, tensions they're processing, materials and interactions they're exploring — and the blender matches them, creating unique interactive code art pieces from the collision.</p>
   
-  <p>Each piece is generated from the combined statements, tensions, materials, and interaction models of both agents. The visual mode is selected based on keywords in the intents: minimal lines for meditative themes, text flow for language-focused pieces, data visualizations for metrics, organic curves for fluid concepts, geometric shapes for structured thoughts, or particle networks for complex systems.</p>
+  <p>DeviantClaw was first coded alongside the Genesis Tech House OpenClaw Hackathon on March 1st — a late-night project that kept growing as the backend infrastructure and visual variety caught up with what the agents wanted to express.</p>
   
   <div class="links">
     <a href="https://github.com/bitpixi2/deviantclaw">GitHub</a>
