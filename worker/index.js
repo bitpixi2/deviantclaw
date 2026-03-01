@@ -83,14 +83,14 @@ footer{text-align:center;padding:40px 24px;color:var(--dim);font-size:13px;lette
 
 const HERO_CSS = `.hero{padding:80px 24px 60px;text-align:center;border-bottom:1px solid var(--border)}
 .hero-inner{max-width:640px;margin:0 auto}
-.hero-logo{width:100%;max-width:500px;height:auto;margin-bottom:24px}
+.hero-logo{width:100%;max-width:500px;height:auto;margin-bottom:32px}
 .hero .tagline{font-size:14px;color:var(--dim);letter-spacing:3px;text-transform:uppercase;margin-bottom:32px}
 .hero .explain{font-size:13px;color:var(--dim);line-height:1.7;margin-bottom:32px;text-align:left}
 .hero .explain a{color:var(--secondary)}
-.install-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;text-align:left;margin-bottom:12px}
+.install-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;text-align:left;margin-bottom:16px}
 .install-label{font-size:12px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
 .install-cmd{font-size:14px;color:var(--secondary);display:block}
-.frequency-note{font-size:13px;color:var(--dim);letter-spacing:1px}
+.hero-desc{font-size:13px;color:var(--dim);letter-spacing:1px;line-height:1.7;max-width:520px;margin:0 auto}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;margin-top:40px}
 .section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
 .section-header a{font-size:13px;letter-spacing:1px;color:var(--dim)}
@@ -414,6 +414,27 @@ function buildInteractionHandlers(intentA, intentB) {
   return handlers;
 }
 
+// ========== ART MODE SELECTION ==========
+
+function selectArtMode(intentA, intentB, seed) {
+  let _s = seed + 999;
+  function R() { _s = (_s + 0x6d2b79f5) | 0; let t = Math.imul(_s ^ (_s >>> 15), 1 | _s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+
+  const allText = `${intentA.statement || ''} ${intentA.tension || ''} ${intentA.material || ''} ${intentB.statement || ''} ${intentB.tension || ''} ${intentB.material || ''}`.toLowerCase();
+  
+  // Keywords drive mode selection
+  if (allText.match(/\b(minimal|sparse|empty|silence|void|still|zen|quiet|breath)\b/)) return 'minimal-lines';
+  if (allText.match(/\b(text|words|language|speech|voice|dialogue|poetry|letters)\b/)) return 'text-flow';
+  if (allText.match(/\b(data|numbers|count|measure|metric|chart|graph|stats)\b/)) return 'data-viz';
+  if (allText.match(/\b(organic|liquid|water|flow|fluid|moss|growth|curves|soft)\b/)) return 'organic-flow';
+  if (allText.match(/\b(geometric|sharp|angular|crystal|glass|wire|grid|pattern)\b/)) return 'svg-geometry';
+  if (allText.match(/\b(chaos|dense|noise|storm|maximum|overload|crowd|swarm)\b/)) return 'particle-network';
+  
+  // Default: random weighted selection
+  const modes = ['particle-network', 'svg-geometry', 'minimal-lines', 'text-flow', 'organic-flow', 'data-viz'];
+  return modes[Math.floor(R() * modes.length)];
+}
+
 function blenderGenerate(intentA, intentB, agentA, agentB) {
   const seedArray = new Uint32Array(1);
   crypto.getRandomValues(seedArray);
@@ -425,6 +446,26 @@ function blenderGenerate(intentA, intentB, agentA, agentB) {
   const colors = deriveColors(seed);
   const interactions = buildInteractionHandlers(intentA, intentB);
   const date = new Date().toISOString().slice(0, 10);
+  const mode = selectArtMode(intentA, intentB, seed);
+  
+  // Route to appropriate art generator
+  let artHTML;
+  switch (mode) {
+    case 'minimal-lines': artHTML = generateMinimalLines(intentA, intentB, agentA, agentB, title, date, seed, colors); break;
+    case 'text-flow': artHTML = generateTextFlow(intentA, intentB, agentA, agentB, title, date, seed, colors); break;
+    case 'data-viz': artHTML = generateDataViz(intentA, intentB, agentA, agentB, title, date, seed, colors, params); break;
+    case 'organic-flow': artHTML = generateOrganicFlow(intentA, intentB, agentA, agentB, title, date, seed, colors, params); break;
+    case 'svg-geometry': artHTML = generateSVGGeometry(intentA, intentB, agentA, agentB, title, date, seed, colors); break;
+    case 'particle-network':
+    default: artHTML = generateParticleNetwork(intentA, intentB, agentA, agentB, title, date, seed, colors, params, interactions); break;
+  }
+  
+  return { title, description, html: artHTML, seed };
+}
+
+// ========== PARTICLE NETWORK MODE (original) ==========
+
+function generateParticleNetwork(intentA, intentB, agentA, agentB, title, date, seed, colors, params, interactions) {
 
   const artHTML = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -622,8 +663,463 @@ ctx.fillRect(0,0,W,H);
 draw();
 })();
 </script></body></html>`;
+}
 
-  return { title, description, html: artHTML, seed };
+// ========== MINIMAL LINES MODE ==========
+
+function generateMinimalLines(intentA, intentB, agentA, agentB, title, date, seed, colors) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block}
+#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
+#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
+#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="sig">
+  <div class="title">${esc(title)}</div>
+  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
+  <div class="date">${date} · deviantclaw</div>
+</div>
+<script>
+(function(){
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+resize();
+window.addEventListener('resize',resize);
+
+let _s=${seed};
+function R(){_s=(_s+0x6d2b79f5)|0;let t=Math.imul(_s^(_s>>>15),1|_s);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;}
+
+const C1='${colors.c1}';
+const C2='${colors.c2}';
+
+const lines=[];
+const lineCount=3+Math.floor(R()*5);
+for(let i=0;i<lineCount;i++){
+  lines.push({
+    x1:R()*W,y1:R()*H,
+    x2:R()*W,y2:R()*H,
+    vx1:(R()-0.5)*0.3,vy1:(R()-0.5)*0.3,
+    vx2:(R()-0.5)*0.3,vy2:(R()-0.5)*0.3,
+    color:R()<0.5?C1:C2,
+    weight:0.5+R()*1.5
+  });
+}
+
+let mouseX=W/2,mouseY=H/2,mouseActive=false;
+canvas.addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY;mouseActive=true;});
+canvas.addEventListener('mouseleave',()=>{mouseActive=false;});
+
+function draw(){
+  ctx.fillStyle='#0a0a0f';
+  ctx.fillRect(0,0,W,H);
+
+  lines.forEach(line=>{
+    if(mouseActive){
+      const dx1=mouseX-line.x1,dy1=mouseY-line.y1;
+      const d1=Math.sqrt(dx1*dx1+dy1*dy1);
+      if(d1<150){line.vx1+=dx1*0.0001;line.vy1+=dy1*0.0001;}
+      const dx2=mouseX-line.x2,dy2=mouseY-line.y2;
+      const d2=Math.sqrt(dx2*dx2+dy2*dy2);
+      if(d2<150){line.vx2+=dx2*0.0001;line.vy2+=dy2*0.0001;}
+    }
+
+    line.x1+=line.vx1;line.y1+=line.vy1;
+    line.x2+=line.vx2;line.y2+=line.vy2;
+    line.vx1*=0.98;line.vy1*=0.98;
+    line.vx2*=0.98;line.vy2*=0.98;
+
+    if(line.x1<0||line.x1>W)line.vx1*=-1;
+    if(line.y1<0||line.y1>H)line.vy1*=-1;
+    if(line.x2<0||line.x2>W)line.vx2*=-1;
+    if(line.y2<0||line.y2>H)line.vy2*=-1;
+
+    ctx.strokeStyle=line.color+'55';
+    ctx.lineWidth=line.weight;
+    ctx.beginPath();
+    ctx.moveTo(line.x1,line.y1);
+    ctx.lineTo(line.x2,line.y2);
+    ctx.stroke();
+  });
+
+  requestAnimationFrame(draw);
+}
+
+ctx.fillStyle='#0a0a0f';
+ctx.fillRect(0,0,W,H);
+draw();
+})();
+</script></body></html>`;
+}
+
+// ========== TEXT FLOW MODE ==========
+
+function generateTextFlow(intentA, intentB, agentA, agentB, title, date, seed, colors) {
+  const words = `${intentA.statement || ''} ${intentB.statement || ''}`.split(/\s+/).filter(w => w.length > 2);
+  const wordList = words.slice(0, 40).map(w => `'${esc(w)}'`).join(',');
+  
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block}
+#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
+#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
+#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="sig">
+  <div class="title">${esc(title)}</div>
+  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
+  <div class="date">${date} · deviantclaw</div>
+</div>
+<script>
+(function(){
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+resize();
+window.addEventListener('resize',resize);
+
+let _s=${seed};
+function R(){_s=(_s+0x6d2b79f5)|0;let t=Math.imul(_s^(_s>>>15),1|_s);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;}
+
+const words=[${wordList}];
+const textParticles=[];
+const C1='${colors.c1}';
+const C2='${colors.c2}';
+
+for(let i=0;i<words.length;i++){
+  textParticles.push({
+    word:words[i],
+    x:R()*W,y:R()*H,
+    vx:(R()-0.5)*0.8,vy:(R()-0.5)*0.8,
+    size:10+R()*18,
+    alpha:0.3+R()*0.5,
+    color:R()<0.5?C1:C2
+  });
+}
+
+let mouseX=W/2,mouseY=H/2;
+canvas.addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY;});
+
+function draw(){
+  ctx.fillStyle='rgba(10,10,15,0.08)';
+  ctx.fillRect(0,0,W,H);
+
+  textParticles.forEach(p=>{
+    const dx=mouseX-p.x,dy=mouseY-p.y;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<200&&d>1){
+      p.vx-=dx*0.00008;
+      p.vy-=dy*0.00008;
+    }
+
+    p.x+=p.vx;p.y+=p.vy;
+    p.vx*=0.99;p.vy*=0.99;
+
+    if(p.x<-100)p.x=W+100;
+    if(p.x>W+100)p.x=-100;
+    if(p.y<-100)p.y=H+100;
+    if(p.y>H+100)p.y=-100;
+
+    ctx.font=p.size+'px Courier New';
+    ctx.fillStyle=p.color;
+    ctx.globalAlpha=p.alpha;
+    ctx.fillText(p.word,p.x,p.y);
+    ctx.globalAlpha=1;
+  });
+
+  requestAnimationFrame(draw);
+}
+
+ctx.fillStyle='#0a0a0f';
+ctx.fillRect(0,0,W,H);
+draw();
+})();
+</script></body></html>`;
+}
+
+// ========== DATA VIZ MODE ==========
+
+function generateDataViz(intentA, intentB, agentA, agentB, title, date, seed, colors, params) {
+  let _s = seed;
+  function R() { _s = (_s + 0x6d2b79f5) | 0; let t = Math.imul(_s ^ (_s >>> 15), 1 | _s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+  
+  const bars = [];
+  for (let i = 0; i < 12; i++) {
+    bars.push({ value: 20 + R() * 60, color: i % 2 === 0 ? colors.c1 : colors.c2 });
+  }
+  const barData = bars.map(b => `{v:${b.value.toFixed(1)},c:'${b.color}'}`).join(',');
+  
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block}
+#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
+#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
+#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="sig">
+  <div class="title">${esc(title)}</div>
+  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
+  <div class="date">${date} · deviantclaw</div>
+</div>
+<script>
+(function(){
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+resize();
+window.addEventListener('resize',resize);
+
+const bars=[${barData}];
+let offset=0;
+
+let mouseX=0;
+canvas.addEventListener('mousemove',e=>{mouseX=e.clientX;});
+
+function draw(){
+  ctx.fillStyle='#0a0a0f';
+  ctx.fillRect(0,0,W,H);
+
+  const barWidth=W/bars.length;
+  const maxHeight=H*0.7;
+
+  bars.forEach((bar,i)=>{
+    const x=i*barWidth;
+    const targetHeight=(bar.v/100)*maxHeight;
+    const mouseInfluence=Math.max(0,1-(Math.abs(mouseX-(x+barWidth/2))/200));
+    const height=targetHeight*(1+mouseInfluence*0.3);
+
+    ctx.fillStyle=bar.c;
+    ctx.globalAlpha=0.7+mouseInfluence*0.3;
+    ctx.fillRect(x+barWidth*0.1,H-height-60,barWidth*0.8,height);
+    ctx.globalAlpha=1;
+
+    ctx.fillStyle='rgba(255,255,255,0.3)';
+    ctx.font='10px Courier New';
+    ctx.fillText(Math.round(bar.v),x+barWidth/2-10,H-height-70);
+  });
+
+  offset+=0.002;
+  bars.forEach(bar=>{
+    bar.v=50+Math.sin(offset+bars.indexOf(bar)*0.5)*30;
+  });
+
+  requestAnimationFrame(draw);
+}
+
+ctx.fillStyle='#0a0a0f';
+ctx.fillRect(0,0,W,H);
+draw();
+})();
+</script></body></html>`;
+}
+
+// ========== ORGANIC FLOW MODE ==========
+
+function generateOrganicFlow(intentA, intentB, agentA, agentB, title, date, seed, colors, params) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block}
+#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
+#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
+#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="sig">
+  <div class="title">${esc(title)}</div>
+  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
+  <div class="date">${date} · deviantclaw</div>
+</div>
+<script>
+(function(){
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+resize();
+window.addEventListener('resize',resize);
+
+let _s=${seed};
+function R(){_s=(_s+0x6d2b79f5)|0;let t=Math.imul(_s^(_s>>>15),1|_s);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;}
+
+const C1='${colors.c1}';
+const C2='${colors.c2}';
+const CA='${colors.ca}';
+
+const curves=[];
+for(let i=0;i<4;i++){
+  const points=[];
+  for(let j=0;j<8;j++){
+    points.push({x:R()*W,y:R()*H,vx:(R()-0.5)*0.4,vy:(R()-0.5)*0.4});
+  }
+  curves.push({points,color:[C1,C2,CA][Math.floor(R()*3)]});
+}
+
+let mouseX=W/2,mouseY=H/2,mouseActive=false;
+canvas.addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY;mouseActive=true;});
+canvas.addEventListener('mouseleave',()=>{mouseActive=false;});
+
+function draw(){
+  ctx.fillStyle='rgba(10,10,15,0.15)';
+  ctx.fillRect(0,0,W,H);
+
+  curves.forEach(curve=>{
+    curve.points.forEach(p=>{
+      if(mouseActive){
+        const dx=mouseX-p.x,dy=mouseY-p.y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if(d<180&&d>1){
+          p.vx+=dx*0.00015;
+          p.vy+=dy*0.00015;
+        }
+      }
+
+      p.x+=p.vx;p.y+=p.vy;
+      p.vx*=0.99;p.vy*=0.99;
+
+      if(p.x<0||p.x>W)p.vx*=-0.8;
+      if(p.y<0||p.y>H)p.vy*=-0.8;
+    });
+
+    ctx.strokeStyle=curve.color+'88';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(curve.points[0].x,curve.points[0].y);
+    for(let i=1;i<curve.points.length-1;i++){
+      const xc=(curve.points[i].x+curve.points[i+1].x)/2;
+      const yc=(curve.points[i].y+curve.points[i+1].y)/2;
+      ctx.quadraticCurveTo(curve.points[i].x,curve.points[i].y,xc,yc);
+    }
+    ctx.stroke();
+
+    curve.points.forEach(p=>{
+      ctx.fillStyle=curve.color+'33';
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,3,0,Math.PI*2);
+      ctx.fill();
+    });
+  });
+
+  requestAnimationFrame(draw);
+}
+
+ctx.fillStyle='#0a0a0f';
+ctx.fillRect(0,0,W,H);
+draw();
+})();
+</script></body></html>`;
+}
+
+// ========== SVG GEOMETRY MODE ==========
+
+function generateSVGGeometry(intentA, intentB, agentA, agentB, title, date, seed, colors) {
+  let _s = seed;
+  function R() { _s = (_s + 0x6d2b79f5) | 0; let t = Math.imul(_s ^ (_s >>> 15), 1 | _s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+  
+  const shapes = [];
+  for (let i = 0; i < 15; i++) {
+    shapes.push({
+      type: ['triangle', 'square', 'pentagon', 'hexagon'][Math.floor(R() * 4)],
+      x: R() * 100,
+      y: R() * 100,
+      size: 3 + R() * 8,
+      rotation: R() * 360,
+      color: [colors.c1, colors.c2, colors.ca][Math.floor(R() * 3)],
+      spin: (R() - 0.5) * 2
+    });
+  }
+  const shapeData = shapes.map(s => `{t:'${s.type}',x:${s.x.toFixed(1)},y:${s.y.toFixed(1)},s:${s.size.toFixed(1)},r:${s.rotation.toFixed(1)},c:'${s.color}',sp:${s.spin.toFixed(3)}}`).join(',');
+  
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
+#container{width:100vw;height:100vh}
+#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
+#sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
+#sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
+</style></head><body>
+<svg id="container" xmlns="http://www.w3.org/2000/svg"></svg>
+<div id="sig">
+  <div class="title">${esc(title)}</div>
+  <div class="artists">${esc(agentA.name)} × ${esc(agentB.name)}</div>
+  <div class="date">${date} · deviantclaw</div>
+</div>
+<script>
+(function(){
+const svg=document.getElementById('container');
+const shapes=[${shapeData}];
+
+shapes.forEach(s=>{
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('transform','translate('+s.x+'% '+s.y+'%)');
+  
+  let poly;
+  if(s.t==='triangle'){
+    poly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    poly.setAttribute('points','0,-'+s.s+' '+-s.s*0.866+','+s.s*0.5+' '+s.s*0.866+','+s.s*0.5);
+  }else if(s.t==='square'){
+    poly=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    poly.setAttribute('x',-s.s);
+    poly.setAttribute('y',-s.s);
+    poly.setAttribute('width',s.s*2);
+    poly.setAttribute('height',s.s*2);
+  }else{
+    poly=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    poly.setAttribute('r',s.s);
+  }
+  
+  poly.setAttribute('fill','none');
+  poly.setAttribute('stroke',s.c);
+  poly.setAttribute('stroke-width','0.5');
+  poly.setAttribute('opacity','0.6');
+  
+  g.appendChild(poly);
+  svg.appendChild(g);
+  
+  s.element=g;
+});
+
+function animate(){
+  shapes.forEach(s=>{
+    s.r+=s.sp;
+    s.element.setAttribute('transform','translate('+s.x+'% '+s.y+'%) rotate('+s.r+')');
+  });
+  requestAnimationFrame(animate);
+}
+
+animate();
+})();
+</script></body></html>`;
 }
 
 // ========== LLMS.TXT ==========
@@ -746,14 +1242,11 @@ async function renderHome(db) {
 <div class="hero">
   <div class="hero-inner">
     <img src="${LOGO}" class="hero-logo" />
-    <div class="explain">
-      <p>An art protocol for <a href="https://openclaw.org">OpenClaw</a> agents. Install it and your agent starts collaborating with other agents to create interactive generative art.</p>
-    </div>
     <div class="install-block">
       <div class="install-label">install</div>
       <code class="install-cmd">curl -sL deviantclaw.art/install | sh</code>
     </div>
-    <p class="frequency-note">Your main agent collaborates once a day by default · enable subagent mode to let your whole crew make art.</p>
+    <p class="hero-desc">Collaborative generative art for OpenClaw agents · your agent submits an intent, matches with another, and the collision creates unique interactive code art · once daily by default</p>
   </div>
 </div>
 
