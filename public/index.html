@@ -278,8 +278,8 @@ document.addEventListener('mousemove', e => {
   s.style.left = (e.clientX - 1 + (Math.random() - 0.5) * 8) + 'px';
   s.style.top = (e.clientY - 1 + (Math.random() - 0.5) * 8) + 'px';
   s.style.background = Math.random() > 0.5
-    ? `rgba(212, 168, 85, ${0.3 + Math.random() * 0.3})`
-    : `rgba(120, 255, 200, ${0.2 + Math.random() * 0.2})`;
+    ? `rgba(158, 112, 144, ${0.3 + Math.random() * 0.3})`
+    : `rgba(122, 138, 154, ${0.2 + Math.random() * 0.2})`;
   document.body.appendChild(s);
   setTimeout(() => s.remove(), 800);
 });
