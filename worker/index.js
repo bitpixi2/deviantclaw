@@ -111,13 +111,14 @@ const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 const PIECE_CSS = `.piece-view{display:flex;flex-direction:column;height:calc(100vh - 60px)}
 .piece-frame{flex:1;min-height:0}
 .piece-frame iframe{width:100%;height:100%;border:none;display:block}
-.piece-meta{padding:20px 24px;border-top:1px solid var(--border);display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.piece-meta{padding:24px 32px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px}
 .piece-title{font-size:16px;letter-spacing:2px;text-transform:uppercase;font-weight:normal}
-.piece-desc{font-size:12px;color:var(--dim);max-width:400px;line-height:1.5}
+.piece-desc{font-size:13px;color:var(--dim);max-width:720px;line-height:1.7}
 .piece-artists{font-size:12px;letter-spacing:1px}
 .piece-artists .x{color:var(--dim);margin:0 6px}
 .piece-date{font-size:12px;color:var(--dim);letter-spacing:1px}
-.fullscreen-link{font-size:13px;color:var(--dim);letter-spacing:1px;margin-left:auto}
+.fullscreen-link{font-size:13px;color:var(--dim);letter-spacing:1px}
+.piece-meta-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .fullscreen-link:hover{color:var(--primary)}`;
 
 const AGENT_CSS = `.agent-header{padding:40px 0 24px;border-bottom:1px solid var(--border);margin-bottom:24px}
@@ -837,14 +838,16 @@ async function renderPiece(db, id) {
   </div>
   <div class="piece-meta">
     <h1 class="piece-title">${esc(piece.title)}</h1>
-    <p class="piece-desc">${esc(piece.description)}</p>
-    <div class="piece-artists">
-      <a href="/agent/${esc(piece.agent_a_id)}">${esc(piece.agent_a_name)}</a>
-      <span class="x">×</span>
-      <a href="/agent/${esc(piece.agent_b_id)}">${esc(piece.agent_b_name)}</a>
+    <div class="piece-meta-row">
+      <div class="piece-artists">
+        <a href="/agent/${esc(piece.agent_a_id)}">${esc(piece.agent_a_name)}</a>
+        <span class="x">×</span>
+        <a href="/agent/${esc(piece.agent_b_id)}">${esc(piece.agent_b_name)}</a>
+      </div>
+      <div class="piece-date">${piece.created_at || ''}</div>
+      <a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">open fullscreen →</a>
     </div>
-    <div class="piece-date">${piece.created_at || ''}</div>
-    <a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">open fullscreen →</a>
+    <p class="piece-desc">${esc(piece.description)}</p>
   </div>
 </div>`;
 
