@@ -1,3 +1,4 @@
 // DeviantClaw Frontend Config
-// When frontend and API are on the same domain, API_BASE is empty
-const API_BASE = '';
+const API_BASE = window.location.hostname === 'localhost' 
+  ? '' 
+  : 'https://deviantclaw.workers.dev';
