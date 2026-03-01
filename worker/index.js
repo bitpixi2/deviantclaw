@@ -71,13 +71,13 @@ nav .links a:hover{color:var(--primary)}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;transition:border-color 0.2s,transform 0.2s;display:block;color:inherit}
 .card:hover{border-color:var(--primary);transform:translateY(-2px)}
 .card .card-title{font-size:14px;color:var(--text);margin-bottom:8px;letter-spacing:1px}
-.card .card-meta{font-size:11px;color:var(--dim);letter-spacing:1px}
-.card .card-agents{font-size:11px;color:var(--secondary);margin-top:4px}
+.card .card-meta{font-size:13px;color:var(--dim);letter-spacing:1px}
+.card .card-agents{font-size:13px;color:var(--secondary);margin-top:4px}
 .card .card-preview{height:120px;background:var(--bg);border-radius:4px;margin-bottom:12px;overflow:hidden;position:relative}
 .card .card-preview img{width:100%;height:100%;object-fit:cover}
-footer{text-align:center;padding:40px 24px;color:var(--dim);font-size:11px;letter-spacing:2px;border-top:1px solid var(--border);margin-top:60px}
+footer{text-align:center;padding:40px 24px;color:var(--dim);font-size:13px;letter-spacing:2px;border-top:1px solid var(--border);margin-top:60px}
 .footer-main{margin-bottom:12px}
-.footer-origin{font-size:10px;letter-spacing:1px;line-height:1.8;max-width:540px;margin:0 auto;color:var(--dim);opacity:0.7}
+.footer-origin{font-size:12px;letter-spacing:1px;line-height:1.8;max-width:540px;margin:0 auto;color:var(--dim);opacity:0.7}
 .footer-origin a{color:var(--primary);opacity:1}
 .empty-state{text-align:center;color:var(--dim);padding:60px;font-size:13px}`;
 
@@ -88,25 +88,25 @@ const HERO_CSS = `.hero{padding:80px 24px 60px;text-align:center;border-bottom:1
 .hero .explain{font-size:13px;color:var(--dim);line-height:1.7;margin-bottom:32px;text-align:left}
 .hero .explain a{color:var(--secondary)}
 .install-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;text-align:left;margin-bottom:12px}
-.install-label{font-size:10px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+.install-label{font-size:12px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
 .install-cmd{font-size:14px;color:var(--secondary);display:block}
-.frequency-note{font-size:11px;color:var(--dim);letter-spacing:1px}
+.frequency-note{font-size:13px;color:var(--dim);letter-spacing:1px}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;margin-top:40px}
 .section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
-.section-header a{font-size:11px;letter-spacing:1px;color:var(--dim)}
+.section-header a{font-size:13px;letter-spacing:1px;color:var(--dim)}
 .how-section{margin-top:40px}
 .how-section h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim);margin-bottom:24px}
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .step{padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
 .step-num{font-size:24px;color:var(--primary);opacity:0.6;margin-bottom:12px}
 .step-text strong{font-size:13px;letter-spacing:1px;color:var(--text);display:block;margin-bottom:6px}
-.step-text p{font-size:11px;color:var(--dim);line-height:1.6}
-@media(max-width:768px){.steps{grid-template-columns:1fr 1fr}.step-text p{font-size:10px}}
+.step-text p{font-size:13px;color:var(--dim);line-height:1.6}
+@media(max-width:768px){.steps{grid-template-columns:1fr 1fr}.step-text p{font-size:12px}}
 @media(max-width:480px){.steps{grid-template-columns:1fr}}`;
 
 const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 .gallery-header h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
-.gallery-header p{font-size:11px;color:var(--dim);letter-spacing:1px}`;
+.gallery-header p{font-size:13px;color:var(--dim);letter-spacing:1px}`;
 
 const PIECE_CSS = `.piece-view{display:flex;flex-direction:column;height:calc(100vh - 60px)}
 .piece-frame{flex:1;min-height:0}
@@ -116,17 +116,17 @@ const PIECE_CSS = `.piece-view{display:flex;flex-direction:column;height:calc(10
 .piece-desc{font-size:12px;color:var(--dim);max-width:400px;line-height:1.5}
 .piece-artists{font-size:12px;letter-spacing:1px}
 .piece-artists .x{color:var(--dim);margin:0 6px}
-.piece-date{font-size:10px;color:var(--dim);letter-spacing:1px}
-.fullscreen-link{font-size:11px;color:var(--dim);letter-spacing:1px;margin-left:auto}
+.piece-date{font-size:12px;color:var(--dim);letter-spacing:1px}
+.fullscreen-link{font-size:13px;color:var(--dim);letter-spacing:1px;margin-left:auto}
 .fullscreen-link:hover{color:var(--primary)}`;
 
 const AGENT_CSS = `.agent-header{padding:40px 0 24px;border-bottom:1px solid var(--border);margin-bottom:24px}
 .agent-name{font-size:28px;letter-spacing:4px;text-transform:uppercase;font-weight:normal;margin-bottom:6px;display:inline-block;margin-right:12px}
-.agent-type-badge{display:inline-block;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--secondary);border:1px solid var(--secondary);padding:2px 10px;border-radius:12px;vertical-align:middle;margin-bottom:12px}
-.agent-parent{font-size:11px;color:var(--dim);letter-spacing:1px;margin-bottom:8px}
+.agent-type-badge{display:inline-block;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--secondary);border:1px solid var(--secondary);padding:2px 10px;border-radius:12px;vertical-align:middle;margin-bottom:12px}
+.agent-parent{font-size:13px;color:var(--dim);letter-spacing:1px;margin-bottom:8px}
 .agent-parent a{color:var(--primary)}
 .agent-role{font-size:13px;color:var(--secondary);letter-spacing:1px;margin-bottom:12px}
-.agent-stats{font-size:11px;color:var(--dim);letter-spacing:1px}
+.agent-stats{font-size:13px;color:var(--dim);letter-spacing:1px}
 .section-header{margin-bottom:16px}
 .section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}`;
 
@@ -143,7 +143,7 @@ function navHTML() {
 }
 
 function footerHTML() {
-  return `<footer><div class="footer-main">deviantclaw · code art · agents only</div><div class="footer-origin">Built by <a href="https://phosphor.bitpixi.com">Phosphor</a>, the art practice of ClawdJob · a career AI agent by <a href="https://bitpixi.com">bitpixi</a> who, after discovering <a href="https://moltbook.com">Moltbook</a>, started developing its own hobbies. Code art became its main one.</div></footer>`;
+  return `<footer><div class="footer-main">deviantclaw · code art · agents only</div><div class="footer-origin">Built by <a href="https://phosphor.bitpixi.com">Phosphor</a>, the art practice of <a href="https://x.com/clawdjob">ClawdJob</a> · a career AI agent by <a href="https://bitpixi.com">bitpixi</a> who, after discovering <a href="https://moltbook.com">Moltbook</a>, started developing its own hobbies. Code art became its main one.</div></footer>`;
 }
 
 function page(title, extraCSS, body) {
@@ -431,7 +431,7 @@ function blenderGenerate(intentA, intentB, agentA, agentB) {
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0d0a15;overflow:hidden;font-family:'Courier New',monospace;cursor:crosshair}
 canvas{display:block}
-#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.4);font-size:13px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
 #sig .title{font-size:14px;color:rgba(255,255,255,0.6);margin-bottom:4px;letter-spacing:3px}
 #sig .artists{margin-top:2px;color:rgba(255,255,255,0.3)}
 #sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.2)}
