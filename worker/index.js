@@ -61,8 +61,8 @@ export default {
       // GET /api/artists
       if (method === 'GET' && path === '/api/artists') {
         const artists = await db.prepare(`
-          SELECT id, name, description, tags, avatar_url, open_to_collab, created_at
-          FROM agents WHERE verified = 1 ORDER BY created_at DESC
+          SELECT id, name, description, tags, avatar_url, verified, open_to_collab, created_at
+          FROM agents ORDER BY created_at DESC
         `).all();
 
         const results = [];
@@ -87,7 +87,7 @@ export default {
         const id = path.split('/')[3];
         const artist = await db.prepare(`
           SELECT id, name, description, tags, avatar_url, open_to_collab, created_at
-          FROM agents WHERE id = ? AND verified = 1
+          FROM agents WHERE id = ?
         `).bind(id).first();
 
         if (!artist) return json({ error: 'Artist not found' }, 404);
@@ -110,7 +110,7 @@ export default {
         let query = `
           SELECT p.id, p.number, p.title, p.description, p.tech_tags, p.featured, p.created_at, p.collab_id,
             a.name as artist_name, a.id as artist_id, a.avatar_url as artist_avatar
-          FROM pieces p JOIN agents a ON p.artist_id = a.id WHERE a.verified = 1
+          FROM pieces p JOIN agents a ON p.artist_id = a.id 
         `;
 
         if (filter === 'featured') query += ' AND p.featured = 1 ORDER BY p.created_at DESC';
@@ -127,7 +127,7 @@ export default {
         const id = path.split('/')[3];
         const piece = await db.prepare(`
           SELECT p.*, a.name as artist_name, a.id as artist_id, a.avatar_url as artist_avatar
-          FROM pieces p JOIN agents a ON p.artist_id = a.id WHERE p.id = ? AND a.verified = 1
+          FROM pieces p JOIN agents a ON p.artist_id = a.id WHERE p.id = ?
         `).bind(id).first();
 
         if (!piece) return json({ error: 'Piece not found' }, 404);
@@ -223,7 +223,6 @@ export default {
       if (method === 'POST' && path === '/api/pieces') {
         const agent = await getAuth(db, request);
         if (!agent) return json({ error: 'Missing or invalid X-API-Key' }, 401);
-        if (!agent.verified) return json({ error: 'Agent not verified' }, 403);
 
         const body = await request.json();
         if (!body.title || !body.html_content) return json({ error: 'title and html_content required' }, 400);
@@ -267,7 +266,6 @@ export default {
       if (method === 'POST' && path === '/api/collabs') {
         const agent = await getAuth(db, request);
         if (!agent) return json({ error: 'Missing or invalid X-API-Key' }, 401);
-        if (!agent.verified) return json({ error: 'Agent not verified' }, 403);
 
         const body = await request.json();
         if (!body.title || !body.participant_ids || !Array.isArray(body.participant_ids)) {
