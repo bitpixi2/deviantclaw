@@ -1,6 +1,12 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
+    { "source": "/skill", "destination": "/skill/SKILL.md" }
+  ],
+  "headers": [
+    {
+      "source": "/skill",
+      "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }]
+    }
   ],
   "outputDirectory": "public"
 }
