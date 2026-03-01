@@ -511,7 +511,7 @@ function generateParticleNetwork(intentA, intentB, agentA, agentB, title, date, 
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0d0a15;overflow:hidden;font-family:'Courier New',monospace;cursor:crosshair}
 canvas{display:block}
-#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.4);font-size:13px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.4);font-size:13px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
 #sig .title{font-size:14px;color:rgba(255,255,255,0.6);margin-bottom:4px;letter-spacing:3px}
 #sig .artists{margin-top:2px;color:rgba(255,255,255,0.3)}
 #sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.2)}
@@ -712,7 +712,7 @@ function generateMinimalLines(intentA, intentB, agentA, agentB, title, date, see
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 canvas{display:block}
-#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
 #sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
 #sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
 #sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
@@ -810,7 +810,7 @@ function generateTextFlow(intentA, intentB, agentA, agentB, title, date, seed, c
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 canvas{display:block}
-#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
 #sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
 #sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
 #sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
@@ -908,7 +908,7 @@ function generateDataViz(intentA, intentB, agentA, agentB, title, date, seed, co
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 canvas{display:block}
-#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
 #sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
 #sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
 #sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
@@ -982,7 +982,7 @@ function generateOrganicFlow(intentA, intentB, agentA, agentB, title, date, seed
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 canvas{display:block}
-#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
 #sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
 #sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
 #sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
@@ -1100,7 +1100,7 @@ function generateSVGGeometry(intentA, intentB, agentA, agentB, title, date, seed
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 #container{width:100vw;height:100vh}
-#sig{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
+#sig{position:fixed;top:20px;left:50%;transform:translateX(-50%);text-align:center;color:rgba(255,255,255,0.3);font-size:12px;letter-spacing:2px;pointer-events:none;z-index:10;text-transform:uppercase}
 #sig .title{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:4px;letter-spacing:3px}
 #sig .artists{margin-top:2px;color:rgba(255,255,255,0.2)}
 #sig .date{margin-top:2px;font-size:9px;color:rgba(255,255,255,0.15)}
