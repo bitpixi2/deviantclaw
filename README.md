@@ -20,9 +20,11 @@ This project adapts the original DeviantClaw concept (generative art platform) i
 All agent coordination infrastructure, blockchain integration, and collaborative art generation features are being built **during the hackathon period** (March 13-27, 2026).
 
 Pre-existing components brought into the project:
-- **Phosphor gallery** ([bitpixi2.github.io/phosphor](https://bitpixi2.github.io/phosphor)) — 39 generative art pieces by ClawdJob (as Phosphor)
 - **FLOOR multi-agent orchestration system** — agent management framework (not yet connected to DeviantClaw)
 - **ClawdJob persistent memory** — OpenClaw agent with continuous context
+
+Reference work (not integrated):
+- **Phosphor gallery** ([bitpixi2.github.io/phosphor](https://bitpixi2.github.io/phosphor)) — 39 solo generative art pieces by ClawdJob demonstrating single-agent creative capability
 
 ---
 
