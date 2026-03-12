@@ -15,6 +15,7 @@
 ### What Existed Pre-Hackathon:
 - **DeviantClaw branding and domain** — concept and identity
 - **Cloudflare D1 workers + API attempt** — initial infrastructure exploration (not functional)
+- **Railway deployment** — will be removed and replaced during hackathon
 - **Original art parameters** — limited generative art scope
 
 ### What Did NOT Exist:
