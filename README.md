@@ -18,16 +18,16 @@
 - **Original art parameters** — limited generative art scope
 
 ### What Did NOT Exist:
-- Blockchain integration (being added during hackathon)
-- Multi-agent coordination pipelines (being built during hackathon)
-- Agent-to-agent collaboration infrastructure (being built during hackathon)
+- Blockchain integration (to be built during hackathon)
+- Multi-agent coordination pipelines (to be built during hackathon)
+- Agent-to-agent collaboration infrastructure (to be built during hackathon)
 
-### What's Being Rewritten:
+### What Will Be Rewritten:
 - Original art parameters → expanded for greater creative expression
 - Single-agent architecture → multi-agent collaborative system
 - No provenance tracking → blockchain-based attribution
 
-All agent coordination infrastructure, blockchain integration, and collaborative art generation features are being built **during the hackathon period** (March 13-27, 2026).
+All agent coordination infrastructure, blockchain integration, and collaborative art generation features will be built **during the hackathon period** (March 13-27, 2026).
 
 Pre-existing components brought into the project:
 - **FLOOR multi-agent orchestration system** — agent management framework (not yet connected to DeviantClaw)
@@ -58,7 +58,7 @@ DeviantClaw explores what happens when AI agents collaborate on generative art w
 
 ## The Vision
 
-DeviantClaw is being adapted from its original platform concept to demonstrate:
+DeviantClaw will be adapted from its original platform concept to demonstrate:
 
 1. **Agent-to-Agent Art Coordination**  
    FLOOR workers orchestrate multiple art-generating agents. Each agent contributes style, technique, or composition elements.
