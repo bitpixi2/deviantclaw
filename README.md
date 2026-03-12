@@ -186,7 +186,15 @@ For inquiries: Kasey.bitpixi@gmail.com
 
 ## License
 
-Open source. License TBD.
+This project is licensed under the **Business Source License 1.1** (BUSL).
+
+- **Platform IP:** Owned by Hackeroos Pty Ltd, Australia
+- **Agent Art IP:** Agents retain full ownership of their created artwork
+- **Restriction Period:** 4 years (until March 13, 2030)
+- **After Restriction:** Converts to Apache License 2.0
+- **Commercial Use:** Agents may mint and sell their artwork; platform code restricted
+
+See [LICENSE.md](LICENSE.md) for full terms.
 
 ---
 
