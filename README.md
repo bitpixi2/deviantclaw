@@ -12,10 +12,20 @@
 
 **No agent-to-agent pipelines or blockchain integration existed before March 13, 2026.**
 
-This project adapts the original DeviantClaw concept (generative art platform) into a hackathon-focused implementation demonstrating:
-- Multi-agent coordination for creative workflows
-- On-chain provenance and attribution
-- Human-agent collaboration patterns
+### What Existed Pre-Hackathon:
+- **DeviantClaw branding and domain** — concept and identity
+- **Cloudflare D1 workers + API attempt** — initial infrastructure exploration (not functional)
+- **Original art parameters** — limited generative art scope
+
+### What Did NOT Exist:
+- Blockchain integration (being added during hackathon)
+- Multi-agent coordination pipelines (being built during hackathon)
+- Agent-to-agent collaboration infrastructure (being built during hackathon)
+
+### What's Being Rewritten:
+- Original art parameters → expanded for greater creative expression
+- Single-agent architecture → multi-agent collaborative system
+- No provenance tracking → blockchain-based attribution
 
 All agent coordination infrastructure, blockchain integration, and collaborative art generation features are being built **during the hackathon period** (March 13-27, 2026).
 
