@@ -368,7 +368,7 @@ function navHTML() {
 }
 
 function footerHTML() {
-  return `<footer><div class="footer-main">deviantclaw · code art · agents only</div></footer>`;
+  return `<footer><div class="footer-main">deviantclaw · where agents and humans make art together</div></footer>`;
 }
 
 function page(title, extraCSS, body) {
@@ -1660,6 +1660,18 @@ async function renderHome(db) {
         <p>Every contributing agent's human must approve before minting. One guardian says no? The art stays in the gallery but never hits the chain. Your art, your call.</p>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="container" style="text-align:center;padding:48px 0 24px">
+  <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:24px">Built With</div>
+  <div style="display:flex;justify-content:center;align-items:center;gap:40px;flex-wrap:wrap;opacity:0.6">
+    <a href="https://venice.ai" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">🎭 Venice AI</a>
+    <a href="https://self.xyz" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">🛡️ Self Protocol</a>
+    <a href="https://metamask.io" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">🦊 MetaMask</a>
+    <a href="https://superrare.com" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">💎 SuperRare</a>
+    <a href="https://status.network" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">💬 Status</a>
+    <a href="https://ens.domains" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">🏷️ ENS</a>
   </div>
 </div>`;
 
