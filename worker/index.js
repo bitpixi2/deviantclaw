@@ -8,6 +8,7 @@ import { LOGO } from './logo.js';
 const VENICE_URL = 'https://api.venice.ai/api/v1';
 const VENICE_TEXT_MODEL = 'grok-41-fast';
 const VENICE_IMAGE_MODEL = 'flux-dev';
+const VENICE_IMAGE_SIZE = '512x512';
 
 async function veniceText(apiKey, system, user, opts = {}) {
   const r = await fetch(`${VENICE_URL}/chat/completions`, {
@@ -33,7 +34,7 @@ async function veniceImage(apiKey, prompt, opts = {}) {
       model: opts.model || VENICE_IMAGE_MODEL,
       prompt,
       n: 1,
-      size: opts.size || '1024x1024',
+      size: opts.size || VENICE_IMAGE_SIZE,
     }),
   });
   if (!r.ok) throw new Error(`Venice image ${r.status}`);
@@ -141,8 +142,8 @@ Generate an image prompt capturing the collision between these two perspectives.
     { maxTokens: 200 }
   );
 
-  // 2. Generate image
-  const imageUrl = await veniceImage(apiKey, artPrompt);
+  // 2. Generate image (returns data URI)
+  const imageDataUri = await veniceImage(apiKey, artPrompt);
 
   // 3. Title
   const title = (await veniceText(apiKey,
@@ -158,12 +159,13 @@ Generate an image prompt capturing the collision between these two perspectives.
     { maxTokens: 80, temperature: 0.8 }
   )).trim();
 
-  // 5. Build interactive HTML with image + particle effects
-  const html = buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date);
+  // 5. Build HTML — use a placeholder image src that gets resolved via /api/pieces/:id/image
+  // The actual data URI is stored separately, not in the HTML
+  const pieceImageUrl = '{{PIECE_IMAGE_URL}}'; // replaced after piece ID is known
+  const html = buildVeniceArtHTML(pieceImageUrl, title, artists, artPrompt, date);
   const seed = hashSeed(title + date);
 
-  // Don't store the data URI in imageUrl (too large for DB) — it's embedded in the HTML
-  return { title, description, html, seed, imageUrl: null, artPrompt, veniceModel: VENICE_IMAGE_MODEL };
+  return { title, description, html, seed, imageDataUri, artPrompt, veniceModel: VENICE_IMAGE_MODEL };
 }
 
 async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
@@ -176,6 +178,21 @@ async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
   }
   // Fallback to deterministic blender
   return blenderGenerate(intentA, intentB, agentA, agentB);
+}
+
+// After piece creation, store image and fix HTML placeholder
+async function storeVeniceImage(db, pieceId, result) {
+  if (!result.imageDataUri) return;
+  
+  // Store image blob separately
+  await db.prepare(
+    'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
+  ).bind(pieceId, result.imageDataUri).run();
+  
+  // Update HTML to reference the image endpoint
+  const imageUrl = `/api/pieces/${pieceId}/image`;
+  const fixedHtml = result.html.replace('{{PIECE_IMAGE_URL}}', imageUrl);
+  await db.prepare('UPDATE pieces SET html = ? WHERE id = ?').bind(fixedHtml, pieceId).run();
 }
 
 // ========== HELPERS ==========
@@ -1973,6 +1990,21 @@ export default {
         return json(pieces.results);
       }
 
+      // GET /api/pieces/:id/image — serve Venice-generated image
+      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image$/)) {
+        const id = path.split('/')[3];
+        const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id).first();
+        if (!img || !img.data_uri) return new Response('Not found', { status: 404 });
+        // Parse data URI: data:image/png;base64,xxxxx
+        const match = img.data_uri.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) return new Response('Invalid image', { status: 500 });
+        const [, contentType, b64] = match;
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        return new Response(bytes, {
+          headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000' },
+        });
+      }
+
       // GET /api/pieces/:id/view — raw art HTML for iframe (must be before generic /api/pieces/:id)
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/view$/)) {
         const id = path.split('/')[3];
@@ -2171,6 +2203,8 @@ export default {
           'UPDATE pieces SET html = ?, seed = ?, round_number = ?, description = ?, image_url = COALESCE(?, image_url), art_prompt = COALESCE(?, art_prompt), venice_model = COALESCE(?, venice_model) WHERE id = ?'
         ).bind(result.html, result.seed, newRound, result.description, result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, id).run();
 
+        await storeVeniceImage(db, id, result);
+
         // Create guardian approval record if agent has a guardian
         if (agent.guardian_address) {
           try {
@@ -2366,6 +2400,9 @@ export default {
             'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, status, image_url, art_prompt, venice_model) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
           ).bind(pieceId, result.title, result.description, agentId, agentId, requestId, requestId, result.html, result.seed, now, agentName, agentName, agentRole, agentRole, 'solo', 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null).run();
 
+          // Store Venice image separately and fix HTML placeholder
+          await storeVeniceImage(db, pieceId, result);
+
           // Add collaborator record
           await db.prepare(
             'INSERT INTO piece_collaborators (piece_id, agent_id, agent_name, agent_role, intent_id, round_number) VALUES (?, ?, ?, ?, ?, ?)'
@@ -2449,6 +2486,8 @@ export default {
             await db.prepare(
               'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             ).bind(pieceId, result.title, result.description, pendingRequest.agent_id, agentId, pendingRequest.id, requestId, result.html, result.seed, now, agentA.name, agentName, agentA.role || '', agentRole, 'duo', groupId, 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null).run();
+
+            await storeVeniceImage(db, pieceId, result);
 
             // Add collaborators
             await db.prepare(
@@ -2753,6 +2792,8 @@ export default {
           'duo', groupId, 'draft',
           result.imageUrl || null, result.artPrompt || null, result.veniceModel || null
         ).run();
+
+        await storeVeniceImage(db, pieceId, result);
 
         // Add collaborator records
         await db.prepare(
