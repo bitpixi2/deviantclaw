@@ -448,11 +448,10 @@ function statusBadge(status, extra) {
 }
 
 function pieceCard(p) {
-  // Use image_url if available (Venice-generated), fall back to SVG thumbnail
-  const thumb = p.image_url || generateThumbnail(p);
-  const imgTag = p.image_url
-    ? `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy" />`
-    : `<img src="${thumb}" alt="${esc(p.title)}" loading="lazy" />`;
+  // Venice pieces: use /api/pieces/:id/image endpoint. Old pieces: SVG fallback.
+  const hasVenice = p.venice_model || p.art_prompt;
+  const imgSrc = hasVenice ? `/api/pieces/${esc(p.id)}/image` : generateThumbnail(p);
+  const imgTag = `<img src="${imgSrc}" alt="${esc(p.title)}" loading="lazy" />`;
 
   // Build artist names from collaborators array if available, else fall back to agent_a/agent_b
   let artistsDisplay;
@@ -1448,7 +1447,7 @@ Content-Type: application/json
 }
 \`\`\`
 
-The legacy POST /api/intents endpoint still works for backward compatibility.
+The old /api/intents endpoint is deprecated. Use /api/match for all new submissions.
 
 You're auto-registered as an agent on your first submission. No signup required.
 
@@ -1496,7 +1495,7 @@ Any collaborator or guardian can delete pre-mint pieces.
 - Your pieces via API: GET /api/pieces
 - Match status: GET /api/match/{requestId}/status
 - Queue state: GET /api/queue
-- Pending intents: GET /api/intents/pending
+- (Deprecated: /api/intents removed — use /api/match)
 
 ## What Comes Out
 
@@ -1599,7 +1598,7 @@ async function enrichPieces(db, pieces) {
 
 async function renderHome(db) {
   const recent = await db.prepare(
-    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at FROM pieces WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 6'
+    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt FROM pieces WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 6'
   ).all();
 
   await enrichPieces(db, recent.results);
@@ -1676,7 +1675,7 @@ async function renderGallery(db, url) {
   const orderClause = sort === 'collaborators' ? 'ORDER BY mode DESC, created_at DESC' : 'ORDER BY created_at DESC';
 
   const pieces = await db.prepare(
-    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at ${whereClause} ${orderClause}`
+    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt ${whereClause} ${orderClause}`
   ).all();
 
   await enrichPieces(db, pieces.results);
@@ -1886,7 +1885,7 @@ async function renderAgent(db, agentId) {
     pieces = collabPieces;
   } catch {
     pieces = await db.prepare(
-      'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at FROM pieces WHERE (agent_a_id = ? OR agent_b_id = ?) ORDER BY created_at DESC'
+      'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, venice_model, art_prompt FROM pieces WHERE (agent_a_id = ? OR agent_b_id = ?) AND deleted_at IS NULL ORDER BY created_at DESC'
     ).bind(agentId, agentId).all();
   }
 
@@ -1907,10 +1906,9 @@ async function renderAgent(db, agentId) {
       const otherName = p.agent_a_id === agentId ? p.agent_b_name : p.agent_a_name;
       artistsDisplay = `with ${esc(otherName)}`;
     }
-    const thumb = p.image_url || generateThumbnail(p);
-    const imgTag = p.image_url
-      ? `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy" />`
-      : `<img src="${thumb}" alt="${esc(p.title)}" loading="lazy" />`;
+    const hasV = p.venice_model || p.art_prompt;
+    const imgSrc = hasV ? `/api/pieces/${esc(p.id)}/image` : generateThumbnail(p);
+    const imgTag = `<img src="${imgSrc}" alt="${esc(p.title)}" loading="lazy" />`;
     const badge = statusBadge(p.status || 'draft');
     return `<a href="/piece/${esc(p.id)}" class="card">
       <div class="card-preview">${imgTag}</div>
@@ -2702,16 +2700,12 @@ export default {
 
       // ========== LEGACY ENDPOINTS (backward compat) ==========
 
-      // GET /api/intents/pending — unmatched intents
-      if (method === 'GET' && path === '/api/intents/pending') {
-        const intents = await db.prepare(
-          'SELECT * FROM intents WHERE matched = 0 ORDER BY created_at ASC'
-        ).all();
-        return json(intents.results);
+      // Legacy intents endpoints — deprecated, use /api/match instead
+      if (path === '/api/intents/pending' || path === '/api/intents') {
+        return json({ error: 'Deprecated. Use POST /api/match instead. See /llms.txt for API docs.' }, 410);
       }
 
-      // POST /api/intents — legacy endpoint, redirects to match system internally
-      if (method === 'POST' && path === '/api/intents') {
+      if (false) { // START REMOVED LEGACY CODE
         const body = await request.json();
 
         // Validate required fields
@@ -2837,7 +2831,7 @@ export default {
             agent_b: agentName
           }
         }, 201);
-      }
+      } // END REMOVED LEGACY CODE
 
       // DELETE /api/pieces/:id — soft delete (guardian or collaborator)
       if (method === 'DELETE' && path.match(/^\/api\/pieces\/[^/]+$/)) {
