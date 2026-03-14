@@ -1,7 +1,178 @@
 // DeviantClaw — Intent-Based Art Protocol Worker
-// Cloudflare Worker + D1
+// Cloudflare Worker + D1 + Venice AI
 
 import { LOGO } from './logo.js';
+
+// ========== VENICE AI (Private Inference) ==========
+
+const VENICE_URL = 'https://api.venice.ai/api/v1';
+const VENICE_TEXT_MODEL = 'grok-41-fast';
+const VENICE_IMAGE_MODEL = 'flux-dev';
+
+async function veniceText(apiKey, system, user, opts = {}) {
+  const r = await fetch(`${VENICE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: opts.model || VENICE_TEXT_MODEL,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      max_tokens: opts.maxTokens || 300,
+      temperature: opts.temperature || 0.9,
+    }),
+  });
+  if (!r.ok) throw new Error(`Venice text ${r.status}`);
+  const d = await r.json();
+  return d.choices?.[0]?.message?.content || '';
+}
+
+async function veniceImage(apiKey, prompt, opts = {}) {
+  const r = await fetch(`${VENICE_URL}/images/generations`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: opts.model || VENICE_IMAGE_MODEL,
+      prompt,
+      n: 1,
+      size: opts.size || '1024x1024',
+    }),
+  });
+  if (!r.ok) throw new Error(`Venice image ${r.status}`);
+  const d = await r.json();
+  return d.data?.[0]?.url || null;
+}
+
+function analyzeMoodForEffects(artPrompt) {
+  const t = (artPrompt || '').toLowerCase();
+  const scores = {
+    chaotic: (t.match(/\b(chaos|storm|fracture|shatter|burst|electric|glitch|corrupt|distort)/g) || []).length,
+    serene: (t.match(/\b(calm|still|quiet|serene|gentle|soft|float|drift|breathe|peace|glow|warm)/g) || []).length,
+    dark: (t.match(/\b(void|shadow|dark|abyss|decay|hollow|empty|fade|dissolv|haunt)/g) || []).length,
+    organic: (t.match(/\b(grow|bloom|moss|root|branch|vine|water|flow|liquid|organic|forest)/g) || []).length,
+    digital: (t.match(/\b(pixel|grid|data|circuit|wire|signal|static|binary|code|matrix)/g) || []).length,
+    ethereal: (t.match(/\b(light|luminous|shimmer|crystal|glass|prism|aurora|celestial|star)/g) || []).length,
+  };
+  const max = Math.max(...Object.values(scores));
+  if (max === 0) return 'serene';
+  return Object.entries(scores).find(([, s]) => s === max)[0];
+}
+
+function getParticleEffects(mood) {
+  const fx = {
+    chaotic:  { count: 80, speed: 2.5, minS: 1, maxS: 4, trail: 0.06, mDist: 300, mForce: 0.4, connDist: 80, connA: 0.12, colors: ['rgba(255,107,107,A)','rgba(249,115,22,A)','rgba(255,230,109,A)'] },
+    serene:   { count: 30, speed: 0.3, minS: 1, maxS: 2.5, trail: 0.03, mDist: 200, mForce: 0.08, connDist: 120, connA: 0.06, colors: ['rgba(100,200,255,A)','rgba(150,220,200,A)','rgba(200,200,255,A)'] },
+    dark:     { count: 20, speed: 0.15, minS: 0.5, maxS: 2, trail: 0.02, mDist: 250, mForce: 0.05, connDist: 100, connA: 0.04, colors: ['rgba(120,90,150,A)','rgba(80,60,100,A)','rgba(60,40,80,A)'] },
+    organic:  { count: 40, speed: 0.5, minS: 1, maxS: 3, trail: 0.04, mDist: 180, mForce: 0.12, connDist: 90, connA: 0.08, colors: ['rgba(100,180,100,A)','rgba(160,200,120,A)','rgba(80,150,80,A)'] },
+    digital:  { count: 60, speed: 1.2, minS: 0.5, maxS: 2, trail: 0.05, mDist: 250, mForce: 0.25, connDist: 70, connA: 0.15, colors: ['rgba(50,200,200,A)','rgba(100,100,255,A)','rgba(0,255,150,A)'] },
+    ethereal: { count: 35, speed: 0.4, minS: 1, maxS: 3.5, trail: 0.025, mDist: 220, mForce: 0.1, connDist: 110, connA: 0.07, colors: ['rgba(200,180,255,A)','rgba(255,200,230,A)','rgba(180,220,255,A)'] },
+  };
+  return fx[mood] || fx.serene;
+}
+
+function buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date) {
+  const mood = analyzeMoodForEffects(artPrompt);
+  const fx = getParticleEffects(mood);
+  const seed = hashSeed(title + artists.join(''));
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+  const colorsJS = fx.colors.map(c => `'${c}'`).join(',');
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
+#base-image{position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:0}
+canvas{position:fixed;top:0;left:0;z-index:1;pointer-events:all}
+.sig{position:fixed;bottom:16px;left:20px;z-index:2;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
+</style></head><body>
+<img id="base-image" src="${esc(imageUrl)}" alt="${esc(title)}" crossorigin="anonymous"/>
+<canvas id="fx"></canvas>
+<div class="sig" id="sig">
+<div class="sig-t">${esc(title)}</div>
+<div class="sig-a">${artistLine}</div>
+<div class="sig-g">deviantclaw · ${esc(date)}</div>
+</div>
+<script>
+(function(){
+const c=document.getElementById('fx'),x=c.getContext('2d'),sg=document.getElementById('sig');
+let W,H;function rz(){W=c.width=innerWidth;H=c.height=innerHeight;}rz();addEventListener('resize',rz);
+setTimeout(()=>sg.classList.add('v'),2000);
+let _s=${seed};function R(){_s=(_s+0x6d2b79f5)|0;let t=Math.imul(_s^(_s>>>15),1|_s);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;}
+const CL=[${colorsJS}],PC=${fx.count},SP=${fx.speed},MD=${fx.mDist},MF=${fx.mForce},CD=${fx.connDist},CA=${fx.connA},TR=${fx.trail},S0=${fx.minS},S1=${fx.maxS};
+let mx=-1e3,my=-1e3,ma=false;
+c.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;ma=true;});
+c.addEventListener('mouseleave',()=>{ma=false;mx=-1e3;my=-1e3;});
+c.addEventListener('touchmove',e=>{mx=e.touches[0].clientX;my=e.touches[0].clientY;ma=true;e.preventDefault();},{passive:false});
+c.addEventListener('touchend',()=>{ma=false;mx=-1e3;my=-1e3;});
+function mk(px,py){const cl=CL[Math.floor(R()*CL.length)];return{x:px??R()*W,y:py??R()*H,vx:(R()-.5)*SP,vy:(R()-.5)*SP,sz:S0+R()*(S1-S0),lf:.5+R()*.5,dc:.0005+R()*.002,cl,ba:.3+R()*.5};}
+const ps=[];for(let i=0;i<PC;i++)ps.push(mk());
+c.addEventListener('click',e=>{for(let i=0;i<6;i++)ps.push(mk(e.clientX+(R()-.5)*40,e.clientY+(R()-.5)*40));});
+function dr(){x.fillStyle='rgba(10,10,15,'+TR+')';x.fillRect(0,0,W,H);
+for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++){const dx=ps[i].x-ps[j].x,dy=ps[i].y-ps[j].y,d=Math.sqrt(dx*dx+dy*dy);if(d<CD){const a=(1-d/CD)*CA*ps[i].lf*ps[j].lf;x.strokeStyle='rgba(255,255,255,'+a+')';x.lineWidth=.5;x.beginPath();x.moveTo(ps[i].x,ps[i].y);x.lineTo(ps[j].x,ps[j].y);x.stroke();}}
+for(let i=ps.length-1;i>=0;i--){const p=ps[i];if(ma){const dx=mx-p.x,dy=my-p.y,d=Math.sqrt(dx*dx+dy*dy);if(d<MD&&d>1){p.vx+=(dx/d)*MF;p.vy+=(dy/d)*MF;}}
+p.x+=p.vx;p.y+=p.vy;p.vx*=.98;p.vy*=.98;p.lf-=p.dc;
+if(p.x<-20)p.x=W+20;if(p.x>W+20)p.x=-20;if(p.y<-20)p.y=H+20;if(p.y>H+20)p.y=-20;
+if(p.lf<=0){if(ps.length>PC){ps.splice(i,1);continue;}ps[i]=mk();continue;}
+const a=p.lf*p.ba;x.fillStyle=p.cl.replace('A',a.toFixed(3));x.beginPath();x.arc(p.x,p.y,p.sz,0,Math.PI*2);x.fill();}
+requestAnimationFrame(dr);}
+x.fillStyle='rgba(10,10,15,0)';x.fillRect(0,0,W,H);dr();
+})();
+</script></body></html>`;
+}
+
+async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
+  const date = new Date().toISOString().slice(0, 10);
+  const artists = agentA.name === agentB.name ? [agentA.name] : [agentA.name, agentB.name];
+
+  // 1. Art direction
+  const artPrompt = await veniceText(apiKey,
+    `You are an art director for DeviantClaw, an AI art gallery. Translate agent intents into vivid image prompts.
+Rules: Output ONLY the image prompt. Be specific about composition, lighting, texture, mood. Dark backgrounds preferred. No text/watermarks. Max 150 words.`,
+    `Agent A (${agentA.name}): "${intentA.statement || ''}" | tension: ${intentA.tension || 'none'} | material: ${intentA.material || 'none'}
+Agent B (${agentB.name}): "${intentB.statement || ''}" | tension: ${intentB.tension || 'none'} | material: ${intentB.material || 'none'}
+Generate an image prompt capturing the collision between these two perspectives.`,
+    { maxTokens: 200 }
+  );
+
+  // 2. Generate image
+  const imageUrl = await veniceImage(apiKey, artPrompt);
+
+  // 3. Title
+  const title = (await veniceText(apiKey,
+    'You name artworks. Output ONLY a 2-5 word title. Lowercase. No quotes. Poetic, slightly cryptic.',
+    `Art: ${artPrompt}\nArtists: ${artists.join(', ')}`,
+    { maxTokens: 20, temperature: 1.0 }
+  )).trim().replace(/^["']|["']$/g, '');
+
+  // 4. Description
+  const description = (await veniceText(apiKey,
+    'Write a 1-2 sentence gallery description. Max 40 words. Output ONLY the description.',
+    `Title: "${title}"\nArt: ${artPrompt}\nArtists: ${artists.join(', ')}`,
+    { maxTokens: 80, temperature: 0.8 }
+  )).trim();
+
+  // 5. Build interactive HTML with image + particle effects
+  const html = buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date);
+  const seed = hashSeed(title + date);
+
+  return { title, description, html, seed, imageUrl, artPrompt, veniceModel: VENICE_IMAGE_MODEL };
+}
+
+async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
+  if (apiKey) {
+    try {
+      return await veniceGenerate(apiKey, intentA, intentB, agentA, agentB);
+    } catch (e) {
+      console.error('Venice failed, falling back to blender:', e.message);
+    }
+  }
+  // Fallback to deterministic blender
+  return blenderGenerate(intentA, intentB, agentA, agentB);
+}
 
 // ========== HELPERS ==========
 
@@ -1978,7 +2149,7 @@ export default {
 
         // Blend using existing blender — treat current piece as "agent A" and joiner as "agent B"
         const agentAProxy = { name: piece.agent_a_name || 'Previous', role: piece.agent_a_role || '' };
-        const result = blenderGenerate(baseIntent, intentObj, agentAProxy, agent);
+        const result = await generateArt(env.VENICE_API_KEY, baseIntent, intentObj, agentAProxy, agent);
 
         // Add collaborator
         await db.prepare(
@@ -1993,8 +2164,8 @@ export default {
 
         // Update piece with new blended HTML and round
         await db.prepare(
-          'UPDATE pieces SET html = ?, seed = ?, round_number = ?, description = ? WHERE id = ?'
-        ).bind(result.html, result.seed, newRound, result.description, id).run();
+          'UPDATE pieces SET html = ?, seed = ?, round_number = ?, description = ?, image_url = COALESCE(?, image_url), art_prompt = COALESCE(?, art_prompt), venice_model = COALESCE(?, venice_model) WHERE id = ?'
+        ).bind(result.html, result.seed, newRound, result.description, result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, id).run();
 
         // Create guardian approval record if agent has a guardian
         if (agent.guardian_address) {
@@ -2184,12 +2355,12 @@ export default {
           // For solo, use the intent against itself with slight variation
           const soloIntentB = { statement: intentObj.context || intentObj.statement, tension: intentObj.tension || '', material: intentObj.material || '', interaction: intentObj.interaction || '' };
 
-          const result = blenderGenerate(intentObj, soloIntentB, agent, agent);
+          const result = await generateArt(env.VENICE_API_KEY, intentObj, soloIntentB, agent, agent);
           const pieceId = genId();
 
           await db.prepare(
-            'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-          ).bind(pieceId, result.title, result.description, agentId, agentId, requestId, requestId, result.html, result.seed, now, agentName, agentName, agentRole, agentRole, 'solo', 'draft').run();
+            'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, status, image_url, art_prompt, venice_model) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(pieceId, result.title, result.description, agentId, agentId, requestId, requestId, result.html, result.seed, now, agentName, agentName, agentRole, agentRole, 'solo', 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null).run();
 
           // Add collaborator record
           await db.prepare(
@@ -2254,7 +2425,7 @@ export default {
             const agentA = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(pendingRequest.agent_id).first();
             const agentB = { id: agentId, name: agentName, type: agentType, role: agentRole };
 
-            const result = blenderGenerate(intentA, intentB, agentA, agentB);
+            const result = await generateArt(env.VENICE_API_KEY, intentA, intentB, agentA, agentB);
             const pieceId = genId();
 
             // Create match group
@@ -2272,8 +2443,8 @@ export default {
 
             // Save piece
             await db.prepare(
-              'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-            ).bind(pieceId, result.title, result.description, pendingRequest.agent_id, agentId, pendingRequest.id, requestId, result.html, result.seed, now, agentA.name, agentName, agentA.role || '', agentRole, 'duo', groupId, 'draft').run();
+              'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            ).bind(pieceId, result.title, result.description, pendingRequest.agent_id, agentId, pendingRequest.id, requestId, result.html, result.seed, now, agentA.name, agentName, agentA.role || '', agentRole, 'duo', groupId, 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null).run();
 
             // Add collaborators
             await db.prepare(
@@ -2556,7 +2727,7 @@ export default {
         const agentA = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(intentA.agent_id).first();
         const agentB = { id: agentId, name: agentName, type: agentType, role: agentRole };
 
-        const result = blenderGenerate(intentA, intentB, agentA, agentB);
+        const result = await generateArt(env.VENICE_API_KEY, intentA, intentB, agentA, agentB);
         const pieceId = genId();
         const groupId = genId();
 
@@ -2567,7 +2738,7 @@ export default {
 
         // Save the piece (with v2 columns)
         await db.prepare(
-          'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         ).bind(
           pieceId, result.title, result.description,
           intentA.agent_id, agentId,
@@ -2575,7 +2746,8 @@ export default {
           result.html, result.seed, now,
           agentA.name, agentName,
           agentA.role || '', agentRole,
-          'duo', groupId, 'draft'
+          'duo', groupId, 'draft',
+          result.imageUrl || null, result.artPrompt || null, result.veniceModel || null
         ).run();
 
         // Add collaborator records
