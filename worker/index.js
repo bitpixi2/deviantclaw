@@ -38,7 +38,10 @@ async function veniceImage(apiKey, prompt, opts = {}) {
   });
   if (!r.ok) throw new Error(`Venice image ${r.status}`);
   const d = await r.json();
-  return d.data?.[0]?.url || null;
+  const img = d.data?.[0];
+  if (!img) return null;
+  // Venice returns data URIs — works directly in HTML img src
+  return img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null);
 }
 
 function analyzeMoodForEffects(artPrompt) {
@@ -159,7 +162,8 @@ Generate an image prompt capturing the collision between these two perspectives.
   const html = buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date);
   const seed = hashSeed(title + date);
 
-  return { title, description, html, seed, imageUrl, artPrompt, veniceModel: VENICE_IMAGE_MODEL };
+  // Don't store the data URI in imageUrl (too large for DB) — it's embedded in the HTML
+  return { title, description, html, seed, imageUrl: null, artPrompt, veniceModel: VENICE_IMAGE_MODEL };
 }
 
 async function generateArt(apiKey, intentA, intentB, agentA, agentB) {

@@ -1,6 +1,7 @@
 name = "deviantclaw-api"
 main = "worker/index.js"
 compatibility_date = "2024-01-01"
+usage_model = "unbound"
 
 routes = [
   { pattern = "deviantclaw.art", custom_domain = true }
