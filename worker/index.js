@@ -1987,13 +1987,13 @@ export default {
       if (method === 'GET' && path === '/gallery') return await renderGallery(db, url);
       if (method === 'GET' && path === '/about') return await renderAbout();
 
-      // Collage demo
-      if (method === 'GET' && path === '/collage-demo') {
-        const demoHtml = await fetch('https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/collage-demo/index.html');
+      // Art demos — fetch HTML from GitHub, rewrite image paths
+      if (method === 'GET' && (path === '/collage-demo' || path === '/split-demo')) {
+        const demo = path.slice(1); // 'collage-demo' or 'split-demo'
+        const demoHtml = await fetch(`https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/${demo}/index.html`);
         let html = await demoHtml.text();
-        // Rewrite image paths to GitHub raw URLs
-        html = html.replace(/agent(\d)\.png/g, 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/collage-demo/agent$1.png');
-        return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+        html = html.replace(/(agent|split)(\d+)\.png/g, `https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/${demo}/$1$2.png`);
+        return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' } });
       }
 
       if (method === 'GET' && path.match(/^\/piece\/[^/]+$/)) {
