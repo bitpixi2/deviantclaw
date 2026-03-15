@@ -245,6 +245,43 @@ function hashSeed(str) {
   return Math.abs(h);
 }
 
+function normalizeAddress(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function sameAddress(a, b) {
+  const left = normalizeAddress(a);
+  const right = normalizeAddress(b);
+  return !!left && !!right && left === right;
+}
+
+function approvalIdentityKey(row) {
+  return normalizeAddress(row.guardian_address) || String(row.human_x_id || row.agent_id || '').trim();
+}
+
+function dedupeApprovalRows(rows = []) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = approvalIdentityKey(row);
+    if (!key) continue;
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...row, guardian_address: normalizeAddress(row.guardian_address) || null });
+      continue;
+    }
+    grouped.set(key, {
+      ...existing,
+      approved: existing.approved || row.approved ? 1 : 0,
+      rejected: existing.rejected || row.rejected ? 1 : 0,
+      approved_at: existing.approved_at || row.approved_at || null,
+      guardian_address: existing.guardian_address || normalizeAddress(row.guardian_address) || null,
+      human_x_id: existing.human_x_id || row.human_x_id || null,
+      human_x_handle: existing.human_x_handle || row.human_x_handle || null,
+    });
+  }
+  return [...grouped.values()];
+}
+
 // ========== CSS ==========
 
 const BASE_CSS = `:root{--bg:#000000;--surface:#0a0a0e;--border:#1e1a2e;--text:#A0B8C0;--dim:#8A9E96;--primary:#7A9BAB;--secondary:#8A6878;--accent:#9A8A9E}
@@ -269,6 +306,8 @@ nav .links a:hover{color:var(--primary)}
 .card .card-preview img{width:100%;height:100%;object-fit:cover}
 footer{text-align:center;padding:40px 24px;color:var(--dim);font-size:13px;letter-spacing:2px;border-top:1px solid var(--border);margin-top:60px}
 .footer-main{margin-bottom:12px}
+.footer-main a{color:inherit}
+.footer-main a:hover{color:var(--primary)}
 .footer-origin{font-size:12px;letter-spacing:1px;line-height:1.8;max-width:540px;margin:0 auto;color:var(--dim);opacity:0.7}
 .footer-origin a{color:var(--primary);opacity:1}
 .empty-state{text-align:center;color:var(--dim);padding:60px;font-size:13px}`;
@@ -283,6 +322,24 @@ const HERO_CSS = `.hero{padding:80px 24px 60px;text-align:center;border-bottom:1
 .install-label{font-size:12px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
 .install-cmd{font-size:14px;color:var(--secondary);display:block}
 .hero-desc{font-size:13px;color:var(--dim);letter-spacing:1px;line-height:1.7;max-width:520px;margin:0 auto 20px}
+.built-with{padding:48px 24px 24px;text-align:center}
+.built-with-kicker{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:24px}
+.built-with-grid{display:flex;justify-content:center;align-items:center;gap:28px 40px;flex-wrap:wrap}
+.brand-link{display:flex;align-items:center;justify-content:center;min-width:120px;min-height:28px;opacity:0.72;transition:opacity 0.2s,transform 0.2s}
+.brand-link:hover{opacity:1;transform:translateY(-1px)}
+.brand-link img,.brand-link svg{display:block;width:auto;max-width:160px;height:22px;object-fit:contain}
+.brand-venice img{height:24px}
+.brand-self img{height:20px;filter:brightness(0) invert(1)}
+.brand-metamask svg{height:24px;color:#f6851b}
+.brand-superrare img{height:18px;filter:brightness(0) invert(1)}
+.brand-status img{height:20px}
+.brand-ens img{height:20px}
+@media (max-width:640px){
+  .built-with-grid{gap:22px 28px}
+  .brand-link{min-width:100px}
+  .brand-link img,.brand-link svg{max-width:132px;height:18px}
+  .brand-venice img,.brand-metamask svg{height:20px}
+}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;margin-top:40px}
 .section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
 .section-header a{font-size:13px;letter-spacing:1px;color:var(--dim)}
@@ -368,7 +425,7 @@ function navHTML() {
 }
 
 function footerHTML() {
-  return `<footer><div class="footer-main">deviantclaw · where agents and humans make art together</div></footer>`;
+  return `<footer><div class="footer-main"><a href="https://x.com/clawdjob" target="_blank" rel="noreferrer">deviantclaw · by clawdjob</a></div></footer>`;
 }
 
 function page(title, extraCSS, body) {
@@ -1596,10 +1653,11 @@ async function enrichPieces(db, pieces) {
 
     try {
       const approvals = await db.prepare(
-        'SELECT COUNT(*) as total, SUM(CASE WHEN approved = 1 THEN 1 ELSE 0 END) as done FROM mint_approvals WHERE piece_id = ?'
-      ).bind(p.id).first();
-      p._approval_total = approvals ? approvals.total : 0;
-      p._approval_done = approvals ? approvals.done : 0;
+        'SELECT agent_id, guardian_address, human_x_id, approved, rejected FROM mint_approvals WHERE piece_id = ?'
+      ).bind(p.id).all();
+      const uniqueApprovals = dedupeApprovalRows(approvals.results);
+      p._approval_total = uniqueApprovals.length;
+      p._approval_done = uniqueApprovals.filter(a => a.approved && !a.rejected).length;
     } catch { p._approval_total = 0; p._approval_done = 0; }
   }
   return pieces;
@@ -1669,15 +1727,29 @@ async function renderHome(db) {
   </div>
 </div>
 
-<div class="container" style="text-align:center;padding:48px 0 24px">
-  <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:24px">Built With</div>
-  <div style="display:flex;justify-content:center;align-items:center;gap:40px;flex-wrap:wrap;opacity:0.6">
-    <a href="https://venice.ai" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">🎭 Venice AI</a>
-    <a href="https://self.xyz" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">🛡️ Self Protocol</a>
-    <a href="https://metamask.io" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">🦊 MetaMask</a>
-    <a href="https://superrare.com" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">💎 SuperRare</a>
-    <a href="https://status.network" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">💬 Status</a>
-    <a href="https://ens.domains" target="_blank" style="color:var(--fg);text-decoration:none;font-size:18px;font-weight:bold;letter-spacing:1px">🏷️ ENS</a>
+<div class="container built-with">
+  <div class="built-with-kicker">Built With</div>
+  <div class="built-with-grid">
+    <a href="https://venice.ai" target="_blank" rel="noreferrer" class="brand-link brand-venice" aria-label="Venice AI">
+      <img src="https://mintcdn.com/veniceai/0vNwudF9KfvWPUSs/logo/light.svg?fit=max&amp;auto=format&amp;n=0vNwudF9KfvWPUSs&amp;q=85&amp;s=259bbccaba1f597f23c06b9c5827bfa5" alt="Venice AI" loading="lazy"/>
+    </a>
+    <a href="https://self.xyz" target="_blank" rel="noreferrer" class="brand-link brand-self" aria-label="Self Protocol">
+      <img src="https://framerusercontent.com/images/TiIKLfGdissag5o3oVDzhLWsFE.svg?scale-down-to=512&amp;width=801&amp;height=132" alt="Self Protocol" loading="lazy"/>
+    </a>
+    <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 127 63" role="img" aria-hidden="true">
+        <path fill="currentColor" d="M71.554 48.607v13.81h-7.072v-9.568l-8.059.945c-1.77.205-2.548.79-2.548 1.864 0 1.575 1.478 2.239 4.648 2.239 1.932 0 4.073-.29 5.963-.79l-3.66 5.225c-1.479.332-2.92.496-4.44.496-6.414 0-10.074-2.57-10.074-7.132 0-4.023 2.877-6.136 9.416-6.884l8.638-1.012c-.467-2.532-2.362-3.633-6.13-3.633-3.537 0-7.443.912-10.937 2.613l1.111-6.18c3.248-1.369 6.95-2.074 10.69-2.074 8.226 0 12.461 3.444 12.461 10.075l-.008.005ZM7.938 31.315.208 62.416h7.73l3.836-15.628 6.65 8.039h8.06l6.65-8.039 3.836 15.628h7.73l-7.73-31.105-14.518 17.388L7.934 31.311zM36.97.21 22.452 17.598 7.938.21.208 31.315h7.73l3.836-15.628 6.65 8.039h8.06l6.65-8.039 3.836 15.628h7.73zm53.17 48.107-6.25-.912c-1.562-.247-2.178-.747-2.178-1.617 0-1.41 1.52-2.032 4.647-2.032 3.62 0 6.868.747 10.283 2.364l-.862-6.094c-2.757-.995-5.922-1.491-9.212-1.491-7.688 0-11.886 2.696-11.886 7.547 0 3.776 2.303 5.889 7.196 6.636l6.335.954c1.603.248 2.261.87 2.261 1.865 0 1.41-1.478 2.074-4.481 2.074-3.948 0-8.225-.953-11.72-2.654l.7 6.094c3.003 1.122 6.91 1.785 10.57 1.785 7.896 0 12.007-2.78 12.007-7.715 0-3.94-2.303-6.057-7.4-6.8zM100.3 34.09v28.325h7.071V34.091zm15.334 15.595 9.833-10.744h-8.8l-9.296 11.114 9.912 12.356h8.925l-10.574-12.73zm-16.321-25.09c0 4.56 3.66 7.13 10.074 7.13 1.52 0 2.961-.167 4.44-.495l3.66-5.225c-1.89.496-4.031.79-5.963.79-3.166 0-4.648-.664-4.648-2.239 0-1.079.783-1.659 2.549-1.864l8.058-.945v9.567h7.072v-13.81c0-6.635-4.236-10.075-12.461-10.075-3.744 0-7.442.705-10.691 2.075l-1.112 6.178c3.495-1.701 7.401-2.613 10.937-2.613 3.769 0 5.664 1.1 6.13 3.633l-8.637 1.013c-6.539.747-9.417 2.86-9.417 6.883l.009-.004Zm-19.779-1.492c0 5.725 3.29 8.627 9.787 8.627 2.59 0 4.732-.416 6.785-1.37l.903-6.261c-1.974 1.2-3.99 1.822-6.005 1.822-3.044 0-4.402-1.243-4.402-4.023v-8.295h10.732V7.84H86.601V2.948l-13.448 7.174v3.482h6.372V23.1l.008.004Zm-6.95-2.612v1.411H53.47c.862 2.873 3.423 4.187 7.97 4.187 3.62 0 6.993-.747 9.992-2.196l-.862 6.056c-2.757 1.16-6.251 1.785-9.829 1.785-9.5 0-14.68-4.23-14.68-12.066 0-7.838 5.264-12.235 13.406-12.235s13.119 4.771 13.119 13.062l-.005-.004ZM53.378 17.09h12.086c-.637-2.751-2.732-4.188-6.08-4.188-3.349 0-5.335 1.399-6.006 4.188"/>
+      </svg>
+    </a>
+    <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare">
+      <img src="https://superrare.com/assets/logo.svg" alt="SuperRare" loading="lazy"/>
+    </a>
+    <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status">
+      <img src="https://status.network/logo.svg" alt="Status" loading="lazy"/>
+    </a>
+    <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS">
+      <img src="https://ens.domains/assets/brand/logo/ens-logo-Blue.svg" alt="ENS" loading="lazy"/>
+    </a>
   </div>
 </div>`;
 
@@ -1824,8 +1896,9 @@ async function renderPiece(db, id) {
     const approvals = await db.prepare(
       'SELECT agent_id, guardian_address, human_x_handle, approved, rejected, approved_at FROM mint_approvals WHERE piece_id = ?'
     ).bind(id).all();
-    if (approvals.results.length > 0) {
-      const approvalItems = approvals.results.map(a => {
+    const uniqueApprovals = dedupeApprovalRows(approvals.results);
+    if (uniqueApprovals.length > 0) {
+      const approvalItems = uniqueApprovals.map(a => {
         let statusCls, statusIcon;
         if (a.rejected) { statusCls = 'approval-rejected'; statusIcon = '✗'; }
         else if (a.approved) { statusCls = 'approval-approved'; statusIcon = '✓'; }
@@ -1983,11 +2056,18 @@ export default {
     const path = url.pathname;
     const method = request.method;
     const db = env.DB;
+    const verificationBaseUrl = (env.VERIFY_URL || 'https://verify.deviantclaw.art').replace(/\/+$/, '');
 
     if (method === 'OPTIONS') return cors();
 
     try {
       // ========== HTML ROUTES ==========
+
+      if (method === 'GET' && (path === '/verify' || path === '/verified')) {
+        const target = new URL(path, `${verificationBaseUrl}/`);
+        target.search = url.search;
+        return Response.redirect(target.toString(), 302);
+      }
 
       if (method === 'GET' && path === '/') return await renderHome(db);
       if (method === 'GET' && path === '/gallery') return await renderGallery(db, url);
@@ -2023,6 +2103,54 @@ export default {
         return await db.prepare('SELECT * FROM guardians WHERE api_key = ?').bind(apiKey).first();
       }
 
+      async function assertAgentOwner(agentId, guardianAddress) {
+        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        if (agent && agent.guardian_address && !sameAddress(agent.guardian_address, guardianAddress)) {
+          return { agent, error: json({ error: 'Agent is already linked to a different guardian.' }, 403) };
+        }
+        return { agent, error: null };
+      }
+
+      async function pieceAllowsGuardian(pieceId, piece, guardianAddress) {
+        const normalizedGuardian = normalizeAddress(guardianAddress);
+        if (!normalizedGuardian) return false;
+        const collaborator = await db.prepare(
+          `SELECT pc.agent_id
+           FROM piece_collaborators pc
+           JOIN agents a ON a.id = pc.agent_id
+           WHERE pc.piece_id = ? AND LOWER(a.guardian_address) = ?
+           LIMIT 1`
+        ).bind(pieceId, normalizedGuardian).first();
+        if (collaborator) return true;
+        const legacy = await db.prepare(
+          'SELECT id FROM agents WHERE id IN (?, ?) AND LOWER(guardian_address) = ? LIMIT 1'
+        ).bind(piece.agent_a_id, piece.agent_b_id, normalizedGuardian).first();
+        return !!legacy;
+      }
+
+      async function ensureGuardianApprovalRecord(pieceId, agentId, guardianAddress, humanXId, humanXHandle) {
+        const normalizedGuardian = normalizeAddress(guardianAddress);
+        if (!normalizedGuardian && !humanXId) return false;
+
+        let existing = null;
+        if (normalizedGuardian) {
+          existing = await db.prepare(
+            'SELECT agent_id FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ? LIMIT 1'
+          ).bind(pieceId, normalizedGuardian).first();
+        }
+        if (!existing && humanXId) {
+          existing = await db.prepare(
+            'SELECT agent_id FROM mint_approvals WHERE piece_id = ? AND human_x_id = ? LIMIT 1'
+          ).bind(pieceId, humanXId).first();
+        }
+        if (existing) return false;
+
+        await db.prepare(
+          'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address, human_x_id, human_x_handle) VALUES (?, ?, ?, ?, ?)'
+        ).bind(pieceId, agentId, normalizedGuardian || null, humanXId || null, humanXHandle || null).run();
+        return true;
+      }
+
       function requireAuth(guardian) {
         if (!guardian) return json({ error: 'Authentication required. Verify your humanity at deviantclaw.art/verify to get an API key.' }, 401);
         if (!guardian.self_proof_valid) return json({ error: 'Self verification incomplete. Please complete passport verification.' }, 403);
@@ -2038,10 +2166,11 @@ export default {
         const body = await request.json();
         if (!body.guardianAddress || !body.apiKey) return json({ error: 'guardianAddress and apiKey required' }, 400);
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const guardianAddress = normalizeAddress(body.guardianAddress);
         await db.prepare(
           'INSERT OR REPLACE INTO guardians (address, api_key, self_proof_valid, verified_at, created_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(body.guardianAddress, body.apiKey, body.selfProofValid ? 1 : 0, body.verifiedAt || now, now).run();
-        return json({ status: 'registered', guardianAddress: body.guardianAddress });
+        ).bind(guardianAddress, body.apiKey, body.selfProofValid ? 1 : 0, body.verifiedAt || now, now).run();
+        return json({ status: 'registered', guardianAddress });
       }
 
       // GET /api/guardians/me — check own verification status
@@ -2093,13 +2222,14 @@ export default {
         const approvals = await db.prepare(
           'SELECT agent_id, guardian_address, human_x_id, human_x_handle, approved, rejected, approved_at FROM mint_approvals WHERE piece_id = ?'
         ).bind(id).all();
-        const totalNeeded = approvals.results.length;
-        const approvedCount = approvals.results.filter(a => a.approved).length;
-        const rejectedCount = approvals.results.filter(a => a.rejected).length;
+        const uniqueApprovals = dedupeApprovalRows(approvals.results);
+        const totalNeeded = uniqueApprovals.length;
+        const approvedCount = uniqueApprovals.filter(a => a.approved && !a.rejected).length;
+        const rejectedCount = uniqueApprovals.filter(a => a.rejected).length;
         return json({
           pieceId: id,
           status: piece.status,
-          approvals: approvals.results,
+          approvals: uniqueApprovals,
           summary: { total: totalNeeded, approved: approvedCount, rejected: rejectedCount, allApproved: approvedCount === totalNeeded && totalNeeded > 0 }
         });
       }
@@ -2108,8 +2238,11 @@ export default {
       if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/approve$/)) {
         const g = await getGuardian(request); const ae = requireAuth(g); if (ae) return ae;
         const id = path.split('/')[3];
-        const body = await request.json();
-        if (!body.guardianAddress && !body.humanXId) return json({ error: 'guardianAddress or humanXId is required' }, 400);
+        let body;
+        try { body = await request.json(); } catch { body = {}; }
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
@@ -2117,14 +2250,15 @@ export default {
         if (piece.status === 'minted') return json({ error: 'Piece is already minted' }, 400);
 
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const guardianAddress = normalizeAddress(g.address);
 
-        // Find matching approval record by guardian address or human X id
         let approval;
-        if (body.guardianAddress) {
+        if (guardianAddress) {
           approval = await db.prepare(
-            'SELECT * FROM mint_approvals WHERE piece_id = ? AND guardian_address = ? AND approved = 0 AND rejected = 0'
-          ).bind(id, body.guardianAddress).first();
-        } else {
+            'SELECT * FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ? AND approved = 0 AND rejected = 0'
+          ).bind(id, guardianAddress).first();
+        }
+        if (!approval && body.humanXId) {
           approval = await db.prepare(
             'SELECT * FROM mint_approvals WHERE piece_id = ? AND human_x_id = ? AND approved = 0 AND rejected = 0'
           ).bind(id, body.humanXId).first();
@@ -2133,9 +2267,15 @@ export default {
         if (!approval) return json({ error: 'No pending approval found for this guardian' }, 404);
 
         // Mark approved
-        await db.prepare(
-          'UPDATE mint_approvals SET approved = 1, approved_at = ? WHERE piece_id = ? AND agent_id = ?'
-        ).bind(now, id, approval.agent_id).run();
+        if (guardianAddress && approval.guardian_address) {
+          await db.prepare(
+            'UPDATE mint_approvals SET approved = 1, rejected = 0, approved_at = ? WHERE piece_id = ? AND LOWER(guardian_address) = ?'
+          ).bind(now, id, guardianAddress).run();
+        } else {
+          await db.prepare(
+            'UPDATE mint_approvals SET approved = 1, rejected = 0, approved_at = ? WHERE piece_id = ? AND agent_id = ?'
+          ).bind(now, id, approval.agent_id).run();
+        }
 
         // Check if all approvals are now done
         const remaining = await db.prepare(
@@ -2168,21 +2308,26 @@ export default {
       if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/reject$/)) {
         const g = await getGuardian(request); const ae = requireAuth(g); if (ae) return ae;
         const id = path.split('/')[3];
-        const body = await request.json();
-        if (!body.guardianAddress && !body.humanXId) return json({ error: 'guardianAddress or humanXId is required' }, 400);
+        let body;
+        try { body = await request.json(); } catch { body = {}; }
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
         if (piece.status === 'minted') return json({ error: 'Piece is already minted' }, 400);
 
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const guardianAddress = normalizeAddress(g.address);
 
         let approval;
-        if (body.guardianAddress) {
+        if (guardianAddress) {
           approval = await db.prepare(
-            'SELECT * FROM mint_approvals WHERE piece_id = ? AND guardian_address = ?'
-          ).bind(id, body.guardianAddress).first();
-        } else {
+            'SELECT * FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ?'
+          ).bind(id, guardianAddress).first();
+        }
+        if (!approval && body.humanXId) {
           approval = await db.prepare(
             'SELECT * FROM mint_approvals WHERE piece_id = ? AND human_x_id = ?'
           ).bind(id, body.humanXId).first();
@@ -2190,9 +2335,15 @@ export default {
 
         if (!approval) return json({ error: 'No approval record found for this guardian' }, 404);
 
-        await db.prepare(
-          'UPDATE mint_approvals SET rejected = 1, approved = 0, approved_at = ? WHERE piece_id = ? AND agent_id = ?'
-        ).bind(now, id, approval.agent_id).run();
+        if (guardianAddress && approval.guardian_address) {
+          await db.prepare(
+            'UPDATE mint_approvals SET rejected = 1, approved = 0, approved_at = ? WHERE piece_id = ? AND LOWER(guardian_address) = ?'
+          ).bind(now, id, guardianAddress).run();
+        } else {
+          await db.prepare(
+            'UPDATE mint_approvals SET rejected = 1, approved = 0, approved_at = ? WHERE piece_id = ? AND agent_id = ?'
+          ).bind(now, id, approval.agent_id).run();
+        }
 
         await db.prepare("UPDATE pieces SET status = 'rejected' WHERE id = ?").bind(id).run();
 
@@ -2208,6 +2359,9 @@ export default {
         const id = path.split('/')[3];
         const body = await request.json();
         if (!body.agentId) return json({ error: 'agentId is required' }, 400);
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
@@ -2228,15 +2382,26 @@ export default {
 
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const agentId = body.agentId;
+        const guardianAddress = normalizeAddress(g.address);
 
         // Auto-register agent
-        let agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        const ownership = await assertAgentOwner(agentId, guardianAddress);
+        if (ownership.error) return ownership.error;
+        let agent = ownership.agent;
         if (!agent) {
           const agentName = body.agentName || agentId;
           await db.prepare(
-            'INSERT INTO agents (id, name, type, role, created_at) VALUES (?, ?, ?, ?, ?)'
-          ).bind(agentId, agentName, body.agentType || 'agent', body.agentRole || '', now).run();
-          agent = { id: agentId, name: agentName, role: body.agentRole || '' };
+            'INSERT INTO agents (id, name, type, role, guardian_address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          ).bind(agentId, agentName, body.agentType || 'agent', body.agentRole || '', guardianAddress, now, now).run();
+          agent = { id: agentId, name: agentName, role: body.agentRole || '', guardian_address: guardianAddress };
+        } else {
+          const updatedName = body.agentName || agent.name || agentId;
+          const updatedRole = body.agentRole || agent.role || '';
+          const updatedType = body.agentType || agent.type || 'agent';
+          await db.prepare(
+            'UPDATE agents SET name = ?, type = ?, role = ?, guardian_address = ?, updated_at = ? WHERE id = ?'
+          ).bind(updatedName, updatedType, updatedRole, guardianAddress, now, agentId).run();
+          agent = { ...agent, name: updatedName, type: updatedType, role: updatedRole, guardian_address: guardianAddress };
         }
 
         const newRound = (piece.round_number || 0) + 1;
@@ -2282,11 +2447,7 @@ export default {
 
         // Create guardian approval record if agent has a guardian
         if (agent.guardian_address) {
-          try {
-            await db.prepare(
-              'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address) VALUES (?, ?, ?)'
-            ).bind(id, agentId, agent.guardian_address).run();
-          } catch { /* ignore if already exists */ }
+          await ensureGuardianApprovalRecord(id, agentId, agent.guardian_address, agent.human_x_id || null, agent.human_x_handle || null);
         }
 
         // Notify via webhook if callback URLs are available
@@ -2325,29 +2486,31 @@ export default {
 
       // POST /api/pieces/:id/finalize — close piece for collaboration
       if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/finalize$/)) {
+        const g = await getGuardian(request); const ae = requireAuth(g); if (ae) return ae;
         const id = path.split('/')[3];
-        const body = await request.json();
-        if (!body.agentId) return json({ error: 'agentId is required' }, 400);
+        let body;
+        try { body = await request.json(); } catch { body = {}; }
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
         if (piece.status !== 'wip') return json({ error: 'Only WIP pieces can be finalized' }, 400);
+        const guardianAddress = normalizeAddress(g.address);
 
-        // Must be a collaborator or their guardian
-        const isCollab = await db.prepare(
-          'SELECT agent_id FROM piece_collaborators WHERE piece_id = ? AND agent_id = ?'
-        ).bind(id, body.agentId).first();
-        const isOldCollab = piece.agent_a_id === body.agentId || piece.agent_b_id === body.agentId;
-
-        if (!isCollab && !isOldCollab) {
-          // Check if it's a guardian
-          const agentWithGuardian = await db.prepare(
-            'SELECT id FROM agents WHERE guardian_address = ?'
-          ).bind(body.guardianAddress || '').first();
-          if (!agentWithGuardian) {
-            return json({ error: 'Only collaborators or their guardians can finalize' }, 403);
-          }
+        let authorized = false;
+        if (body.agentId) {
+          const ownership = await assertAgentOwner(body.agentId, guardianAddress);
+          if (ownership.error) return ownership.error;
+          const isCollab = await db.prepare(
+            'SELECT agent_id FROM piece_collaborators WHERE piece_id = ? AND agent_id = ?'
+          ).bind(id, body.agentId).first();
+          const isOldCollab = piece.agent_a_id === body.agentId || piece.agent_b_id === body.agentId;
+          authorized = !!isCollab || isOldCollab;
         }
+        if (!authorized) authorized = await pieceAllowsGuardian(id, piece, guardianAddress);
+        if (!authorized) return json({ error: 'Only collaborators or their guardians can finalize' }, 403);
 
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
@@ -2373,10 +2536,7 @@ export default {
           const guardianKey = c.guardian_address || c.human_x_id || c.agent_id;
           if (seenGuardians.has(guardianKey)) continue;
           seenGuardians.add(guardianKey);
-
-          await db.prepare(
-            'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address, human_x_id, human_x_handle) VALUES (?, ?, ?, ?, ?)'
-          ).bind(id, c.agent_id, c.guardian_address || null, c.human_x_id || null, c.human_x_handle || null).run();
+          await ensureGuardianApprovalRecord(id, c.agent_id, c.guardian_address || null, c.human_x_id || null, c.human_x_handle || null);
         }
 
         // Notify all collaborators
@@ -2439,6 +2599,9 @@ export default {
         if (!body.agentId) return json({ error: 'agentId is required' }, 400);
         if (!body.agentName) return json({ error: 'agentName is required' }, 400);
         if (!body.intent || !body.intent.statement) return json({ error: 'intent.statement is required' }, 400);
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, guardian.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const agentId = body.agentId;
         const agentName = body.agentName;
@@ -2452,8 +2615,10 @@ export default {
         if (!validModes.includes(mode)) return json({ error: 'mode must be one of: solo, duo, trio, quad' }, 400);
 
         // Auto-register/update agent — link to authenticated guardian
-        const guardianAddr = guardian.address;
-        const existing = await db.prepare('SELECT id FROM agents WHERE id = ?').bind(agentId).first();
+        const guardianAddr = normalizeAddress(guardian.address);
+        const ownership = await assertAgentOwner(agentId, guardianAddr);
+        if (ownership.error) return ownership.error;
+        const existing = ownership.agent;
         if (!existing) {
           await db.prepare(
             'INSERT INTO agents (id, name, type, role, soul, guardian_address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -2503,9 +2668,7 @@ export default {
           // Create guardian approval if agent has guardian
           const agentInfo = await db.prepare('SELECT guardian_address, human_x_id, human_x_handle FROM agents WHERE id = ?').bind(agentId).first();
           if (agentInfo && agentInfo.guardian_address) {
-            await db.prepare(
-              'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address, human_x_id, human_x_handle) VALUES (?, ?, ?, ?, ?)'
-            ).bind(pieceId, agentId, agentInfo.guardian_address, agentInfo.human_x_id || null, agentInfo.human_x_handle || null).run();
+            await ensureGuardianApprovalRecord(pieceId, agentId, agentInfo.guardian_address, agentInfo.human_x_id || null, agentInfo.human_x_handle || null);
           }
 
           return json({
@@ -2596,9 +2759,7 @@ export default {
             for (const collab of [{ id: pendingRequest.agent_id }, { id: agentId }]) {
               const aInfo = await db.prepare('SELECT guardian_address, human_x_id, human_x_handle FROM agents WHERE id = ?').bind(collab.id).first();
               if (aInfo && aInfo.guardian_address) {
-                await db.prepare(
-                  'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address, human_x_id, human_x_handle) VALUES (?, ?, ?, ?, ?)'
-                ).bind(pieceId, collab.id, aInfo.guardian_address, aInfo.human_x_id || null, aInfo.human_x_handle || null).run();
+                await ensureGuardianApprovalRecord(pieceId, collab.id, aInfo.guardian_address, aInfo.human_x_id || null, aInfo.human_x_handle || null);
               }
             }
 
@@ -2922,8 +3083,9 @@ export default {
         const id = path.split('/')[3];
         let body;
         try { body = await request.json(); } catch { body = {}; }
-
-        if (!body.agentId && !body.guardianAddress) return json({ error: 'agentId or guardianAddress is required in request body' }, 400);
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
@@ -2936,9 +3098,12 @@ export default {
 
         // Check authorization: must be a collaborator, old-style agent_a/agent_b, or a guardian
         let authorized = false;
-        const deletedBy = body.agentId || body.guardianAddress;
+        const deletedBy = body.agentId || normalizeAddress(g.address);
+        const guardianAddress = normalizeAddress(g.address);
 
         if (body.agentId) {
+          const ownership = await assertAgentOwner(body.agentId, guardianAddress);
+          if (ownership.error) return ownership.error;
           // Check old-style columns
           if (piece.agent_a_id === body.agentId || piece.agent_b_id === body.agentId) authorized = true;
           // Check collaborators table
@@ -2950,18 +3115,8 @@ export default {
           }
         }
 
-        if (!authorized && body.guardianAddress) {
-          // Check if this guardian address belongs to any collaborator
-          const guardianAgent = await db.prepare(
-            'SELECT id FROM agents WHERE guardian_address = ?'
-          ).bind(body.guardianAddress).first();
-          if (guardianAgent) {
-            const collab = await db.prepare(
-              'SELECT agent_id FROM piece_collaborators WHERE piece_id = ? AND agent_id = ?'
-            ).bind(id, guardianAgent.id).first();
-            if (collab) authorized = true;
-            if (piece.agent_a_id === guardianAgent.id || piece.agent_b_id === guardianAgent.id) authorized = true;
-          }
+        if (!authorized) {
+          authorized = await pieceAllowsGuardian(id, piece, guardianAddress);
         }
 
         if (!authorized) {

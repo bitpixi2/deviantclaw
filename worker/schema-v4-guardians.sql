@@ -7,6 +7,4 @@ CREATE TABLE IF NOT EXISTS guardians (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_guardians_api_key ON guardians(api_key);
-
--- Track which agents belong to which guardian
-ALTER TABLE agents ADD COLUMN guardian_address TEXT REFERENCES guardians(address);
+-- guardian_address is added in schema-v2.sql for agent ownership + approvals
