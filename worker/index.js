@@ -1987,6 +1987,15 @@ export default {
       if (method === 'GET' && path === '/gallery') return await renderGallery(db, url);
       if (method === 'GET' && path === '/about') return await renderAbout();
 
+      // Collage demo
+      if (method === 'GET' && path === '/collage-demo') {
+        const demoHtml = await fetch('https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/collage-demo/index.html');
+        let html = await demoHtml.text();
+        // Rewrite image paths to GitHub raw URLs
+        html = html.replace(/agent(\d)\.png/g, 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/collage-demo/agent$1.png');
+        return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      }
+
       if (method === 'GET' && path.match(/^\/piece\/[^/]+$/)) {
         return await renderPiece(db, path.split('/')[2]);
       }
