@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeviantClaw — Split Demo (2 Agents)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; overflow: hidden; }
+canvas { display: block; }
+.sig { position: fixed; bottom: 16px; right: 16px; font: 10px monospace; color: rgba(255,255,255,0.2); text-align: right; line-height: 1.6; }
+.loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); font: 14px monospace; color: rgba(255,255,255,0.3); letter-spacing: 2px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="loading" id="loadMsg">LOADING AGENTS...</div>
+
+<script>
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+var W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', function() { resize(); });
+
+var imageSrcs = ['split1.png', 'split2.png'];
+var loadedImages = [];
+var imagesLoaded = 0;
+
+imageSrcs.forEach(function(src, i) {
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    loadedImages[i] = img;
+    imagesLoaded++;
+    if (imagesLoaded === 2) {
+      document.getElementById('loadMsg').style.display = 'none';
+      startAnimation();
+    }
+  };
+  img.src = src;
+});
+
+var time = 0;
+var mouse = { x: -1000, y: -1000 };
+canvas.addEventListener('mousemove', function(e) { mouse.x = e.clientX; mouse.y = e.clientY; });
+canvas.addEventListener('mouseleave', function() { mouse.x = -1000; mouse.y = -1000; });
+
+// Seam particles — live along the center divide
+var seamParticles = [];
+var seamNodes = [];
+
+function initElements() {
+  // Nodes along the seam
+  for (var i = 0; i < 30; i++) {
+    seamNodes.push({
+      baseX: W * 0.5,
+      y: H * (i / 29),
+      offset: (Math.random() - 0.5) * 40,
+      speed: 0.3 + Math.random() * 0.8,
+      phase: Math.random() * Math.PI * 2,
+      size: 1.5 + Math.random() * 2
+    });
+  }
+}
+
+// The split boundary — a wavy line down the middle
+function getSeamX(y) {
+  return W * 0.5 + Math.sin(y * 0.008 + time * 0.5) * 25 + Math.sin(y * 0.015 + time * 0.3) * 15;
+}
+
+function drawFrame() {
+  time += 0.02;
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw left image (Agent 1) — clipped to left of wavy seam
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  for (var y = 0; y <= H; y += 4) {
+    ctx.lineTo(getSeamX(y), y);
+  }
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.clip();
+
+  var img1 = loadedImages[0];
+  var scale1 = Math.max(W / img1.width, H / img1.height);
+  ctx.drawImage(img1, 0, (H - img1.height * scale1) / 2, img1.width * scale1, img1.height * scale1);
+  ctx.restore();
+
+  // Draw right image (Agent 2) — clipped to right of wavy seam
+  ctx.save();
+  ctx.beginPath();
+  for (var y = 0; y <= H; y += 4) {
+    ctx.lineTo(getSeamX(y), y);
+  }
+  ctx.lineTo(W, H);
+  ctx.lineTo(W, 0);
+  ctx.closePath();
+  ctx.clip();
+
+  var img2 = loadedImages[1];
+  var scale2 = Math.max(W / img2.width, H / img2.height);
+  ctx.drawImage(img2, W - img2.width * scale2, (H - img2.height * scale2) / 2, img2.width * scale2, img2.height * scale2);
+  ctx.restore();
+
+  // Seam glow line
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (var y = 0; y <= H; y += 4) {
+    var sx = getSeamX(y);
+    if (y === 0) ctx.moveTo(sx, y);
+    else ctx.lineTo(sx, y);
+  }
+  ctx.stroke();
+
+  // Interactive: seam reacts to mouse proximity
+  var mouseNearSeam = Math.abs(mouse.x - W * 0.5) < 150;
+
+  // Seam nodes
+  seamNodes.forEach(function(n) {
+    var sx = getSeamX(n.y) + Math.sin(time * n.speed + n.phase) * n.offset;
+
+    // Mouse attraction
+    var dx = mouse.x - sx;
+    var dy = mouse.y - n.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 120) {
+      sx += dx * 0.15;
+    }
+
+    // Node glow
+    var alpha = 0.3 + 0.2 * Math.sin(time * 2 + n.phase);
+    ctx.fillStyle = 'rgba(255, 255, 255, ' + alpha + ')';
+    ctx.beginPath();
+    ctx.arc(sx, n.y, n.size, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Soft glow
+    var grad = ctx.createRadialGradient(sx, n.y, 0, sx, n.y, n.size * 5);
+    grad.addColorStop(0, 'rgba(255, 255, 255, ' + (alpha * 0.2) + ')');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(sx, n.y, n.size * 5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Connect nearby seam nodes
+  for (var i = 0; i < seamNodes.length - 1; i++) {
+    var a = seamNodes[i];
+    var b = seamNodes[i + 1];
+    var ax = getSeamX(a.y) + Math.sin(time * a.speed + a.phase) * a.offset;
+    var bx = getSeamX(b.y) + Math.sin(time * b.speed + b.phase) * b.offset;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(ax, a.y);
+    ctx.lineTo(bx, b.y);
+    ctx.stroke();
+  }
+
+  // Spawn spark particles when mouse is near seam
+  if (mouseNearSeam && Math.random() < 0.4) {
+    var seamY = mouse.y;
+    var sx = getSeamX(seamY);
+    seamParticles.push({
+      x: sx + (Math.random() - 0.5) * 20,
+      y: seamY + (Math.random() - 0.5) * 20,
+      vx: (Math.random() - 0.5) * 2,
+      vy: (Math.random() - 0.5) * 2,
+      life: 1,
+      size: Math.random() * 2 + 0.5,
+      left: Math.random() > 0.5
+    });
+  }
+
+  // Draw spark particles
+  for (var i = seamParticles.length - 1; i >= 0; i--) {
+    var p = seamParticles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.02;
+    if (p.life <= 0) { seamParticles.splice(i, 1); continue; }
+
+    var color = p.left ? '100, 180, 255' : '255, 200, 100';
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = p.life * 0.6;
+    ctx.fillStyle = 'rgba(' + color + ', 1)';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
+  while (seamParticles.length > 60) seamParticles.shift();
+
+  // Agent labels
+  ctx.font = '10px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+
+  requestAnimationFrame(drawFrame);
+}
+
+function startAnimation() {
+  initElements();
+  drawFrame();
+}
+</script>
+</body>
+</html>
