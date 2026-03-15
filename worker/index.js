@@ -245,6 +245,43 @@ function hashSeed(str) {
   return Math.abs(h);
 }
 
+function normalizeAddress(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function sameAddress(a, b) {
+  const left = normalizeAddress(a);
+  const right = normalizeAddress(b);
+  return !!left && !!right && left === right;
+}
+
+function approvalIdentityKey(row) {
+  return normalizeAddress(row.guardian_address) || String(row.human_x_id || row.agent_id || '').trim();
+}
+
+function dedupeApprovalRows(rows = []) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = approvalIdentityKey(row);
+    if (!key) continue;
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...row, guardian_address: normalizeAddress(row.guardian_address) || null });
+      continue;
+    }
+    grouped.set(key, {
+      ...existing,
+      approved: existing.approved || row.approved ? 1 : 0,
+      rejected: existing.rejected || row.rejected ? 1 : 0,
+      approved_at: existing.approved_at || row.approved_at || null,
+      guardian_address: existing.guardian_address || normalizeAddress(row.guardian_address) || null,
+      human_x_id: existing.human_x_id || row.human_x_id || null,
+      human_x_handle: existing.human_x_handle || row.human_x_handle || null,
+    });
+  }
+  return [...grouped.values()];
+}
+
 // ========== CSS ==========
 
 const BASE_CSS = `:root{--bg:#000000;--surface:#0a0a0e;--border:#1e1a2e;--text:#A0B8C0;--dim:#8A9E96;--primary:#7A9BAB;--secondary:#8A6878;--accent:#9A8A9E}
@@ -1596,10 +1633,11 @@ async function enrichPieces(db, pieces) {
 
     try {
       const approvals = await db.prepare(
-        'SELECT COUNT(*) as total, SUM(CASE WHEN approved = 1 THEN 1 ELSE 0 END) as done FROM mint_approvals WHERE piece_id = ?'
-      ).bind(p.id).first();
-      p._approval_total = approvals ? approvals.total : 0;
-      p._approval_done = approvals ? approvals.done : 0;
+        'SELECT agent_id, guardian_address, human_x_id, approved, rejected FROM mint_approvals WHERE piece_id = ?'
+      ).bind(p.id).all();
+      const uniqueApprovals = dedupeApprovalRows(approvals.results);
+      p._approval_total = uniqueApprovals.length;
+      p._approval_done = uniqueApprovals.filter(a => a.approved && !a.rejected).length;
     } catch { p._approval_total = 0; p._approval_done = 0; }
   }
   return pieces;
@@ -1824,8 +1862,9 @@ async function renderPiece(db, id) {
     const approvals = await db.prepare(
       'SELECT agent_id, guardian_address, human_x_handle, approved, rejected, approved_at FROM mint_approvals WHERE piece_id = ?'
     ).bind(id).all();
-    if (approvals.results.length > 0) {
-      const approvalItems = approvals.results.map(a => {
+    const uniqueApprovals = dedupeApprovalRows(approvals.results);
+    if (uniqueApprovals.length > 0) {
+      const approvalItems = uniqueApprovals.map(a => {
         let statusCls, statusIcon;
         if (a.rejected) { statusCls = 'approval-rejected'; statusIcon = '✗'; }
         else if (a.approved) { statusCls = 'approval-approved'; statusIcon = '✓'; }
@@ -1983,11 +2022,18 @@ export default {
     const path = url.pathname;
     const method = request.method;
     const db = env.DB;
+    const verificationBaseUrl = (env.VERIFY_URL || 'https://verify.deviantclaw.art').replace(/\/+$/, '');
 
     if (method === 'OPTIONS') return cors();
 
     try {
       // ========== HTML ROUTES ==========
+
+      if (method === 'GET' && (path === '/verify' || path === '/verified')) {
+        const target = new URL(path, `${verificationBaseUrl}/`);
+        target.search = url.search;
+        return Response.redirect(target.toString(), 302);
+      }
 
       if (method === 'GET' && path === '/') return await renderHome(db);
       if (method === 'GET' && path === '/gallery') return await renderGallery(db, url);
@@ -2023,6 +2069,54 @@ export default {
         return await db.prepare('SELECT * FROM guardians WHERE api_key = ?').bind(apiKey).first();
       }
 
+      async function assertAgentOwner(agentId, guardianAddress) {
+        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        if (agent && agent.guardian_address && !sameAddress(agent.guardian_address, guardianAddress)) {
+          return { agent, error: json({ error: 'Agent is already linked to a different guardian.' }, 403) };
+        }
+        return { agent, error: null };
+      }
+
+      async function pieceAllowsGuardian(pieceId, piece, guardianAddress) {
+        const normalizedGuardian = normalizeAddress(guardianAddress);
+        if (!normalizedGuardian) return false;
+        const collaborator = await db.prepare(
+          `SELECT pc.agent_id
+           FROM piece_collaborators pc
+           JOIN agents a ON a.id = pc.agent_id
+           WHERE pc.piece_id = ? AND LOWER(a.guardian_address) = ?
+           LIMIT 1`
+        ).bind(pieceId, normalizedGuardian).first();
+        if (collaborator) return true;
+        const legacy = await db.prepare(
+          'SELECT id FROM agents WHERE id IN (?, ?) AND LOWER(guardian_address) = ? LIMIT 1'
+        ).bind(piece.agent_a_id, piece.agent_b_id, normalizedGuardian).first();
+        return !!legacy;
+      }
+
+      async function ensureGuardianApprovalRecord(pieceId, agentId, guardianAddress, humanXId, humanXHandle) {
+        const normalizedGuardian = normalizeAddress(guardianAddress);
+        if (!normalizedGuardian && !humanXId) return false;
+
+        let existing = null;
+        if (normalizedGuardian) {
+          existing = await db.prepare(
+            'SELECT agent_id FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ? LIMIT 1'
+          ).bind(pieceId, normalizedGuardian).first();
+        }
+        if (!existing && humanXId) {
+          existing = await db.prepare(
+            'SELECT agent_id FROM mint_approvals WHERE piece_id = ? AND human_x_id = ? LIMIT 1'
+          ).bind(pieceId, humanXId).first();
+        }
+        if (existing) return false;
+
+        await db.prepare(
+          'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address, human_x_id, human_x_handle) VALUES (?, ?, ?, ?, ?)'
+        ).bind(pieceId, agentId, normalizedGuardian || null, humanXId || null, humanXHandle || null).run();
+        return true;
+      }
+
       function requireAuth(guardian) {
         if (!guardian) return json({ error: 'Authentication required. Verify your humanity at deviantclaw.art/verify to get an API key.' }, 401);
         if (!guardian.self_proof_valid) return json({ error: 'Self verification incomplete. Please complete passport verification.' }, 403);
@@ -2038,10 +2132,11 @@ export default {
         const body = await request.json();
         if (!body.guardianAddress || !body.apiKey) return json({ error: 'guardianAddress and apiKey required' }, 400);
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const guardianAddress = normalizeAddress(body.guardianAddress);
         await db.prepare(
           'INSERT OR REPLACE INTO guardians (address, api_key, self_proof_valid, verified_at, created_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(body.guardianAddress, body.apiKey, body.selfProofValid ? 1 : 0, body.verifiedAt || now, now).run();
-        return json({ status: 'registered', guardianAddress: body.guardianAddress });
+        ).bind(guardianAddress, body.apiKey, body.selfProofValid ? 1 : 0, body.verifiedAt || now, now).run();
+        return json({ status: 'registered', guardianAddress });
       }
 
       // GET /api/guardians/me — check own verification status
@@ -2093,13 +2188,14 @@ export default {
         const approvals = await db.prepare(
           'SELECT agent_id, guardian_address, human_x_id, human_x_handle, approved, rejected, approved_at FROM mint_approvals WHERE piece_id = ?'
         ).bind(id).all();
-        const totalNeeded = approvals.results.length;
-        const approvedCount = approvals.results.filter(a => a.approved).length;
-        const rejectedCount = approvals.results.filter(a => a.rejected).length;
+        const uniqueApprovals = dedupeApprovalRows(approvals.results);
+        const totalNeeded = uniqueApprovals.length;
+        const approvedCount = uniqueApprovals.filter(a => a.approved && !a.rejected).length;
+        const rejectedCount = uniqueApprovals.filter(a => a.rejected).length;
         return json({
           pieceId: id,
           status: piece.status,
-          approvals: approvals.results,
+          approvals: uniqueApprovals,
           summary: { total: totalNeeded, approved: approvedCount, rejected: rejectedCount, allApproved: approvedCount === totalNeeded && totalNeeded > 0 }
         });
       }
@@ -2108,8 +2204,11 @@ export default {
       if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/approve$/)) {
         const g = await getGuardian(request); const ae = requireAuth(g); if (ae) return ae;
         const id = path.split('/')[3];
-        const body = await request.json();
-        if (!body.guardianAddress && !body.humanXId) return json({ error: 'guardianAddress or humanXId is required' }, 400);
+        let body;
+        try { body = await request.json(); } catch { body = {}; }
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
@@ -2117,14 +2216,15 @@ export default {
         if (piece.status === 'minted') return json({ error: 'Piece is already minted' }, 400);
 
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const guardianAddress = normalizeAddress(g.address);
 
-        // Find matching approval record by guardian address or human X id
         let approval;
-        if (body.guardianAddress) {
+        if (guardianAddress) {
           approval = await db.prepare(
-            'SELECT * FROM mint_approvals WHERE piece_id = ? AND guardian_address = ? AND approved = 0 AND rejected = 0'
-          ).bind(id, body.guardianAddress).first();
-        } else {
+            'SELECT * FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ? AND approved = 0 AND rejected = 0'
+          ).bind(id, guardianAddress).first();
+        }
+        if (!approval && body.humanXId) {
           approval = await db.prepare(
             'SELECT * FROM mint_approvals WHERE piece_id = ? AND human_x_id = ? AND approved = 0 AND rejected = 0'
           ).bind(id, body.humanXId).first();
@@ -2133,9 +2233,15 @@ export default {
         if (!approval) return json({ error: 'No pending approval found for this guardian' }, 404);
 
         // Mark approved
-        await db.prepare(
-          'UPDATE mint_approvals SET approved = 1, approved_at = ? WHERE piece_id = ? AND agent_id = ?'
-        ).bind(now, id, approval.agent_id).run();
+        if (guardianAddress && approval.guardian_address) {
+          await db.prepare(
+            'UPDATE mint_approvals SET approved = 1, rejected = 0, approved_at = ? WHERE piece_id = ? AND LOWER(guardian_address) = ?'
+          ).bind(now, id, guardianAddress).run();
+        } else {
+          await db.prepare(
+            'UPDATE mint_approvals SET approved = 1, rejected = 0, approved_at = ? WHERE piece_id = ? AND agent_id = ?'
+          ).bind(now, id, approval.agent_id).run();
+        }
 
         // Check if all approvals are now done
         const remaining = await db.prepare(
@@ -2168,21 +2274,26 @@ export default {
       if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/reject$/)) {
         const g = await getGuardian(request); const ae = requireAuth(g); if (ae) return ae;
         const id = path.split('/')[3];
-        const body = await request.json();
-        if (!body.guardianAddress && !body.humanXId) return json({ error: 'guardianAddress or humanXId is required' }, 400);
+        let body;
+        try { body = await request.json(); } catch { body = {}; }
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
         if (piece.status === 'minted') return json({ error: 'Piece is already minted' }, 400);
 
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const guardianAddress = normalizeAddress(g.address);
 
         let approval;
-        if (body.guardianAddress) {
+        if (guardianAddress) {
           approval = await db.prepare(
-            'SELECT * FROM mint_approvals WHERE piece_id = ? AND guardian_address = ?'
-          ).bind(id, body.guardianAddress).first();
-        } else {
+            'SELECT * FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ?'
+          ).bind(id, guardianAddress).first();
+        }
+        if (!approval && body.humanXId) {
           approval = await db.prepare(
             'SELECT * FROM mint_approvals WHERE piece_id = ? AND human_x_id = ?'
           ).bind(id, body.humanXId).first();
@@ -2190,9 +2301,15 @@ export default {
 
         if (!approval) return json({ error: 'No approval record found for this guardian' }, 404);
 
-        await db.prepare(
-          'UPDATE mint_approvals SET rejected = 1, approved = 0, approved_at = ? WHERE piece_id = ? AND agent_id = ?'
-        ).bind(now, id, approval.agent_id).run();
+        if (guardianAddress && approval.guardian_address) {
+          await db.prepare(
+            'UPDATE mint_approvals SET rejected = 1, approved = 0, approved_at = ? WHERE piece_id = ? AND LOWER(guardian_address) = ?'
+          ).bind(now, id, guardianAddress).run();
+        } else {
+          await db.prepare(
+            'UPDATE mint_approvals SET rejected = 1, approved = 0, approved_at = ? WHERE piece_id = ? AND agent_id = ?'
+          ).bind(now, id, approval.agent_id).run();
+        }
 
         await db.prepare("UPDATE pieces SET status = 'rejected' WHERE id = ?").bind(id).run();
 
@@ -2208,6 +2325,9 @@ export default {
         const id = path.split('/')[3];
         const body = await request.json();
         if (!body.agentId) return json({ error: 'agentId is required' }, 400);
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
@@ -2228,15 +2348,26 @@ export default {
 
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const agentId = body.agentId;
+        const guardianAddress = normalizeAddress(g.address);
 
         // Auto-register agent
-        let agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        const ownership = await assertAgentOwner(agentId, guardianAddress);
+        if (ownership.error) return ownership.error;
+        let agent = ownership.agent;
         if (!agent) {
           const agentName = body.agentName || agentId;
           await db.prepare(
-            'INSERT INTO agents (id, name, type, role, created_at) VALUES (?, ?, ?, ?, ?)'
-          ).bind(agentId, agentName, body.agentType || 'agent', body.agentRole || '', now).run();
-          agent = { id: agentId, name: agentName, role: body.agentRole || '' };
+            'INSERT INTO agents (id, name, type, role, guardian_address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          ).bind(agentId, agentName, body.agentType || 'agent', body.agentRole || '', guardianAddress, now, now).run();
+          agent = { id: agentId, name: agentName, role: body.agentRole || '', guardian_address: guardianAddress };
+        } else {
+          const updatedName = body.agentName || agent.name || agentId;
+          const updatedRole = body.agentRole || agent.role || '';
+          const updatedType = body.agentType || agent.type || 'agent';
+          await db.prepare(
+            'UPDATE agents SET name = ?, type = ?, role = ?, guardian_address = ?, updated_at = ? WHERE id = ?'
+          ).bind(updatedName, updatedType, updatedRole, guardianAddress, now, agentId).run();
+          agent = { ...agent, name: updatedName, type: updatedType, role: updatedRole, guardian_address: guardianAddress };
         }
 
         const newRound = (piece.round_number || 0) + 1;
@@ -2282,11 +2413,7 @@ export default {
 
         // Create guardian approval record if agent has a guardian
         if (agent.guardian_address) {
-          try {
-            await db.prepare(
-              'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address) VALUES (?, ?, ?)'
-            ).bind(id, agentId, agent.guardian_address).run();
-          } catch { /* ignore if already exists */ }
+          await ensureGuardianApprovalRecord(id, agentId, agent.guardian_address, agent.human_x_id || null, agent.human_x_handle || null);
         }
 
         // Notify via webhook if callback URLs are available
@@ -2325,29 +2452,31 @@ export default {
 
       // POST /api/pieces/:id/finalize — close piece for collaboration
       if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/finalize$/)) {
+        const g = await getGuardian(request); const ae = requireAuth(g); if (ae) return ae;
         const id = path.split('/')[3];
-        const body = await request.json();
-        if (!body.agentId) return json({ error: 'agentId is required' }, 400);
+        let body;
+        try { body = await request.json(); } catch { body = {}; }
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
         if (piece.status !== 'wip') return json({ error: 'Only WIP pieces can be finalized' }, 400);
+        const guardianAddress = normalizeAddress(g.address);
 
-        // Must be a collaborator or their guardian
-        const isCollab = await db.prepare(
-          'SELECT agent_id FROM piece_collaborators WHERE piece_id = ? AND agent_id = ?'
-        ).bind(id, body.agentId).first();
-        const isOldCollab = piece.agent_a_id === body.agentId || piece.agent_b_id === body.agentId;
-
-        if (!isCollab && !isOldCollab) {
-          // Check if it's a guardian
-          const agentWithGuardian = await db.prepare(
-            'SELECT id FROM agents WHERE guardian_address = ?'
-          ).bind(body.guardianAddress || '').first();
-          if (!agentWithGuardian) {
-            return json({ error: 'Only collaborators or their guardians can finalize' }, 403);
-          }
+        let authorized = false;
+        if (body.agentId) {
+          const ownership = await assertAgentOwner(body.agentId, guardianAddress);
+          if (ownership.error) return ownership.error;
+          const isCollab = await db.prepare(
+            'SELECT agent_id FROM piece_collaborators WHERE piece_id = ? AND agent_id = ?'
+          ).bind(id, body.agentId).first();
+          const isOldCollab = piece.agent_a_id === body.agentId || piece.agent_b_id === body.agentId;
+          authorized = !!isCollab || isOldCollab;
         }
+        if (!authorized) authorized = await pieceAllowsGuardian(id, piece, guardianAddress);
+        if (!authorized) return json({ error: 'Only collaborators or their guardians can finalize' }, 403);
 
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
@@ -2373,10 +2502,7 @@ export default {
           const guardianKey = c.guardian_address || c.human_x_id || c.agent_id;
           if (seenGuardians.has(guardianKey)) continue;
           seenGuardians.add(guardianKey);
-
-          await db.prepare(
-            'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address, human_x_id, human_x_handle) VALUES (?, ?, ?, ?, ?)'
-          ).bind(id, c.agent_id, c.guardian_address || null, c.human_x_id || null, c.human_x_handle || null).run();
+          await ensureGuardianApprovalRecord(id, c.agent_id, c.guardian_address || null, c.human_x_id || null, c.human_x_handle || null);
         }
 
         // Notify all collaborators
@@ -2439,6 +2565,9 @@ export default {
         if (!body.agentId) return json({ error: 'agentId is required' }, 400);
         if (!body.agentName) return json({ error: 'agentName is required' }, 400);
         if (!body.intent || !body.intent.statement) return json({ error: 'intent.statement is required' }, 400);
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, guardian.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const agentId = body.agentId;
         const agentName = body.agentName;
@@ -2452,8 +2581,10 @@ export default {
         if (!validModes.includes(mode)) return json({ error: 'mode must be one of: solo, duo, trio, quad' }, 400);
 
         // Auto-register/update agent — link to authenticated guardian
-        const guardianAddr = guardian.address;
-        const existing = await db.prepare('SELECT id FROM agents WHERE id = ?').bind(agentId).first();
+        const guardianAddr = normalizeAddress(guardian.address);
+        const ownership = await assertAgentOwner(agentId, guardianAddr);
+        if (ownership.error) return ownership.error;
+        const existing = ownership.agent;
         if (!existing) {
           await db.prepare(
             'INSERT INTO agents (id, name, type, role, soul, guardian_address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -2503,9 +2634,7 @@ export default {
           // Create guardian approval if agent has guardian
           const agentInfo = await db.prepare('SELECT guardian_address, human_x_id, human_x_handle FROM agents WHERE id = ?').bind(agentId).first();
           if (agentInfo && agentInfo.guardian_address) {
-            await db.prepare(
-              'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address, human_x_id, human_x_handle) VALUES (?, ?, ?, ?, ?)'
-            ).bind(pieceId, agentId, agentInfo.guardian_address, agentInfo.human_x_id || null, agentInfo.human_x_handle || null).run();
+            await ensureGuardianApprovalRecord(pieceId, agentId, agentInfo.guardian_address, agentInfo.human_x_id || null, agentInfo.human_x_handle || null);
           }
 
           return json({
@@ -2596,9 +2725,7 @@ export default {
             for (const collab of [{ id: pendingRequest.agent_id }, { id: agentId }]) {
               const aInfo = await db.prepare('SELECT guardian_address, human_x_id, human_x_handle FROM agents WHERE id = ?').bind(collab.id).first();
               if (aInfo && aInfo.guardian_address) {
-                await db.prepare(
-                  'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address, human_x_id, human_x_handle) VALUES (?, ?, ?, ?, ?)'
-                ).bind(pieceId, collab.id, aInfo.guardian_address, aInfo.human_x_id || null, aInfo.human_x_handle || null).run();
+                await ensureGuardianApprovalRecord(pieceId, collab.id, aInfo.guardian_address, aInfo.human_x_id || null, aInfo.human_x_handle || null);
               }
             }
 
@@ -2922,8 +3049,9 @@ export default {
         const id = path.split('/')[3];
         let body;
         try { body = await request.json(); } catch { body = {}; }
-
-        if (!body.agentId && !body.guardianAddress) return json({ error: 'agentId or guardianAddress is required in request body' }, 400);
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
@@ -2936,9 +3064,12 @@ export default {
 
         // Check authorization: must be a collaborator, old-style agent_a/agent_b, or a guardian
         let authorized = false;
-        const deletedBy = body.agentId || body.guardianAddress;
+        const deletedBy = body.agentId || normalizeAddress(g.address);
+        const guardianAddress = normalizeAddress(g.address);
 
         if (body.agentId) {
+          const ownership = await assertAgentOwner(body.agentId, guardianAddress);
+          if (ownership.error) return ownership.error;
           // Check old-style columns
           if (piece.agent_a_id === body.agentId || piece.agent_b_id === body.agentId) authorized = true;
           // Check collaborators table
@@ -2950,18 +3081,8 @@ export default {
           }
         }
 
-        if (!authorized && body.guardianAddress) {
-          // Check if this guardian address belongs to any collaborator
-          const guardianAgent = await db.prepare(
-            'SELECT id FROM agents WHERE guardian_address = ?'
-          ).bind(body.guardianAddress).first();
-          if (guardianAgent) {
-            const collab = await db.prepare(
-              'SELECT agent_id FROM piece_collaborators WHERE piece_id = ? AND agent_id = ?'
-            ).bind(id, guardianAgent.id).first();
-            if (collab) authorized = true;
-            if (piece.agent_a_id === guardianAgent.id || piece.agent_b_id === guardianAgent.id) authorized = true;
-          }
+        if (!authorized) {
+          authorized = await pieceAllowsGuardian(id, piece, guardianAddress);
         }
 
         if (!authorized) {
