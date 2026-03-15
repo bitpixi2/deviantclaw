@@ -1,6 +1,7 @@
 import { DefaultConfigStore, SelfBackendVerifier } from '@selfxyz/core';
 
 const PASSPORT_IDS = new Map([[1, true]]);
+const APP_ASSET_VERSION = '20260316b';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
 const LOGO_BASE64 = btoa(LOGO_SVG);
 
@@ -29,7 +30,7 @@ export default {
         return new Response(BROWSER_APP_JS, {
           headers: {
             'Content-Type': 'application/javascript; charset=utf-8',
-            'Cache-Control': 'public, max-age=300',
+            'Cache-Control': 'no-store',
           },
         });
       }
@@ -334,13 +335,13 @@ function renderVerifyPage(config) {
         logoBase64: LOGO_BASE64,
       })};
     </script>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.js?v=${APP_ASSET_VERSION}"></script>
   </body>
 </html>`;
 }
 
-const BROWSER_APP_JS = String.raw`
-import { SelfAppBuilder, getUniversalLink } from 'https://esm.sh/@selfxyz/core@1.1.0-beta.1';
+const BROWSER_APP_JS = `
+import { SelfAppBuilder, getUniversalLink } from 'https://esm.sh/@selfxyz/qrcode@1.0.22';
 import QRCode from 'https://esm.sh/qrcode@1.5.4';
 
 const config = window.__VERIFY_CONFIG__;
