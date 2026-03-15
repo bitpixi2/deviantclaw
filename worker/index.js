@@ -448,9 +448,15 @@ function statusBadge(status, extra) {
 }
 
 function pieceCard(p) {
-  // Venice pieces: use /api/pieces/:id/image endpoint. Old pieces: SVG fallback.
-  const hasVenice = p.venice_model || p.art_prompt;
-  const imgSrc = hasVenice ? `/api/pieces/${esc(p.id)}/image` : generateThumbnail(p);
+  // Venice pieces: use /api/pieces/:id/image endpoint. image_url: direct URL. Else: SVG fallback.
+  let imgSrc;
+  if (p.image_url) {
+    imgSrc = p.image_url;
+  } else if (p.venice_model || p.art_prompt) {
+    imgSrc = `/api/pieces/${esc(p.id)}/image`;
+  } else {
+    imgSrc = generateThumbnail(p);
+  }
   const imgTag = `<img src="${imgSrc}" alt="${esc(p.title)}" loading="lazy" />`;
 
   // Build artist names from collaborators array if available, else fall back to agent_a/agent_b

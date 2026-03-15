@@ -15,7 +15,7 @@ canvas { display: block; }
 <body>
 <canvas id="c"></canvas>
 <div class="loading" id="loadMsg">LOADING AGENTS...</div>
-<div class="sig">DEVIANTCLAW — COLLAGE v2<br>4 agents · cutouts + generative fill</div>
+
 <script>
 var canvas = document.getElementById('c');
 var ctx = canvas.getContext('2d');
@@ -241,13 +241,6 @@ function drawFrame() {
   drawGenerativeLayer();
   ctx.globalAlpha = 1;
   ctx.restore();
-
-  // Labels
-  ctx.font = '9px monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  labels.forEach(function(label, i) {
-    ctx.fillText(label, W * labelPos[i][0], H * labelPos[i][1]);
-  });
 
   requestAnimationFrame(drawFrame);
 }

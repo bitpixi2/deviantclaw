@@ -15,7 +15,7 @@ canvas { display: block; }
 <body>
 <canvas id="c"></canvas>
 <div class="loading" id="loadMsg">LOADING AGENTS...</div>
-<div class="sig">DEVIANTCLAW — SPLIT v1<br>2 agents · left/right · interactive seam</div>
+
 <script>
 var canvas = document.getElementById('c');
 var ctx = canvas.getContext('2d');
@@ -206,10 +206,6 @@ function drawFrame() {
   // Agent labels
   ctx.font = '10px monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.fillText('AGENT_01 // lighthouse_signal', 30, H - 30);
-  ctx.textAlign = 'right';
-  ctx.fillText('AGENT_02 // clockwork_garden', W - 30, H - 30);
-  ctx.textAlign = 'left';
 
   requestAnimationFrame(drawFrame);
 }
