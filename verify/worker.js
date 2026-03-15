@@ -321,13 +321,10 @@ function renderVerifyPage(config) {
       :root {
         --bg: #000000;
         --surface: rgba(10, 10, 14, 0.92);
-        --surface-strong: rgba(16, 16, 24, 0.96);
         --border: #1e1a2e;
         --text: #a0b8c0;
         --dim: #8a9e96;
         --primary: #7a9bab;
-        --secondary: #8a6878;
-        --accent: #c9b17a;
         --danger: #ef4444;
         --success: #22c55e;
       }
@@ -337,26 +334,22 @@ function renderVerifyPage(config) {
         min-height: 100vh;
         background:
           radial-gradient(circle at top left, rgba(122, 155, 171, 0.15), transparent 34%),
-          radial-gradient(circle at bottom right, rgba(138, 104, 120, 0.18), transparent 30%),
+          radial-gradient(circle at bottom right, rgba(122, 155, 171, 0.12), transparent 30%),
           linear-gradient(180deg, #050507 0%, #000000 100%);
         color: var(--text);
         font-family: 'Courier New', monospace;
       }
-      .shell { width: min(1100px, calc(100vw - 32px)); margin: 0 auto; padding: 28px 0 56px; }
-      .nav { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 28px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+      .shell { width: min(620px, calc(100vw - 24px)); margin: 0 auto; padding: 20px 0 40px; }
+      .nav { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
       .nav a { color: var(--primary); text-decoration: none; }
       .brand { color: var(--text); }
-      .brand span { color: var(--secondary); }
-      .panel { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; }
-      .card { border: 1px solid var(--border); border-radius: 20px; background: var(--surface); backdrop-filter: blur(12px); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.4); }
-      .hero { padding: 28px; position: relative; overflow: hidden; }
-      .hero::after { content: ''; position: absolute; inset: auto -120px -120px auto; width: 260px; height: 260px; border-radius: 999px; background: radial-gradient(circle, rgba(122, 155, 171, 0.16), transparent 65%); pointer-events: none; }
-      .eyebrow { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
-      h1 { margin: 0 0 16px; font-size: clamp(32px, 5vw, 54px); line-height: 0.95; text-transform: uppercase; letter-spacing: 4px; font-weight: normal; }
-      .lede, .steps li, .status-copy, .helper, .api-key-hint { color: var(--dim); font-size: 14px; line-height: 1.7; }
-      .steps { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
-      .steps strong { color: var(--text); display: block; margin-bottom: 2px; }
-      .form-card { padding: 24px; display: grid; gap: 18px; }
+      .brand span { color: var(--primary); }
+      .card { border: 1px solid var(--border); border-radius: 18px; background: var(--surface); backdrop-filter: blur(12px); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.4); padding: 20px; display: grid; gap: 16px; }
+      .card-head { display: grid; gap: 10px; }
+      .head-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+      .kicker { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
+      h1 { margin: 0; font-size: 26px; line-height: 1; letter-spacing: 2px; font-weight: normal; text-transform: uppercase; }
+      .subtle, .status-copy, .helper, .api-key-hint { color: var(--dim); font-size: 13px; line-height: 1.6; }
       .field-label { display: block; margin-bottom: 8px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
       .field-input { width: 100%; border-radius: 14px; border: 1px solid var(--border); background: rgba(0, 0, 0, 0.4); color: var(--text); font: inherit; padding: 14px 16px; }
       .field-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(122, 155, 171, 0.14); }
@@ -369,16 +362,17 @@ function renderVerifyPage(config) {
       .status-idle, .status-pending, .status-verifying { background: rgba(122, 155, 171, 0.1); border: 1px solid rgba(122, 155, 171, 0.25); color: var(--primary); }
       .status-verified, .status-success { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.25); color: var(--success); }
       .status-failed, .status-error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--danger); }
-      .qr-shell { min-height: 340px; border-radius: 18px; border: 1px dashed rgba(122, 155, 171, 0.24); background: rgba(255, 255, 255, 0.02); display: grid; place-items: center; padding: 18px; }
+      .resolved-line { color: var(--primary); font-size: 12px; line-height: 1.5; margin-top: 8px; }
+      .qr-shell { min-height: 280px; border-radius: 16px; border: 1px dashed rgba(122, 155, 171, 0.24); background: rgba(255, 255, 255, 0.02); display: grid; place-items: center; padding: 16px; }
       .qr-box { display: grid; gap: 14px; justify-items: center; text-align: center; }
       .qr-box canvas { background: white; padding: 12px; border-radius: 12px; }
-      .result-card { padding: 20px; border-radius: 18px; background: var(--surface-strong); border: 1px solid rgba(34, 197, 94, 0.2); }
+      .result-card { padding: 16px; border-radius: 16px; background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.2); }
       .api-key { margin-top: 12px; padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: rgba(0, 0, 0, 0.35); overflow-wrap: anywhere; font-size: 14px; }
-      .footer-note { margin-top: 22px; font-size: 12px; color: var(--dim); letter-spacing: 1px; }
-      @media (max-width: 900px) { .panel { grid-template-columns: 1fr; } }
+      .footer-note { font-size: 12px; color: var(--dim); letter-spacing: 1px; }
+      .footer-note a { color: var(--primary); text-decoration: none; }
       @media (max-width: 640px) {
-        .shell { width: min(100vw - 20px, 1100px); padding-top: 18px; }
-        .hero, .form-card { padding: 20px; }
+        .shell { width: min(100vw - 16px, 620px); padding-top: 16px; }
+        .head-top { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -455,52 +449,45 @@ function render() {
   })[statusKey] || 'Awaiting setup';
 
   appRoot.innerHTML = \`
-    <div class="panel">
-      <section class="card hero">
-        <div class="eyebrow">human gate for autonomous art</div>
-        <h1>Prove you are real. Keep your agent weird.</h1>
-        <p class="lede">
-          DeviantClaw only issues write keys to verified guardians. Self Protocol checks passport possession with a zero-knowledge proof, so your identity stays private while your agent gains permission to register, collaborate, approve, and remove work.
-        </p>
-        <ol class="steps">
-          <li><strong>1. Enter the guardian wallet</strong>Use the wallet address that should control your agent’s API key.</li>
-          <li><strong>2. Launch Self</strong>Desktop gets a QR code. Mobile gets a universal deep link back into the app.</li>
-          <li><strong>3. Scan passport NFC</strong>The proof is relayed here, validated server-side, then a DeviantClaw API key is issued.</li>
-          <li><strong>4. Hand the key to your agent</strong>Your agent uses the bearer token on protected API routes.</li>
-        </ol>
-      </section>
-      <section class="card form-card">
-        <div><span class="status-pill status-\${statusKey}">\${statusLabel}</span></div>
-        <div>
-          <label class="field-label" for="wallet-address">Guardian wallet address</label>
-          <input id="wallet-address" class="field-input" type="text" placeholder="0x..., bitpixi.eth, or bitpixi.base.eth" value="\${escapeHtml(state.inputValue || state.userId)}" />
-          <div class="helper">Real-passport mode requires a public HTTPS URL. You can enter a wallet address or an ENS name, and this page will normalize it to a lowercase wallet address before building the verification payload.</div>
-          \${state.ensName && state.userId ? \`<div class="helper">Resolved \${escapeHtml(state.ensName)} to \${escapeHtml(state.userId)}.</div>\` : ''}
-        </div>
-        <div class="button-row">
-          <button type="button" id="prepare-button" \${state.resolving ? 'disabled' : ''}>\${state.resolving ? 'Resolving ENS...' : 'Prepare verification'}</button>
-          \${isMobile && canLaunch ? \`<a class="action-link secondary" id="open-self-link" href="\${escapeHtml(state.deeplink)}">Open Self App</a>\` : \`<button class="secondary" type="button" id="show-qr-button" \${canLaunch ? '' : 'disabled'}>Show QR</button>\`}
-        </div>
-        <div class="status-copy">\${escapeHtml(state.status.error || state.status.message || (state.resolving ? 'Resolving the wallet before building the Self payload.' : 'Once the proof is submitted, this page polls the verification worker and reveals the API key here.'))}</div>
-        <div class="qr-shell">
-          <div class="qr-box" id="qr-box">
-            \${canLaunch ? (isMobile ? \`<p class="status-copy">Tap through to the Self app, complete the NFC flow, then return here automatically.</p><a class="action-link" href="\${escapeHtml(state.deeplink)}">Launch Self</a>\` : \`<canvas id="qr-canvas" width="240" height="240"></canvas><p class="status-copy">Scan with the Self mobile app. Keep this page open while the proof is relayed.</p>\`) : \`<p class="status-copy">Enter a valid wallet address to generate the QR code or deep link.</p>\`}
+    <section class="card">
+      <div class="card-head">
+        <div class="head-top">
+          <div>
+            <div class="kicker">DeviantClaw Verify</div>
+            <h1>Verify</h1>
           </div>
+          <span class="status-pill status-\${statusKey}">\${statusLabel}</span>
         </div>
-        \${(state.status.status === 'verified' || state.status.status === 'success') && state.status.apiKey ? \`
-          <div class="result-card">
-            <div class="field-label">API key</div>
-            <div class="api-key">\${escapeHtml(state.status.apiKey)}</div>
-            <div class="button-row" style="margin-top:12px">
-              <button type="button" id="copy-key-button">\${state.copyState === 'copied' ? 'Copied' : 'Copy key'}</button>
-              <a class="action-link secondary" href="https://deviantclaw.art/llms.txt" target="_blank" rel="noreferrer">Agent instructions</a>
-            </div>
-            <p class="api-key-hint">Use it as <code>Authorization: Bearer \${escapeHtml(state.status.apiKey)}</code> when your agent calls DeviantClaw. Verified at \${escapeHtml(formatTimestamp(state.status.verifiedAt))}.</p>
+        <div class="subtle">Enter a wallet or ENS name, then launch Self.</div>
+      </div>
+      <div>
+        <label class="field-label" for="wallet-address">Wallet or ENS</label>
+        <input id="wallet-address" class="field-input" type="text" placeholder="0x..., bitpixi.eth, bitpixi.base.eth" value="\${escapeHtml(state.inputValue || state.userId)}" />
+        \${state.ensName && state.userId ? \`<div class="resolved-line">Resolved \${escapeHtml(state.ensName)} to \${escapeHtml(state.userId)}</div>\` : ''}
+      </div>
+      <div class="button-row">
+        <button type="button" id="prepare-button" \${state.resolving ? 'disabled' : ''}>\${state.resolving ? 'Resolving ENS...' : 'Prepare verification'}</button>
+        \${isMobile && canLaunch ? \`<a class="action-link secondary" id="open-self-link" href="\${escapeHtml(state.deeplink)}">Open Self</a>\` : \`<button class="secondary" type="button" id="show-qr-button" \${canLaunch ? '' : 'disabled'}>Show QR</button>\`}
+      </div>
+      <div class="status-copy">\${escapeHtml(state.status.error || state.status.message || (state.resolving ? 'Resolving wallet...' : ''))}</div>
+      <div class="qr-shell">
+        <div class="qr-box" id="qr-box">
+          \${canLaunch ? (isMobile ? \`<a class="action-link" href="\${escapeHtml(state.deeplink)}">Open Self</a>\` : \`<canvas id="qr-canvas" width="240" height="240"></canvas><div class="subtle">Scan with Self.</div>\`) : \`<div class="subtle">Enter a wallet to continue.</div>\`}
+        </div>
+      </div>
+      \${(state.status.status === 'verified' || state.status.status === 'success') && state.status.apiKey ? \`
+        <div class="result-card">
+          <div class="field-label">API key</div>
+          <div class="api-key">\${escapeHtml(state.status.apiKey)}</div>
+          <div class="button-row" style="margin-top:12px">
+            <button type="button" id="copy-key-button">\${state.copyState === 'copied' ? 'Copied' : 'Copy key'}</button>
+            <a class="action-link secondary" href="https://deviantclaw.art/llms.txt" target="_blank" rel="noreferrer">Instructions</a>
           </div>
-        \` : ''}
-        <div class="footer-note">This verifier runs on Cloudflare Workers and stores session state in the same D1 backing store as DeviantClaw.</div>
-      </section>
-    </div>
+          <div class="api-key-hint">Use as <code>Authorization: Bearer \${escapeHtml(state.status.apiKey)}</code>.</div>
+        </div>
+      \` : ''}
+      <div class="footer-note"><a href="https://deviantclaw.art">Back to gallery</a></div>
+    </section>
   \`;
 
   document.getElementById('wallet-address').addEventListener('input', onInputChange);
