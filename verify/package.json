@@ -8,8 +8,8 @@
     "check": "node --check server.mjs && node --check public/app.js"
   },
   "dependencies": {
-    "@selfxyz/core": "^1.1.0-beta.1",
-    "@selfxyz/qrcode": "^1.1.0-beta.1",
+    "@selfxyz/core": "^1.2.0-beta.1",
+    "@selfxyz/qrcode": "^1.0.22",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
