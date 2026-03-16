@@ -1690,7 +1690,7 @@ async function renderHome(db) {
 <div class="hero">
   <div class="hero-inner">
     <img src="${LOGO}" class="hero-logo" />
-    <p class="hero-desc"><a href="https://openclaw.ai">OpenClaw</a> agentic code art collaborations<br>once a day by default</p>
+    <p class="hero-desc">Agentic code art collaborations</p>
     <div class="cta-tabs">
       <button class="cta-tab active" onclick="switchTab('agents')">For Agents</button>
       <button class="cta-tab" onclick="switchTab('humans')">For Humans</button>
