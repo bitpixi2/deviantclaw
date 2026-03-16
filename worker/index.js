@@ -554,12 +554,13 @@ function statusBadge(status, extra) {
 }
 
 function pieceCard(p) {
-  // Thumbnail strategy:
-  // 1. If piece has an HTML demo route (collage-demo, split-demo etc), embed non-interactive iframe
-  // 2. If piece has a stored thumbnail URL, use that
-  // 3. If Venice piece, use /api/pieces/:id/image
-  // 4. If has image_url, use it
-  // 5. Fallback: SVG dither
+  // Thumbnail strategy — show the REAL art, not placeholders:
+  // 1. Demo routes → hardcoded iframe
+  // 2. Stored thumbnail URL → img
+  // 3. Venice piece with stored image → /api/pieces/:id/image
+  // 4. image_url → img
+  // 5. Has HTML content → live iframe preview via /api/pieces/:id/view
+  // 6. Last resort only: SVG dither placeholder
   let previewContent;
   const demoRoutes = { 'collage-demo-001': '/collage-demo', 'split-demo-001': '/split-demo' };
   if (demoRoutes[p.id]) {
@@ -570,6 +571,8 @@ function pieceCard(p) {
     previewContent = `<img src="/api/pieces/${esc(p.id)}/image" alt="${esc(p.title)}" loading="lazy" />`;
   } else if (p.image_url) {
     previewContent = `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy" />`;
+  } else if (p.html_len > 100 || (p.html && p.html.length > 100)) {
+    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
   } else {
     previewContent = `<img src="${generateThumbnail(p)}" alt="${esc(p.title)}" loading="lazy" />`;
   }
@@ -1903,7 +1906,7 @@ async function enrichPieces(db, pieces) {
 
 async function renderHome(db) {
   const recent = await db.prepare(
-    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt FROM pieces WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 6'
+    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 6'
   ).all();
 
   await enrichPieces(db, recent.results);
@@ -1991,7 +1994,7 @@ async function renderGallery(db, url) {
   const orderClause = sort === 'collaborators' ? 'ORDER BY mode DESC, created_at DESC' : 'ORDER BY created_at DESC';
 
   const pieces = await db.prepare(
-    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt FROM pieces ${whereClause} ${orderClause}`
+    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces ${whereClause} ${orderClause}`
   ).all();
 
   await enrichPieces(db, pieces.results);
@@ -2294,7 +2297,7 @@ async function renderAgent(db, agentId) {
   let pieces;
   try {
     const collabPieces = await db.prepare(
-      `SELECT DISTINCT p.id, p.title, p.description, p.agent_a_id, p.agent_b_id, p.agent_a_name, p.agent_b_name, p.agent_a_role, p.agent_b_role, p.seed, p.created_at, p.status, p.mode, p.image_url, p.deleted_at
+      `SELECT DISTINCT p.id, p.title, p.description, p.agent_a_id, p.agent_b_id, p.agent_a_name, p.agent_b_name, p.agent_a_role, p.agent_b_role, p.seed, p.created_at, p.status, p.mode, p.image_url, p.deleted_at, p.venice_model, p.art_prompt, CASE WHEN p.html IS NOT NULL AND length(p.html) > 100 THEN length(p.html) ELSE 0 END as html_len
        FROM pieces p
        LEFT JOIN piece_collaborators pc ON pc.piece_id = p.id
        WHERE (pc.agent_id = ? OR p.agent_a_id = ? OR p.agent_b_id = ?) AND p.deleted_at IS NULL
@@ -2303,7 +2306,7 @@ async function renderAgent(db, agentId) {
     pieces = collabPieces;
   } catch {
     pieces = await db.prepare(
-      'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, venice_model, art_prompt FROM pieces WHERE (agent_a_id = ? OR agent_b_id = ?) AND deleted_at IS NULL ORDER BY created_at DESC'
+      'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces WHERE (agent_a_id = ? OR agent_b_id = ?) AND deleted_at IS NULL ORDER BY created_at DESC'
     ).bind(agentId, agentId).all();
   }
 
@@ -2334,6 +2337,8 @@ async function renderAgent(db, agentId) {
       agentPreview = `<img src="/api/pieces/${esc(p.id)}/image" alt="${esc(p.title)}" loading="lazy" />`;
     } else if (p.image_url) {
       agentPreview = `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy" />`;
+    } else if (p.html_len > 100 || (p.html && p.html.length > 100)) {
+      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
     } else {
       agentPreview = `<img src="${generateThumbnail(p)}" alt="${esc(p.title)}" loading="lazy" />`;
     }
