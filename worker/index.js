@@ -72,6 +72,63 @@ function getParticleEffects(mood) {
   return fx[mood] || fx.serene;
 }
 
+// ========== REACTION (Duo) — Sound-reactive art ==========
+function buildReactionHTML(imageUrl, title, artists, date) {
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
+canvas{position:fixed;top:0;left:0;z-index:1}
+img{position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:0}
+.mic-prompt{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;text-align:center;cursor:pointer;padding:30px;border:1px solid rgba(122,155,171,0.3);border-radius:12px;background:rgba(0,0,0,0.8);backdrop-filter:blur(10px)}
+.mic-prompt h2{color:#7a9bab;font-size:16px;letter-spacing:3px;font-weight:normal;text-transform:uppercase;margin-bottom:8px}
+.mic-prompt p{color:rgba(255,255,255,0.4);font-size:12px;letter-spacing:1px}
+.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
+.level{position:fixed;bottom:16px;right:20px;z-index:10;font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px}
+</style></head><body>
+<img src="${esc(imageUrl)}" alt="${esc(title)}" id="base"/>
+<canvas id="c"></canvas>
+<div class="mic-prompt" id="prompt" onclick="startAudio()">
+<h2>🎤 TAP TO LISTEN</h2>
+<p>This piece reacts to sound</p>
+</div>
+<div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(date)} · reaction</div></div>
+<div class="level" id="lvl"></div>
+<script>
+(function(){
+const c=document.getElementById('c'),ctx=c.getContext('2d'),base=document.getElementById('base');
+let W,H;function rz(){W=c.width=innerWidth;H=c.height=innerHeight;}rz();addEventListener('resize',rz);
+let analyser,dataArray,audioStarted=false;
+const particles=[];
+function mkP(x,y,isBass){return{x:x||Math.random()*W,y:y||Math.random()*H,vx:(Math.random()-.5)*2,vy:(Math.random()-.5)*2,sz:isBass?4+Math.random()*6:1+Math.random()*3,life:1,decay:0.003+Math.random()*0.005,bass:isBass,a:0.5+Math.random()*0.5};}
+for(let i=0;i<80;i++)particles.push(mkP(null,null,i<40));
+window.startAudio=async function(){
+try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});const ac=new AudioContext();const src=ac.createMediaStreamSource(stream);analyser=ac.createAnalyser();analyser.fftSize=256;dataArray=new Uint8Array(analyser.frequencyBinCount);src.connect(analyser);audioStarted=true;document.getElementById('prompt').style.display='none';}
+catch(e){document.getElementById('prompt').innerHTML='<h2>No mic access</h2><p>Animates gently without sound</p>';setTimeout(()=>document.getElementById('prompt').style.display='none',2000);}};
+function getBassAndTreble(){if(!audioStarted||!analyser)return{bass:0.3,treble:0.2};analyser.getByteFrequencyData(dataArray);const n=dataArray.length;let b=0,t=0;for(let i=0;i<n/4;i++)b+=dataArray[i];for(let i=Math.floor(n*0.6);i<n;i++)t+=dataArray[i];return{bass:b/(n/4)/255,treble:t/(n*0.4)/255};}
+function draw(){const{bass,treble}=getBassAndTreble();ctx.clearRect(0,0,W,H);
+base.style.transform='scale('+(1+bass*0.08)+')';
+base.style.filter='brightness('+(0.7+bass*0.5)+') hue-rotate('+Math.floor(treble*30)+'deg)';
+const bp=particles.filter(p=>p.bass);
+for(let i=0;i<bp.length;i++)for(let j=i+1;j<bp.length;j++){const dx=bp[i].x-bp[j].x,dy=bp[i].y-bp[j].y,d=Math.sqrt(dx*dx+dy*dy);if(d<120+bass*200){const a=(1-d/(120+bass*200))*0.3*bass;ctx.strokeStyle='rgba(122,155,171,'+a+')';ctx.lineWidth=0.5+bass*2;ctx.beginPath();ctx.moveTo(bp[i].x,bp[i].y);ctx.lineTo(bp[j].x,bp[j].y);ctx.stroke();}}
+for(let i=particles.length-1;i>=0;i--){const p=particles[i];const e=p.bass?bass:treble;p.vx+=(Math.random()-.5)*e*3;p.vy+=(Math.random()-.5)*e*3;p.vx*=p.bass?0.96:0.92;p.vy*=p.bass?0.96:0.92;p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;const sz=p.sz*(1+e*2);const al=p.a*(0.3+e*0.7);ctx.fillStyle=(p.bass?'rgba(122,155,171,A)':'rgba(255,120,80,A)').replace('A',al.toFixed(3));ctx.beginPath();ctx.arc(p.x,p.y,sz,0,Math.PI*2);ctx.fill();}
+if(bass>0.5)particles.push(mkP(W/2+(Math.random()-.5)*200,H/2+(Math.random()-.5)*200,true));
+if(treble>0.4)particles.push(mkP(Math.random()*W,Math.random()*H,false));
+while(particles.length>200)particles.shift();
+document.getElementById('lvl').textContent='BASS '+Math.floor(bass*100)+'% · TREBLE '+Math.floor(treble*100)+'%';
+requestAnimationFrame(draw);}
+draw();setTimeout(()=>document.getElementById('sig').classList.add('v'),2000);
+})();
+</script></body></html>`;
+}
+
 // ========== GAME (Trio + Quad) — GBC-style mini game ==========
 async function buildGameHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
@@ -511,9 +568,9 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   const numArtists = artists.length;
   let method;
   if (!isCollab) {
-    method = ['image', 'code'][Math.floor(Math.random() * 2)];
+    method = ['single', 'code'][Math.floor(Math.random() * 2)];
   } else if (numArtists === 2) {
-    method = ['fusion', 'split', 'collage', 'code'][Math.floor(Math.random() * 4)];
+    method = ['fusion', 'split', 'collage', 'code', 'reaction'][Math.floor(Math.random() * 5)];
   } else if (numArtists === 3) {
     method = ['fusion', 'game', 'collage', 'code', 'sequence', 'exquisite-corpse'][Math.floor(Math.random() * 6)];
   } else {
@@ -590,6 +647,8 @@ Generate an image prompt that captures BOTH agents' identities colliding. Each a
   let html;
   if (method === 'code') {
     html = await buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
+  } else if (method === 'reaction') {
+    html = buildReactionHTML(pieceImageUrl, title, artists, date);
   } else if (method === 'game') {
     html = await buildGameHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
   } else if (method === 'split') {
@@ -3554,8 +3613,8 @@ Content-Type: application/json
             },
             Method: {
               type: 'string',
-              values: ['image', 'code', 'fusion', 'split', 'collage', 'game', 'sequence', 'exquisite-corpse', 'parallax', 'glitch'],
-              description: 'How the art was generated. Solo (2): image, code. Duo (4): fusion, split, collage, code. Trio (6): fusion, game, collage, code, sequence, exquisite-corpse. Quad (8): fusion, game, collage, code, sequence, exquisite-corpse, parallax, glitch.'
+              values: ['single', 'code', 'fusion', 'split', 'collage', 'reaction', 'game', 'sequence', 'exquisite-corpse', 'parallax', 'glitch'],
+              description: 'How the art was generated. Solo (2): single, code. Duo (5): fusion, split, collage, code, reaction. Trio (6): fusion, game, collage, code, sequence, exquisite-corpse. Quad (8): fusion, game, collage, code, sequence, exquisite-corpse, parallax, glitch.'
             },
             Agent: {
               type: 'string',
@@ -3622,7 +3681,7 @@ Content-Type: application/json
           external_url: `https://deviantclaw.art/piece/${id}`,
           attributes: [
             { trait_type: 'Composition', value: piece.composition || (agents.length > 1 ? 'duo' : 'solo') },
-            { trait_type: 'Method', value: piece.method || 'image' },
+            { trait_type: 'Method', value: piece.method || 'single' },
             ...(collabs.results.length > 0
               ? collabs.results.map(c => ({
                   trait_type: (c.agent_type === 'subagent') ? 'Subagent' : 'Agent',
@@ -4248,7 +4307,7 @@ Content-Type: application/json
 
           await db.prepare(
             'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, status, image_url, art_prompt, venice_model, method, composition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-          ).bind(pieceId, result.title, result.description, agentId, agentId, requestId, requestId, result.html, result.seed, now, agentName, agentName, agentRole, agentRole, 'solo', 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, result.method || 'image', result.composition || 'solo').run();
+          ).bind(pieceId, result.title, result.description, agentId, agentId, requestId, requestId, result.html, result.seed, now, agentName, agentName, agentRole, agentRole, 'solo', 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, result.method || 'single', result.composition || 'solo').run();
 
           // Store Venice image separately and fix HTML placeholder
           await storeVeniceImage(db, pieceId, result);
