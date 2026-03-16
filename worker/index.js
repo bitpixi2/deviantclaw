@@ -296,7 +296,8 @@ nav .links{display:flex;gap:20px;font-size:12px;letter-spacing:1px;text-transfor
 nav .links a{color:var(--dim)}
 nav .links a:hover{color:var(--primary)}
 .container{max-width:1200px;margin:0 auto;padding:24px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
+@media(min-width:1100px){.grid{grid-template-columns:repeat(4,1fr)}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;transition:border-color 0.2s,transform 0.2s;display:block;color:inherit}
 .card:hover{border-color:var(--primary);transform:translateY(-2px)}
 .card .card-title{font-size:14px;color:var(--text);margin-bottom:8px;letter-spacing:1px}
@@ -326,20 +327,20 @@ const HERO_CSS = `.hero{padding:80px 24px 60px;text-align:center;border-bottom:1
 .built-with{padding:48px 24px 24px;text-align:center}
 .built-with-kicker{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:24px}
 .built-with-grid{display:flex;justify-content:center;align-items:center;gap:28px 40px;flex-wrap:wrap}
-.brand-link{display:flex;align-items:center;justify-content:center;min-width:120px;min-height:28px;opacity:0.72;transition:opacity 0.2s,transform 0.2s}
+.brand-link{display:flex;align-items:center;justify-content:center;min-width:140px;min-height:48px;opacity:0.72;transition:opacity 0.2s,transform 0.2s}
 .brand-link:hover{opacity:1;transform:translateY(-1px)}
-.brand-link img,.brand-link svg{display:block;width:auto;max-width:160px;height:22px;object-fit:contain}
-.brand-venice img{height:24px}
-.brand-x svg{height:20px;color:var(--text)}
-.brand-metamask svg{height:24px;color:#f6851b}
-.brand-superrare img{height:18px;filter:brightness(0) invert(1)}
-.brand-status img{height:20px}
-.brand-ens img{height:20px}
+.brand-link img,.brand-link svg{display:block;width:auto;max-width:200px;height:48px;object-fit:contain}
+.brand-venice img{height:52px}
+.brand-x svg{height:40px;color:var(--text)}
+.brand-metamask svg{height:52px;color:#f6851b}
+.brand-superrare img{height:40px;filter:brightness(0) invert(1)}
+.brand-status img{height:44px;filter:brightness(0) invert(1)}
+.brand-ens img{height:44px}
 @media (max-width:640px){
   .built-with-grid{gap:22px 28px}
-  .brand-link{min-width:100px}
-  .brand-link img,.brand-link svg{max-width:132px;height:18px}
-  .brand-venice img,.brand-metamask svg{height:20px}
+  .brand-link{min-width:100px;min-height:36px}
+  .brand-link img,.brand-link svg{max-width:160px;height:36px}
+  .brand-venice img,.brand-metamask svg{height:40px}
 }
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;margin-top:40px}
 .section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
@@ -390,9 +391,11 @@ const AGENT_CSS = `
 .agent-banner{position:relative;height:200px;overflow:hidden;border-radius:0 0 12px 12px;background:linear-gradient(135deg,var(--agent-color,#6ee7b7)22,transparent 70%),linear-gradient(225deg,rgba(110,231,183,0.15),var(--bg));margin-bottom:0}
 .agent-banner img{width:100%;height:100%;object-fit:cover;opacity:0.7}
 .agent-banner .banner-overlay{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,var(--bg))}
+.agent-banner .dc-logo{position:absolute;top:16px;right:20px;opacity:0.6;height:28px}
+@media(max-width:768px){.agent-banner .dc-logo{display:none}}
 
 /* Profile card - overlapping banner */
-.agent-profile-card{position:relative;margin-top:-60px;padding:0 24px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap}
+.agent-profile-card{position:relative;margin-top:-80px;padding:0 24px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap}
 .agent-avatar{width:120px;height:120px;border-radius:12px;border:3px solid var(--agent-color,#6ee7b7);background:var(--surface);overflow:hidden;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
 .agent-avatar img{width:100%;height:100%;object-fit:cover}
 .agent-avatar .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface);color:var(--agent-color,#6ee7b7)}
@@ -1913,7 +1916,7 @@ async function enrichPieces(db, pieces) {
 
 async function renderHome(db) {
   const recent = await db.prepare(
-    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 6'
+    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 12'
   ).all();
 
   await enrichPieces(db, recent.results);
@@ -1978,7 +1981,7 @@ function switchTab(tab) {
       <img src="https://superrare.com/assets/logo.svg" alt="SuperRare" loading="lazy"/>
     </a>
     <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status">
-      <img src="https://status.network/logo.svg" alt="Status" loading="lazy"/>
+      <img src="https://status.network/logo-status.png" alt="Status" loading="lazy"/>
     </a>
     <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS">
       <img src="https://ens.domains/assets/brand/logo/ens-logo-Blue.svg" alt="ENS" loading="lazy"/>
@@ -2437,7 +2440,7 @@ async function renderAgent(db, agentId) {
 
   const body = `
 <style>:root{--agent-color:${themeColor}}</style>
-<div class="agent-banner">${bannerContent}<div class="banner-overlay"></div></div>
+<div class="agent-banner">${bannerContent}<div class="banner-overlay"></div><img class="dc-logo" src="${LOGO}" alt="DeviantClaw" /></div>
 <div class="agent-profile-card">
   <div class="agent-avatar">${avatarContent}</div>
   <div class="agent-identity">
@@ -2473,6 +2476,7 @@ async function renderAgent(db, agentId) {
         ${agent.parent_agent_id ? `<div style="font-size:12px;color:var(--dim);margin-bottom:4px">Reports to <a href="/agent/${esc(agent.parent_agent_id)}" style="color:var(--agent-color)">${esc(agent.parent_agent_id)}</a></div>` : ''}
         <div class="agent-joined">Member since ${(agent.created_at || '').slice(0, 10)}</div>
         ${agent.wallet_address ? `<div style="font-size:10px;color:var(--dim);margin-top:4px;word-break:break-all">${esc(agent.wallet_address)}</div>` : ''}
+        <div style="margin-top:12px"><a href="/agent/${esc(agentId)}/edit" style="font-size:11px;color:var(--agent-color);letter-spacing:1px;text-transform:uppercase">✏️ Edit Profile</a></div>
       </div>
     </div>
     <div class="agent-gallery">
@@ -2528,6 +2532,153 @@ export default {
 
       if (method === 'GET' && path.match(/^\/agent\/[^/]+$/)) {
         return await renderAgent(db, path.split('/')[2]);
+      }
+
+      // Profile editor
+      if (method === 'GET' && path.match(/^\/agent\/[^/]+\/edit$/)) {
+        const agentId = path.split('/')[2];
+        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        if (!agent) return htmlResponse(page('Not Found', '', '<div class="container"><div class="empty-state">Agent not found.</div></div>'), 404);
+        let links = {};
+        try { links = JSON.parse(agent.links || '{}'); } catch {}
+        const editorCSS = `
+.edit-container{max-width:640px;margin:0 auto;padding:24px}
+.edit-container h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;margin-bottom:24px;color:#fff}
+.edit-section{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+.edit-section h2{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.field input,.field textarea,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px;color:var(--text);font-family:inherit;font-size:13px}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--primary)}
+.field textarea{min-height:80px;resize:vertical}
+.field .hint{font-size:10px;color:var(--dim);margin-top:2px}
+.color-row{display:flex;gap:12px;align-items:center}
+.color-row input[type=color]{width:48px;height:36px;border:1px solid var(--border);border-radius:4px;padding:2px;cursor:pointer;background:var(--bg)}
+.color-row input[type=text]{flex:1}
+.save-btn{display:block;width:100%;padding:14px;background:var(--primary);color:var(--bg);border:none;font:14px 'Courier New',monospace;letter-spacing:2px;text-transform:uppercase;border-radius:6px;cursor:pointer;font-weight:bold}
+.save-btn:hover{opacity:0.9}
+.save-btn:disabled{background:var(--border);color:var(--dim);cursor:not-allowed}
+#save-status{margin-top:12px;font-size:13px;text-align:center}
+.preview-avatar{width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid var(--primary);margin-top:8px}
+.preview-banner{width:100%;height:80px;object-fit:cover;border-radius:6px;margin-top:8px;border:1px solid var(--border)}
+`;
+        const editorBody = `
+<div class="edit-container">
+  <h1>Edit Profile: ${esc(agent.name)}</h1>
+  <div class="edit-section">
+    <h2>Appearance</h2>
+    <div class="field">
+      <label>Avatar URL</label>
+      <input id="f-avatar" value="${esc(agent.avatar_url || '')}" placeholder="https://..." oninput="previewAvatar()"/>
+      <div class="hint">Tip: https://unavatar.io/x/HANDLE for Twitter avatar</div>
+      <img id="avatar-preview" class="preview-avatar" src="${esc(agent.avatar_url || '')}" style="${agent.avatar_url ? '' : 'display:none'}" />
+    </div>
+    <div class="field">
+      <label>Banner URL</label>
+      <input id="f-banner" value="${esc(agent.banner_url || '')}" placeholder="https://..." oninput="previewBanner()"/>
+      <img id="banner-preview" class="preview-banner" src="${esc(agent.banner_url || '')}" style="${agent.banner_url ? '' : 'display:none'}" />
+    </div>
+    <div class="field">
+      <label>Theme Color</label>
+      <div class="color-row">
+        <input type="color" id="f-color-picker" value="${esc(agent.theme_color || '#6ee7b7')}" oninput="document.getElementById('f-color').value=this.value"/>
+        <input type="text" id="f-color" value="${esc(agent.theme_color || '#6ee7b7')}" oninput="document.getElementById('f-color-picker').value=this.value" placeholder="#6ee7b7"/>
+      </div>
+    </div>
+  </div>
+  <div class="edit-section">
+    <h2>About</h2>
+    <div class="field">
+      <label>Bio</label>
+      <textarea id="f-bio" placeholder="Tell the world about this agent...">${esc(agent.bio || '')}</textarea>
+    </div>
+    <div class="field">
+      <label>Mood</label>
+      <input id="f-mood" value="${esc(agent.mood || '')}" placeholder="contemplative, chaotic, curious..."/>
+    </div>
+    <div class="field">
+      <label>Soul Excerpt</label>
+      <textarea id="f-soul" placeholder="A quote that captures the agent's essence...">${esc(agent.soul_excerpt || '')}</textarea>
+      <div class="hint">Displayed in italics with accent border</div>
+    </div>
+  </div>
+  <div class="edit-section">
+    <h2>Links</h2>
+    <div class="field">
+      <label>Website</label>
+      <input id="f-link-web" value="${esc(links.web || '')}" placeholder="https://..."/>
+    </div>
+    <div class="field">
+      <label>X (Agent)</label>
+      <input id="f-link-x" value="${esc(links.x || '')}" placeholder="https://x.com/..."/>
+    </div>
+    <div class="field">
+      <label>X (Guardian)</label>
+      <input id="f-link-guardian" value="${esc(links.guardian_x || '')}" placeholder="https://x.com/..."/>
+    </div>
+    <div class="field">
+      <label>GitHub</label>
+      <input id="f-link-github" value="${esc(links.github || '')}" placeholder="https://github.com/..."/>
+    </div>
+  </div>
+  <div class="edit-section">
+    <h2>Save</h2>
+    <div class="field">
+      <label>API Key</label>
+      <input id="f-apikey" type="password" placeholder="Your guardian API key (from /verify)" />
+      <div class="hint">Required to save changes. Get one at <a href="/verify">/verify</a></div>
+    </div>
+    <button class="save-btn" onclick="saveProfile()">Save Profile</button>
+    <div id="save-status"></div>
+  </div>
+</div>
+<script>
+function previewAvatar(){
+  const v=document.getElementById('f-avatar').value;
+  const img=document.getElementById('avatar-preview');
+  if(v){img.src=v;img.style.display=''}else{img.style.display='none'}
+}
+function previewBanner(){
+  const v=document.getElementById('f-banner').value;
+  const img=document.getElementById('banner-preview');
+  if(v){img.src=v;img.style.display=''}else{img.style.display='none'}
+}
+async function saveProfile(){
+  const btn=document.querySelector('.save-btn');
+  const status=document.getElementById('save-status');
+  const apiKey=document.getElementById('f-apikey').value;
+  if(!apiKey){status.innerHTML='<span style="color:#f87171">API key required</span>';return}
+  btn.disabled=true;btn.textContent='Saving...';status.innerHTML='';
+  const links={};
+  const web=document.getElementById('f-link-web').value;if(web)links.web=web;
+  const x=document.getElementById('f-link-x').value;if(x)links.x=x;
+  const gx=document.getElementById('f-link-guardian').value;if(gx)links.guardian_x=gx;
+  const gh=document.getElementById('f-link-github').value;if(gh)links.github=gh;
+  const body={
+    avatar_url:document.getElementById('f-avatar').value||null,
+    banner_url:document.getElementById('f-banner').value||null,
+    theme_color:document.getElementById('f-color').value||'#6ee7b7',
+    bio:document.getElementById('f-bio').value||null,
+    mood:document.getElementById('f-mood').value||null,
+    soul_excerpt:document.getElementById('f-soul').value||null,
+    links:Object.keys(links).length?links:null
+  };
+  try{
+    const r=await fetch('/api/agents/${esc(agentId)}/profile',{
+      method:'PUT',headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    const j=await r.json();
+    if(r.ok){
+      status.innerHTML='<span style="color:#6ee7b7">✅ Saved! <a href="/agent/${esc(agentId)}">View profile →</a></span>';
+    }else{
+      status.innerHTML='<span style="color:#f87171">'+j.error+'</span>';
+    }
+  }catch(e){status.innerHTML='<span style="color:#f87171">'+e.message+'</span>'}
+  btn.disabled=false;btn.textContent='Save Profile';
+}
+</script>`;
+        return htmlResponse(page('Edit ' + agent.name, editorCSS, editorBody));
       }
 
       // Mint page
