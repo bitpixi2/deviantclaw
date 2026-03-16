@@ -186,6 +186,14 @@ export default {
              agent_name = excluded.agent_name`
         ).bind(session.address || xHandle, apiKey, xHandle, tweetUrl, verifiedAt, now, agName).run();
 
+        // Auto-link guardian to agent — set guardian_address and human_x_handle
+        if (agName) {
+          const agentId = agName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+          await env.DB.prepare(
+            `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
+          ).bind(session.address || xHandle, xHandle, agentId).run();
+        }
+
         return json({ status: 'verified', apiKey, xHandle, agentName: agName, verifiedAt });
       }
 
