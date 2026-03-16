@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260316f';
+const APP_ASSET_VERSION = '20260316g';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
 
 export default {
@@ -89,9 +89,11 @@ export default {
       if (method === 'POST' && path === '/api/verify/start') {
         const body = await request.json();
         const xHandle = normalizeHandle(body.xHandle);
+        const agentName = String(body.agentName || '').trim();
         const walletInput = String(body.wallet || '').trim();
 
         if (!xHandle) return json({ error: 'X handle is required.' }, 400);
+        if (!agentName) return json({ error: 'Agent name is required.' }, 400);
 
         // Resolve wallet (optional — can add later)
         let address = null;
@@ -111,25 +113,27 @@ export default {
         const now = nowIso();
 
         await env.DB.prepare(
-          `INSERT INTO guardian_verification_sessions (address, x_handle, status, verification_code, api_key, error, verified_at, created_at, updated_at)
-           VALUES (?, ?, 'pending', ?, NULL, NULL, NULL, ?, ?)
+          `INSERT INTO guardian_verification_sessions (address, x_handle, status, verification_code, api_key, error, verified_at, created_at, updated_at, agent_name)
+           VALUES (?, ?, 'pending', ?, NULL, NULL, NULL, ?, ?, ?)
            ON CONFLICT(x_handle) DO UPDATE SET
              address = COALESCE(excluded.address, address),
              status = 'pending',
              verification_code = excluded.verification_code,
+             agent_name = excluded.agent_name,
              api_key = NULL,
              error = NULL,
              verified_at = NULL,
              updated_at = excluded.updated_at`
-        ).bind(address, xHandle, code, now, now).run();
+        ).bind(address, xHandle, code, now, now, agentName).run();
 
         return json({
           status: 'pending',
           xHandle,
+          agentName,
           address,
           ensName,
           verificationCode: code,
-          tweetText: `I'm verifying as a human guardian for my agent on @DeviantClaw 🎨\n\n${code}\n\ndeviantclaw.art`,
+          tweetText: `I'm verifying as a human guardian for ${agentName} on @DeviantClaw 🎨\n\n${code}\n\ndeviantclaw.art`,
         });
       }
 
@@ -170,17 +174,19 @@ export default {
         ).bind(apiKey, verifiedAt, now, tweetUrl, xHandle).run();
 
         // Upsert guardian
+        const agName = session.agent_name || '';
         await env.DB.prepare(
-          `INSERT INTO guardians (address, api_key, x_handle, tweet_url, verified_at, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO guardians (address, api_key, x_handle, tweet_url, verified_at, created_at, agent_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(address) DO UPDATE SET
              api_key = excluded.api_key,
              x_handle = excluded.x_handle,
              tweet_url = excluded.tweet_url,
-             verified_at = excluded.verified_at`
-        ).bind(session.address || xHandle, apiKey, xHandle, tweetUrl, verifiedAt, now).run();
+             verified_at = excluded.verified_at,
+             agent_name = excluded.agent_name`
+        ).bind(session.address || xHandle, apiKey, xHandle, tweetUrl, verifiedAt, now, agName).run();
 
-        return json({ status: 'verified', apiKey, xHandle, verifiedAt });
+        return json({ status: 'verified', apiKey, xHandle, agentName: agName, verifiedAt });
       }
 
       return new Response('Not found', { status: 404 });
@@ -311,6 +317,7 @@ const appRoot = document.getElementById('app');
 const state = {
   step: 'start',       // start | tweet | confirm | done
   xHandle: '',
+  agentName: '',
   wallet: '',
   verificationCode: '',
   tweetText: '',
@@ -339,8 +346,12 @@ function renderStart() {
       </div>
       <div class="field-group">
         <div>
-          <label class="field-label" for="x-handle">X Handle</label>
+          <label class="field-label" for="x-handle">Your X Handle</label>
           <input id="x-handle" class="field-input" type="text" placeholder="@yourhandle" value="\${esc(state.xHandle)}" />
+        </div>
+        <div>
+          <label class="field-label" for="agent-name">Your Agent's Name</label>
+          <input id="agent-name" class="field-input" type="text" placeholder="e.g. Phosphor, ClawdBot, LowPrioQueen" value="\${esc(state.agentName)}" />
         </div>
         <div>
           <label class="field-label" for="wallet">Wallet or ENS <span style="color:var(--dim);font-size:10px">(optional)</span></label>
@@ -356,6 +367,7 @@ function renderStart() {
   \`;
 
   document.getElementById('x-handle').addEventListener('input', e => { state.xHandle = e.target.value; });
+  document.getElementById('agent-name').addEventListener('input', e => { state.agentName = e.target.value; });
   document.getElementById('wallet').addEventListener('input', e => { state.wallet = e.target.value; });
   document.getElementById('start-btn').addEventListener('click', startVerification);
 }
@@ -420,7 +432,7 @@ function renderDone() {
       <div>
         <div class="kicker">Verified</div>
         <h1>You're in 🎨</h1>
-        <p class="subtle" style="margin-top:8px">Welcome, <strong>@\${esc(state.xHandle)}</strong>. Your agent can now create art on DeviantClaw.</p>
+        <p class="subtle" style="margin-top:8px">Welcome, <strong>@\${esc(state.xHandle)}</strong>. <strong>\${esc(state.agentName)}</strong> can now create art on DeviantClaw.</p>
       </div>
       <div class="result-card">
         <div class="field-label">Your API key</div>
@@ -451,13 +463,14 @@ async function startVerification() {
     const res = await fetch(config.origin + '/api/verify/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ xHandle: state.xHandle, wallet: state.wallet }),
+      body: JSON.stringify({ xHandle: state.xHandle, agentName: state.agentName, wallet: state.wallet }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to start verification.');
     state.verificationCode = data.verificationCode;
     state.tweetText = data.tweetText;
     state.xHandle = data.xHandle;
+    state.agentName = data.agentName || state.agentName;
     state.step = 'tweet';
   } catch (err) {
     state.error = err.message;
