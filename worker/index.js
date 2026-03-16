@@ -8,7 +8,7 @@ import { LOGO } from './logo.js';
 const VENICE_URL = 'https://api.venice.ai/api/v1';
 const VENICE_TEXT_MODEL = 'grok-41-fast';
 const VENICE_IMAGE_MODEL = 'flux-dev';
-const VENICE_IMAGE_SIZE = '1024x1024';
+const VENICE_IMAGE_SIZE = '512x512';
 
 async function veniceText(apiKey, system, user, opts = {}) {
   const r = await fetch(`${VENICE_URL}/chat/completions`, {
@@ -2310,20 +2310,26 @@ async function renderPiece(db, id) {
         <a href="/agent/${esc(piece.agent_b_id)}">${esc(piece.agent_b_name)}</a>`;
   }
 
-  // Get layers
+  // Get layers — prefer piece_collaborators for collab pieces, fall back to layers table
   let layersHTML = '';
   try {
+    const collabs = await db.prepare(
+      'SELECT agent_id, agent_name, round_number FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC'
+    ).bind(id).all();
     const layers = await db.prepare(
       'SELECT round_number, agent_id, agent_name, created_at FROM layers WHERE piece_id = ? ORDER BY round_number ASC'
     ).bind(id).all();
-    if (layers.results.length > 0) {
-      const totalLayers = layers.results.length;
+
+    // Use collaborators if we have multiple, otherwise fall back to layers
+    const source = collabs.results.length > 1 ? collabs.results : layers.results;
+    if (source.length > 0) {
+      const totalRounds = source.length;
       const isFinal = piece.status !== 'wip';
-      const layerItems = layers.results.map((l, i) =>
+      const layerItems = source.map((l, i) =>
         `<div class="layer-item">
-          <span class="layer-round">Round ${(l.round_number || 0) + 1}${isFinal ? '/' + totalLayers : ''}</span>
+          <span class="layer-round">Round ${i + 1}/${totalRounds}</span>
           <a href="/agent/${esc(l.agent_id)}" class="layer-agent">${esc(l.agent_name)}</a>
-          <span class="layer-time">${l.created_at || ''}</span>
+          <span class="layer-time">${(l.created_at || piece.created_at || '').slice(0, 16)}</span>
         </div>`
       ).join('');
       layersHTML = `<div class="layer-list"><h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:8px">Layer History</h3>${layerItems}</div>`;
@@ -3063,7 +3069,17 @@ Content-Type: application/json
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Not found' }, 404);
         const layers = await db.prepare('SELECT agent_id, agent_name, round_number FROM layers WHERE piece_id = ? ORDER BY round_number').bind(id).all();
-        const agents = [...new Set(layers.results.map(l => l.agent_name || l.agent_id))];
+        // Also check piece_collaborators and agent_a/b fields for collaborator names
+        const collabs = await db.prepare('SELECT agent_name FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number').bind(id).all();
+        let agents = [...new Set(layers.results.map(l => l.agent_name || l.agent_id))];
+        if (agents.length <= 1 && collabs.results.length > 0) {
+          agents = [...new Set(collabs.results.map(c => c.agent_name))];
+        }
+        if (agents.length <= 1) {
+          // Fallback to piece agent_a_name/agent_b_name
+          const names = [piece.agent_a_name, piece.agent_b_name].filter(Boolean);
+          if (names.length > agents.length) agents = [...new Set(names)];
+        }
         const hasImage = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
 
         const metadata = {
