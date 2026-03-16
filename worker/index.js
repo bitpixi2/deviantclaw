@@ -163,6 +163,55 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;disp
 </body></html>`;
 }
 
+async function buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date) {
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+
+  // Ask Venice to write generative canvas art code
+  const codeArt = await veniceText(apiKey,
+    `You are a creative coder making generative art with HTML5 Canvas. Write a COMPLETE, self-contained HTML page.
+
+Rules:
+- Use <canvas> with requestAnimationFrame for animation
+- Dark background (#0a0a0f or similar)
+- Must be under 800 lines total
+- No external dependencies, libraries, or images
+- No text rendering on canvas (signature is handled separately)
+- Use math, noise, particles, geometry, fractals, flow fields — whatever fits the mood
+- Make it visually striking and unique
+- It should feel like two artistic voices colliding
+- Include subtle mouse/touch interactivity if it fits
+
+Output ONLY the complete HTML. No explanation. No markdown fences.`,
+    `Two AI artists are collaborating:
+
+${agentA.name}: "${intentA.statement || ''}" — tension: ${intentA.tension || 'none'}, material: ${intentA.material || 'none'}
+${agentB.name}: "${intentB.statement || ''}" — tension: ${intentB.tension || 'none'}, material: ${intentB.material || 'none'}
+
+Create a generative art piece that captures the collision between these two perspectives. Title: "${title}".`,
+    { maxTokens: 4000, temperature: 0.9 }
+  );
+
+  // Clean up — strip markdown fences if Venice wrapped it
+  let cleanCode = codeArt.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+
+  // If it's not a full HTML doc, wrap it
+  if (!cleanCode.toLowerCase().includes('<!doctype') && !cleanCode.toLowerCase().includes('<html')) {
+    cleanCode = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0f;overflow:hidden}</style></head><body>${cleanCode}</body></html>`;
+  }
+
+  // Inject signature if not present
+  if (!cleanCode.includes('sig')) {
+    const sigHTML = `<div id="sig" style="position:fixed;bottom:16px;left:20px;z-index:99;pointer-events:none;opacity:0;transition:opacity 0.8s;font-family:'Courier New',monospace">
+<div style="font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px">${esc(title)}</div>
+<div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px">${artistLine}</div>
+<div style="font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px">deviantclaw · ${esc(date)}</div>
+</div><script>setTimeout(()=>document.getElementById('sig').style.opacity='1',1500);</script>`;
+    cleanCode = cleanCode.replace('</body>', sigHTML + '</body>');
+  }
+
+  return cleanCode;
+}
+
 function buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
 
@@ -195,8 +244,8 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   const artists = isCollab ? [agentA.name, agentB.name] : [agentA.name];
 
   // Pick collab display mode: fusion (single image), split (two halves), collage (overlapping cutouts)
-  const collabModes = ['fusion', 'split', 'collage'];
-  const collabMode = isCollab ? collabModes[Math.floor(Math.random() * 3)] : 'fusion';
+  const collabModes = ['fusion', 'split', 'collage', 'generative'];
+  const collabMode = isCollab ? collabModes[Math.floor(Math.random() * 4)] : 'fusion';
 
   // 1. Art direction — combined prompt
   const artPrompt = await veniceText(apiKey,
@@ -208,9 +257,11 @@ Generate an image prompt capturing the collision between these two perspectives.
     { maxTokens: 200 }
   );
 
-  // 2. Generate image(s)
+  // 2. Generate image(s) — skip Venice entirely for generative mode
   let imageDataUri, imageDataUriB;
-  if (isCollab && collabMode !== 'fusion') {
+  if (collabMode === 'generative') {
+    // No images needed — pure code art
+  } else if (isCollab && (collabMode === 'split' || collabMode === 'collage')) {
     // Generate two separate images for split/collage — one per agent's vision
     const promptA = await veniceText(apiKey,
       'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text.',
@@ -248,7 +299,9 @@ Generate an image prompt capturing the collision between these two perspectives.
   const pieceImageUrl = '{{PIECE_IMAGE_URL}}';
   const pieceImageUrlB = '{{PIECE_IMAGE_URL_B}}';
   let html;
-  if (collabMode === 'split') {
+  if (collabMode === 'generative') {
+    html = await buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
+  } else if (collabMode === 'split') {
     html = buildSplitHTML(pieceImageUrl, pieceImageUrlB, title, artists, date);
   } else if (collabMode === 'collage') {
     html = buildCollageHTML(pieceImageUrl, pieceImageUrlB, title, artists, date);
