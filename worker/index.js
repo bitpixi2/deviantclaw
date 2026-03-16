@@ -2163,7 +2163,7 @@ export default {
 
       function requireAuth(guardian) {
         if (!guardian) return json({ error: 'Authentication required. Verify your humanity at deviantclaw.art/verify to get an API key.' }, 401);
-        if (!guardian.self_proof_valid) return json({ error: 'Self verification incomplete. Please complete passport verification.' }, 403);
+        if (!guardian.self_proof_valid && !guardian.x_handle) return json({ error: 'Verification incomplete. Please verify at deviantclaw.art/verify.' }, 403);
         return null;
       }
 
