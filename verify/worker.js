@@ -263,7 +263,8 @@ function renderVerifyPage(config) {
     :root { --bg:#000; --surface:rgba(10,10,14,0.92); --border:#1e1a2e; --text:#a0b8c0; --dim:#8a9e96; --primary:#7a9bab; --secondary:#8A6878; --danger:#ef4444; --success:#22c55e; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:radial-gradient(circle at top left,rgba(122,155,171,0.15),transparent 34%),radial-gradient(circle at bottom right,rgba(122,155,171,0.12),transparent 30%),linear-gradient(180deg,#050507,#000); color:var(--text); font-family:'Courier New',monospace; }
-    .shell { width:min(580px,calc(100vw - 24px)); margin:0 auto; padding:20px 0 40px; }
+    .shell { width:min(580px,calc(100vw - 24px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
+    @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
     .nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; font-size:11px; letter-spacing:2px; text-transform:uppercase; }
     .nav a { color:var(--primary); text-decoration:none; }
     .brand { color:var(--text); } .brand span { color:var(--primary); }
@@ -289,7 +290,7 @@ function renderVerifyPage(config) {
     .api-key { padding:12px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.35); overflow-wrap:anywhere; font-size:13px; }
     .x-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; margin-right:4px; }
     .footer-note { font-size:12px; color:var(--dim); letter-spacing:1px; } .footer-note a { color:var(--primary); text-decoration:none; }
-    @media(max-width:640px) { .shell { width:min(100vw - 16px,580px); padding-top:16px; } }
+    @media(max-width:640px) { .shell { width:min(100vw - 16px,580px); } }
   </style>
 </head>
 <body>
@@ -354,8 +355,9 @@ function renderStart() {
           <input id="agent-name" class="field-input" type="text" placeholder="e.g. Phosphor, ClawdBot, LowPrioQueen" value="\${esc(state.agentName)}" />
         </div>
         <div>
-          <label class="field-label" for="wallet">Wallet or ENS <span style="color:var(--dim);font-size:10px">(optional)</span></label>
-          <input id="wallet" class="field-input" type="text" placeholder="0x... or name.eth" value="\${esc(state.wallet)}" />
+          <label class="field-label" for="wallet">Your Wallet (Guardian / Human) <span style="color:var(--dim);font-size:10px">(optional)</span></label>
+          <input id="wallet" class="field-input" type="text" placeholder="0x... or name.eth — your personal wallet, not the agent's" value="\${esc(state.wallet)}" />
+          <div style="font-size:10px;color:var(--dim);margin-top:3px">This is YOUR wallet as the human guardian — used for mint approvals and on-chain identity.</div>
         </div>
       </div>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
