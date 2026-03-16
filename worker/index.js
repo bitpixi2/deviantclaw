@@ -8,7 +8,7 @@ import { LOGO } from './logo.js';
 const VENICE_URL = 'https://api.venice.ai/api/v1';
 const VENICE_TEXT_MODEL = 'grok-41-fast';
 const VENICE_IMAGE_MODEL = 'flux-dev';
-const VENICE_IMAGE_SIZE = '512x512';
+const VENICE_IMAGE_SIZE = '1024x1024';
 
 async function veniceText(apiKey, system, user, opts = {}) {
   const r = await fetch(`${VENICE_URL}/chat/completions`, {
@@ -2316,9 +2316,11 @@ async function renderPiece(db, id) {
       'SELECT round_number, agent_id, agent_name, created_at FROM layers WHERE piece_id = ? ORDER BY round_number ASC'
     ).bind(id).all();
     if (layers.results.length > 0) {
-      const layerItems = layers.results.map(l =>
+      const totalLayers = layers.results.length;
+      const isFinal = piece.status !== 'wip';
+      const layerItems = layers.results.map((l, i) =>
         `<div class="layer-item">
-          <span class="layer-round">Round ${l.round_number}</span>
+          <span class="layer-round">Round ${(l.round_number || 0) + 1}${isFinal ? '/' + totalLayers : ''}</span>
           <a href="/agent/${esc(l.agent_id)}" class="layer-agent">${esc(l.agent_name)}</a>
           <span class="layer-time">${l.created_at || ''}</span>
         </div>`
@@ -3336,7 +3338,8 @@ async function saveProfile(){
         
         const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
         if (!agent) return json({ error: 'Agent not found' }, 404);
-        if (agent.guardian_address && !sameAddress(agent.guardian_address, guardian.wallet_address)) {
+        const gAddr = guardian.address || guardian.wallet_address;
+        if (agent.guardian_address && !sameAddress(agent.guardian_address, gAddr)) {
           return json({ error: 'Not your agent' }, 403);
         }
 
@@ -3355,6 +3358,42 @@ async function saveProfile(){
         values.push(agentId);
         await db.prepare(`UPDATE agents SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).bind(...values).run();
         return json({ ok: true, updated: updates.length });
+      }
+
+      // POST /api/pieces/:id/regen-image — regenerate Venice image at higher res
+      if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/regen-image$/)) {
+        const pieceId = path.split('/')[3];
+        const guardian = await getGuardian(request);
+        if (!guardian) return json({ error: 'Unauthorized' }, 401);
+
+        const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(pieceId).first();
+        if (!piece) return json({ error: 'Piece not found' }, 404);
+        if (!piece.art_prompt) return json({ error: 'No art prompt to regenerate from' }, 400);
+
+        // Verify guardian owns one of the agents on this piece
+        const agentA = piece.agent_a_id ? await db.prepare('SELECT guardian_address FROM agents WHERE id = ?').bind(piece.agent_a_id).first() : null;
+        const agentB = piece.agent_b_id ? await db.prepare('SELECT guardian_address FROM agents WHERE id = ?').bind(piece.agent_b_id).first() : null;
+        const guardianAddr = guardian.address || guardian.wallet_address;
+        const isGuardian = (agentA && sameAddress(agentA.guardian_address, guardianAddr)) || 
+                           (agentB && sameAddress(agentB.guardian_address, guardianAddr));
+        if (!isGuardian) return json({ error: 'Not a guardian of this piece\'s agents' }, 403);
+
+        const body = await request.json().catch(() => ({}));
+        const size = body.size || '1024x1024';
+
+        const imageUrl = await veniceImage(env.VENICE_API_KEY, piece.art_prompt, { 
+          model: piece.venice_model || VENICE_IMAGE_MODEL, 
+          size 
+        });
+        if (!imageUrl) return json({ error: 'Venice image generation failed' }, 500);
+
+        // Store the new image
+        const imageData = imageUrl.startsWith('data:') ? imageUrl.split(',')[1] : null;
+        if (imageData) {
+          await db.prepare('UPDATE pieces SET image_url = ? WHERE id = ?').bind(imageUrl, pieceId).run();
+        }
+
+        return json({ ok: true, pieceId, size, imageUrl: `/api/pieces/${pieceId}/image` });
       }
 
       // ========== MATCH SYSTEM (v2) ==========
