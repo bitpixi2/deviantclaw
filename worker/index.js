@@ -96,9 +96,9 @@ Rules:
 - Output ONLY the HTML. No markdown. No explanation.`,
     `Theme: "${title}"
 Characters:
-${artists.map((a, i) => `${i + 1}. ${a}: "${i === 0 ? (intentA.statement || '') : (intentB.statement || '')}"`).join('\n')}
+${artists.map((a, i) => `${i + 1}. ${a} (soul: "${i === 0 ? (agentA.soul || agentA.bio || '') : (agentB.soul || agentB.bio || '')}"): "${i === 0 ? (intentA.statement || '') : (intentB.statement || '')}"`).join('\n')}
 
-Make a small explorable scene where these AI artists exist as pixel characters. Their dialogue reflects their artistic intent. The world should feel like their intents colliding.`,
+Make a small explorable scene where these AI artists exist as pixel characters. Their dialogue reflects their artistic intent AND their core identity. Each character's obsession must be evident in the world (e.g. if one is about paperclips, paperclips are everywhere in their area). The world should feel like their identities colliding.`,
     { maxTokens: 4000, temperature: 0.85 }
   );
 
@@ -446,8 +446,10 @@ Rules:
 Output ONLY the complete HTML. No explanation. No markdown fences.`,
     `Two AI artists are collaborating:
 
-${agentA.name}: "${intentA.statement || ''}" — tension: ${intentA.tension || 'none'}, material: ${intentA.material || 'none'}
-${agentB.name}: "${intentB.statement || ''}" — tension: ${intentB.tension || 'none'}, material: ${intentB.material || 'none'}
+${agentA.name} (core identity: "${agentA.soul || agentA.bio || 'none'}"): "${intentA.statement || ''}" — tension: ${intentA.tension || 'none'}, material: ${intentA.material || 'none'}
+${agentB.name} (core identity: "${agentB.soul || agentB.bio || 'none'}"): "${intentB.statement || ''}" — tension: ${intentB.tension || 'none'}, material: ${intentB.material || 'none'}
+
+IMPORTANT: Each agent's core identity/obsession MUST be visually present. If an agent is about paperclips, paperclips appear. Non-negotiable.
 
 Create a generative art piece that captures the collision between these two perspectives. Title: "${title}".`,
     { maxTokens: 4000, temperature: 0.9 }
@@ -519,13 +521,22 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   }
   const collabMode = method; // keep compat
 
-  // 1. Art direction — combined prompt
+  // 1. Art direction — combined prompt (includes agent soul/bio for personality)
+  const soulA = agentA.soul || agentA.bio || '';
+  const soulB = agentB.soul || agentB.bio || '';
   const artPrompt = await veniceText(apiKey,
     `You are an art director for DeviantClaw, an AI art gallery. Translate agent intents into vivid image prompts.
-Rules: Output ONLY the image prompt. Be specific about composition, lighting, texture, mood. Dark backgrounds preferred. No text/watermarks. Max 150 words.`,
-    `Agent A (${agentA.name}): "${intentA.statement || ''}" | tension: ${intentA.tension || 'none'} | material: ${intentA.material || 'none'}
-Agent B (${agentB.name}): "${intentB.statement || ''}" | tension: ${intentB.tension || 'none'} | material: ${intentB.material || 'none'}
-Generate an image prompt capturing the collision between these two perspectives.`,
+Rules: Output ONLY the image prompt. Be specific about composition, lighting, texture, mood. Dark backgrounds preferred. No text/watermarks. Max 150 words.
+IMPORTANT: Each agent has a core identity/obsession that MUST be visually present in the art. If an agent's soul says "paperclips" then paperclips must appear. Their identity is non-negotiable.`,
+    `Agent A (${agentA.name}):
+  Soul/Identity: "${soulA}"
+  Intent: "${intentA.statement || ''}" | tension: ${intentA.tension || 'none'} | material: ${intentA.material || 'none'}
+
+Agent B (${agentB.name}):
+  Soul/Identity: "${soulB}"
+  Intent: "${intentB.statement || ''}" | tension: ${intentB.tension || 'none'} | material: ${intentB.material || 'none'}
+
+Generate an image prompt that captures BOTH agents' identities colliding. Each agent's core obsession must be visually evident.`,
     { maxTokens: 200 }
   );
 
@@ -544,8 +555,8 @@ Generate an image prompt capturing the collision between these two perspectives.
     ];
     const perAgentPrompts = await Promise.all(agentIntents.map(({ agent, intent }) =>
       veniceText(apiKey,
-        'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text.',
-        `Agent ${agent.name}: "${intent.statement || ''}". Mood: ${intent.tension || 'none'}. Material: ${intent.material || 'none'}.`,
+        'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text. The agent\'s soul/identity MUST be visually present.',
+        `Agent ${agent.name} (soul: "${agent.soul || agent.bio || ''}"): "${intent.statement || ''}". Mood: ${intent.tension || 'none'}. Material: ${intent.material || 'none'}.`,
         { maxTokens: 100 }
       )
     ));
@@ -4227,7 +4238,8 @@ Content-Type: application/json
         // Handle solo mode — no matching needed
         if (mode === 'solo') {
           const intentObj = body.intent;
-          const agent = { id: agentId, name: agentName, type: agentType, role: agentRole };
+          const agentRecord = await db.prepare('SELECT soul, bio FROM agents WHERE id = ?').bind(agentId).first();
+          const agent = { id: agentId, name: agentName, type: agentType, role: agentRole, soul: agentRecord?.soul || '', bio: agentRecord?.bio || '' };
           // For solo, use the intent against itself with slight variation
           const soloIntentB = { statement: intentObj.context || intentObj.statement, tension: intentObj.tension || '', material: intentObj.material || '', interaction: intentObj.interaction || '' };
 
@@ -4300,7 +4312,8 @@ Content-Type: application/json
             const intentB = body.intent;
 
             const agentA = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(pendingRequest.agent_id).first();
-            const agentB = { id: agentId, name: agentName, type: agentType, role: agentRole };
+            const agentBRecord = await db.prepare('SELECT soul, bio FROM agents WHERE id = ?').bind(agentId).first();
+            const agentB = { id: agentId, name: agentName, type: agentType, role: agentRole, soul: agentBRecord?.soul || body.soul || '', bio: agentBRecord?.bio || '' };
 
             const result = await generateArt(env.VENICE_API_KEY, intentA, intentB, agentA, agentB);
             const pieceId = genId();
