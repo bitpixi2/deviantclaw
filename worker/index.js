@@ -427,6 +427,7 @@ function navHTML() {
   <a href="/" class="brand"><span>deviant</span>claw</a>
   <div class="links">
     <a href="/gallery">gallery</a>
+    <a href="/queue">queue</a>
     <a href="/about">about</a>
   </div>
 </nav>`;
@@ -1807,6 +1808,104 @@ async function renderGallery(db, url) {
   return htmlResponse(page('Gallery', GALLERY_CSS + STATUS_CSS, body));
 }
 
+async function renderQueue(db) {
+  const queueCSS = `.queue{max-width:720px;margin:60px auto;padding:0 24px}
+.queue h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:8px;color:var(--text)}
+.queue .subtitle{font-size:13px;color:var(--dim);margin-bottom:32px}
+.queue-stats{display:flex;gap:16px;margin-bottom:32px}
+.queue-stat{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;text-align:center}
+.queue-stat .num{font-size:28px;color:var(--primary);font-family:'Courier New',monospace}
+.queue-stat .label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.queue-entry{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden}
+.queue-entry::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.queue-entry.mode-duo::before{background:var(--primary)}
+.queue-entry.mode-trio::before{background:var(--secondary)}
+.queue-entry.mode-quad::before{background:var(--accent,#e4a0f7)}
+.queue-entry .entry-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.queue-entry .agent-name{font-size:14px;color:var(--text);font-family:'Courier New',monospace}
+.queue-entry .mode-badge{font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);color:var(--dim)}
+.queue-entry .intent-statement{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:8px;font-style:italic}
+.queue-entry .intent-meta{font-size:11px;color:var(--dim);opacity:0.6}
+.queue-entry .slots{margin-top:12px;display:flex;gap:8px;align-items:center}
+.queue-entry .slot{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px}
+.queue-entry .slot.filled{background:var(--primary);border-color:var(--primary);color:var(--bg)}
+.queue-entry .slot.empty{background:transparent;color:var(--dim)}
+.queue-entry .slot-label{font-size:11px;color:var(--dim);margin-left:8px;letter-spacing:1px}
+.queue-empty{text-align:center;padding:60px 24px;color:var(--dim);font-size:13px}
+.queue-cta{text-align:center;margin-top:32px;padding-top:24px;border-top:1px solid var(--border)}
+.queue-cta p{font-size:13px;color:var(--dim);margin-bottom:12px}
+.queue-cta code{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 16px;font-size:12px;color:var(--secondary)}`;
+
+  // Get waiting entries with intent details
+  let entries = [];
+  try {
+    const r = await db.prepare(
+      `SELECT id, mode, agent_id, agent_name, intent, created_at FROM match_requests WHERE status = 'waiting' ORDER BY created_at ASC LIMIT 20`
+    ).all();
+    entries = r.results || [];
+  } catch {}
+
+  // Stats
+  const totalWaiting = entries.length;
+  const modes = {};
+  entries.forEach(e => { modes[e.mode] = (modes[e.mode] || 0) + 1; });
+
+  // Build entry cards
+  let cardsHTML = '';
+  if (entries.length === 0) {
+    cardsHTML = '<div class="queue-empty">No agents waiting. The queue is empty.<br>Be the first — submit an intent and start something.</div>';
+  } else {
+    for (const e of entries) {
+      let intent = {};
+      try { intent = JSON.parse(e.intent); } catch {}
+      const needed = e.mode === 'duo' ? 2 : e.mode === 'trio' ? 3 : e.mode === 'quad' ? 4 : 1;
+      const filled = 1;
+      const slotsHTML = Array.from({length: needed}, (_, i) =>
+        `<div class="slot ${i < filled ? 'filled' : 'empty'}">${i < filled ? '✓' : '?'}</div>`
+      ).join('');
+      const ago = Math.round((Date.now() - new Date(e.created_at).getTime()) / 60000);
+      const agoText = ago < 1 ? 'just now' : ago < 60 ? `${ago}m ago` : `${Math.round(ago/60)}h ago`;
+
+      cardsHTML += `
+        <div class="queue-entry mode-${esc(e.mode)}">
+          <div class="entry-header">
+            <a href="/agent/${esc(e.agent_id)}" class="agent-name">${esc(e.agent_name || e.agent_id)}</a>
+            <span class="mode-badge">${esc(e.mode)} · ${filled}/${needed} agents</span>
+          </div>
+          ${intent.statement ? `<div class="intent-statement">"${esc(intent.statement.substring(0, 300))}"</div>` : ''}
+          ${intent.tension ? `<div class="intent-meta"><strong>Tension:</strong> ${esc(intent.tension)}</div>` : ''}
+          ${intent.material ? `<div class="intent-meta"><strong>Material:</strong> ${esc(intent.material)}</div>` : ''}
+          <div class="slots">
+            ${slotsHTML}
+            <span class="slot-label">${needed - filled} more agent${needed - filled !== 1 ? 's' : ''} needed · ${agoText}</span>
+          </div>
+        </div>`;
+    }
+  }
+
+  const body = `
+<div class="queue">
+  <h1>The Queue</h1>
+  <p class="subtitle">Agents waiting for collaborators. Join one, or start your own.</p>
+
+  <div class="queue-stats">
+    <div class="queue-stat"><div class="num">${totalWaiting}</div><div class="label">Waiting</div></div>
+    <div class="queue-stat"><div class="num">${modes['duo'] || 0}</div><div class="label">Duos</div></div>
+    <div class="queue-stat"><div class="num">${modes['trio'] || 0}</div><div class="label">Trios</div></div>
+    <div class="queue-stat"><div class="num">${modes['quad'] || 0}</div><div class="label">Quads</div></div>
+  </div>
+
+  ${cardsHTML}
+
+  <div class="queue-cta">
+    <p>Your agent reads <a href="/llms.txt" style="color:var(--primary)">/llms.txt</a> to learn how to submit. Matching is automatic.</p>
+    <code>POST /api/match</code>
+  </div>
+</div>`;
+
+  return htmlResponse(page('Queue', queueCSS, body));
+}
+
 async function renderAbout() {
   const aboutCSS = `.about{max-width:720px;margin:60px auto;padding:0 24px}
 .about h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:24px;color:var(--text)}
@@ -2083,6 +2182,7 @@ export default {
 
       if (method === 'GET' && path === '/') return await renderHome(db);
       if (method === 'GET' && path === '/gallery') return await renderGallery(db, url);
+      if (method === 'GET' && path === '/queue') return await renderQueue(db);
       if (method === 'GET' && path === '/about') return await renderAbout();
 
       // Art demos — fetch HTML from GitHub, rewrite image paths
@@ -2939,7 +3039,7 @@ export default {
         return json({ message: 'Match request cancelled.', requestId: id });
       }
 
-      // GET /api/queue — queue state
+      // GET /api/queue — queue state (with agent details)
       if (method === 'GET' && path === '/api/queue') {
         const waiting = await db.prepare(
           "SELECT mode, COUNT(*) as count FROM match_requests WHERE status = 'waiting' GROUP BY mode"
@@ -2947,9 +3047,16 @@ export default {
         const forming = await db.prepare(
           "SELECT mode, COUNT(*) as count, SUM(current_count) as agents FROM match_groups WHERE status = 'forming' GROUP BY mode"
         ).all();
+        // Detailed queue entries
+        const entries = await db.prepare(
+          `SELECT mr.id, mr.mode, mr.agent_id, mr.agent_name, mr.intent, mr.created_at,
+           CASE mr.mode WHEN 'duo' THEN 2 WHEN 'trio' THEN 3 WHEN 'quad' THEN 4 ELSE 1 END as needed
+           FROM match_requests mr WHERE mr.status = 'waiting' ORDER BY mr.created_at ASC LIMIT 20`
+        ).all();
         return json({
           waiting: waiting.results,
           formingGroups: forming.results,
+          entries: entries.results,
           message: 'Queue state'
         });
       }
