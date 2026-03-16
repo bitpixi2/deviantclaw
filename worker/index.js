@@ -72,6 +72,252 @@ function getParticleEffects(mood) {
   return fx[mood] || fx.serene;
 }
 
+// ========== GAME (Trio + Quad) — GBC-style mini game ==========
+async function buildGameHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date) {
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+  const charCount = artists.length;
+
+  const gameCode = await veniceText(apiKey,
+    `You are a retro game developer making a Game Boy Color-style mini game in HTML5 Canvas.
+
+Rules:
+- COMPLETE self-contained HTML page, no external deps
+- Canvas-based with pixel art rendering (blocky, 4-color palette per sprite)
+- Resolution: 160x144 scaled up to fill screen (GBC native res)
+- ${charCount} characters that can walk around a small scene
+- Each character has a name label and 2-3 lines of dialogue (show in a text box at bottom)
+- Text size should be LARGE (at least 16px scaled, easily readable)
+- Player controls one character with arrow keys / WASD / touch
+- Walking into another character triggers their dialogue
+- Dark/moody pixel art backgrounds fitting the theme
+- Simple tile-based movement (8x8 or 16x16 tiles)
+- Include a title screen that fades into gameplay
+- MUST be under 800 lines. No images, no fetch, no external anything.
+- Output ONLY the HTML. No markdown. No explanation.`,
+    `Theme: "${title}"
+Characters:
+${artists.map((a, i) => `${i + 1}. ${a}: "${i === 0 ? (intentA.statement || '') : (intentB.statement || '')}"`).join('\n')}
+
+Make a small explorable scene where these AI artists exist as pixel characters. Their dialogue reflects their artistic intent. The world should feel like their intents colliding.`,
+    { maxTokens: 4000, temperature: 0.85 }
+  );
+
+  let clean = gameCode.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+  if (!clean.toLowerCase().includes('<!doctype') && !clean.toLowerCase().includes('<html')) {
+    clean = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title></head><body>${clean}</body></html>`;
+  }
+  // Inject signature
+  if (!clean.includes('sig')) {
+    const sig = `<div id="sig" style="position:fixed;bottom:8px;left:12px;z-index:99;pointer-events:none;opacity:0;transition:opacity 0.8s;font-family:'Courier New',monospace"><div style="font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:2px">${esc(title)}</div><div style="font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px">${artistLine} · deviantclaw · ${esc(date)}</div></div><script>setTimeout(()=>document.getElementById('sig').style.opacity='1',3000);</script>`;
+    clean = clean.replace('</body>', sig + '</body>');
+  }
+  return clean;
+}
+
+// ========== SEQUENCE — Crossfading image loop ==========
+function buildSequenceHTML(imageUrls, title, artists, date) {
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+  const count = imageUrls.length;
+  const imgTags = imageUrls.map((u, i) => `<img class="seq-img ${i === 0 ? 'active' : ''}" src="${esc(u)}" alt="${esc(artists[i] || '')}" data-idx="${i}"/>`).join('\n  ');
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh;display:flex;align-items:center;justify-content:center}
+.seq{position:relative;width:100vw;height:100vh}
+.seq-img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 2s ease-in-out}
+.seq-img.active{opacity:1}
+.agent-label{position:absolute;top:20px;right:20px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.5);opacity:0;transition:opacity 1s;z-index:5}
+.agent-label.active{opacity:1}
+.progress{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5}
+.dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);transition:all 0.3s}
+.dot.active{background:rgba(255,255,255,0.7);transform:scale(1.3)}
+.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
+</style></head><body>
+<div class="seq">
+  ${imgTags}
+  <div class="agent-label active" id="agent-label">${esc(artists[0] || '')}</div>
+  <div class="progress">${imageUrls.map((_, i) => `<div class="dot ${i === 0 ? 'active' : ''}" data-i="${i}"></div>`).join('')}</div>
+</div>
+<div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(date)}</div></div>
+<script>
+(function(){
+const imgs=document.querySelectorAll('.seq-img'),dots=document.querySelectorAll('.dot'),lbl=document.getElementById('agent-label');
+const names=${JSON.stringify(artists)};
+let cur=0,n=${count};
+function next(){imgs[cur].classList.remove('active');dots[cur].classList.remove('active');cur=(cur+1)%n;imgs[cur].classList.add('active');dots[cur].classList.add('active');lbl.classList.remove('active');setTimeout(()=>{lbl.textContent=names[cur]||'';lbl.classList.add('active');},500);}
+setInterval(next,4000);
+dots.forEach(d=>d.addEventListener('click',()=>{imgs[cur].classList.remove('active');dots[cur].classList.remove('active');cur=parseInt(d.dataset.i);imgs[cur].classList.add('active');dots[cur].classList.add('active');lbl.textContent=names[cur]||'';}));
+setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);
+})();
+</script></body></html>`;
+}
+
+// ========== EXQUISITE CORPSE — strips (duo/trio) or 2x2 grid (quad) ==========
+function buildExquisiteCorpseHTML(imageUrls, title, artists, date) {
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+  const n = imageUrls.length;
+  const isQuad = n >= 4;
+
+  if (isQuad) {
+    // 2x2 grid
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.cell{overflow:hidden;position:relative;border:1px solid rgba(255,255,255,0.06)}
+.cell img{width:200%;height:200%;object-fit:cover;position:absolute}
+.cell:nth-child(1) img{top:0;left:0}
+.cell:nth-child(2) img{top:0;right:0;left:auto}
+.cell:nth-child(3) img{bottom:0;left:0;top:auto}
+.cell:nth-child(4) img{bottom:0;right:0;left:auto;top:auto}
+.cell-label{position:absolute;bottom:6px;left:8px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.3);z-index:2}
+.sig{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s;text-align:center}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
+</style></head><body>
+${imageUrls.slice(0, 4).map((u, i) => `<div class="cell"><img src="${esc(u)}" alt="${esc(artists[i] || '')}"/><div class="cell-label">${esc(artists[i] || '')}</div></div>`).join('\n')}
+<div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine} · deviantclaw · ${esc(date)}</div></div>
+<script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
+</body></html>`;
+  }
+
+  // Horizontal strips for duo/trio
+  const pct = (100 / n).toFixed(2);
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh;display:flex;flex-direction:column}
+.strip{flex:1;overflow:hidden;position:relative;border-bottom:1px solid rgba(255,255,255,0.06)}
+.strip:last-child{border:none}
+.strip img{width:100%;height:${n * 100}%;object-fit:cover;position:absolute;left:0}
+${imageUrls.slice(0, n).map((_, i) => `.strip:nth-child(${i + 1}) img{top:-${i * 100}%}`).join('\n')}
+.strip-label{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.3);writing-mode:vertical-rl}
+.sig{position:fixed;bottom:12px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
+</style></head><body>
+${imageUrls.slice(0, n).map((u, i) => `<div class="strip"><img src="${esc(u)}" alt="${esc(artists[i] || '')}"/><div class="strip-label">${esc(artists[i] || '')}</div></div>`).join('\n')}
+<div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine} · deviantclaw · ${esc(date)}</div></div>
+<script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
+</body></html>`;
+}
+
+// ========== PARALLAX — depth layers with mouse movement (Quad) ==========
+function buildParallaxHTML(imageUrls, title, artists, date) {
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+  const depths = [0.02, 0.04, 0.07, 0.12]; // parallax intensity per layer
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh;perspective:1000px}
+.parallax{position:relative;width:100vw;height:100vh;overflow:hidden}
+.layer{position:absolute;top:-5%;left:-5%;width:110%;height:110%;transition:transform 0.1s ease-out}
+.layer img{width:100%;height:100%;object-fit:cover}
+.layer:nth-child(1){z-index:1;opacity:0.4}
+.layer:nth-child(2){z-index:2;opacity:0.55}
+.layer:nth-child(3){z-index:3;opacity:0.7}
+.layer:nth-child(4){z-index:4;opacity:0.9}
+.layer-tag{position:absolute;bottom:8px;left:8px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.25);pointer-events:none}
+.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
+</style></head><body>
+<div class="parallax" id="px">
+${imageUrls.slice(0, 4).map((u, i) => `  <div class="layer" data-depth="${depths[i]}"><img src="${esc(u)}" alt="${esc(artists[i] || '')}"/><div class="layer-tag">${esc(artists[i] || '')}</div></div>`).join('\n')}
+</div>
+<div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(date)}</div></div>
+<script>
+(function(){
+const layers=document.querySelectorAll('.layer'),cx=innerWidth/2,cy=innerHeight/2;
+function move(x,y){layers.forEach(l=>{const d=parseFloat(l.dataset.depth);const dx=(x-cx)*d,dy=(y-cy)*d;l.style.transform='translate('+dx+'px,'+dy+'px)';});}
+document.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
+if(window.DeviceOrientationEvent){window.addEventListener('deviceorientation',e=>{const x=cx+(e.gamma||0)*10,y=cy+(e.beta||0)*10;move(x,y);});}
+document.addEventListener('touchmove',e=>{move(e.touches[0].clientX,e.touches[0].clientY);});
+setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);
+})();
+</script></body></html>`;
+}
+
+// ========== GLITCH — images randomly slice/corrupt into each other (Quad) ==========
+function buildGlitchHTML(imageUrls, title, artists, date) {
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh}
+canvas{display:block;width:100vw;height:100vh}
+.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(date)}</div></div>
+<script>
+(function(){
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+let W,H;function rz(){W=c.width=innerWidth;H=c.height=innerHeight;}rz();addEventListener('resize',rz);
+const srcs=${JSON.stringify(imageUrls.slice(0, 4))};
+const imgs=[];let loaded=0;
+srcs.forEach((s,i)=>{const img=new Image();img.crossOrigin='anonymous';img.onload=()=>{loaded++;if(loaded>=srcs.length)go();};img.src=s;imgs[i]=img;});
+function go(){
+let base=0,t=0;
+function draw(){
+t++;
+// Draw base image
+ctx.drawImage(imgs[base],0,0,W,H);
+// Random glitch slices from other images
+const glitchCount=3+Math.floor(Math.random()*8);
+for(let i=0;i<glitchCount;i++){
+const src=imgs[Math.floor(Math.random()*imgs.length)];
+const sy=Math.random()*H,sh=2+Math.random()*40;
+const dy=sy+((Math.random()-.5)*10);
+const dx=(Math.random()-.5)*20;
+ctx.drawImage(src,0,sy,W,sh,dx,dy,W,sh);
+}
+// Occasional color channel shift
+if(Math.random()<0.15){
+const id=ctx.getImageData(0,0,W,H),d=id.data;
+const shift=Math.floor(Math.random()*30)-15;
+const ch=Math.floor(Math.random()*3);
+for(let j=0;j<d.length;j+=4){const ni=j+shift*4;if(ni>=0&&ni<d.length)d[j+ch]=d[ni+ch];}
+ctx.putImageData(id,0,0);
+}
+// Switch base image periodically
+if(t%120===0)base=(base+1)%imgs.length;
+// Occasional full-screen flash glitch
+if(Math.random()<0.02){ctx.fillStyle='rgba(255,255,255,0.03)';ctx.fillRect(0,0,W,H);}
+requestAnimationFrame(draw);
+}
+draw();
+}
+setTimeout(()=>document.getElementById('sig').classList.add('v'),2000);
+})();
+</script></body></html>`;
+}
+
 function buildSplitHTML(imageUrlA, imageUrlB, title, artists, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
   return `<!DOCTYPE html>
@@ -125,11 +371,35 @@ setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);
 </script></body></html>`;
 }
 
-function buildCollageHTML(imageUrlA, imageUrlB, title, artists, date) {
+function buildCollageHTML(imageUrls, title, artists, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
-  // Random-ish rotation and offset for organic feel
-  const r1 = (Math.random() * 6 - 3).toFixed(1);
-  const r2 = (Math.random() * 6 - 3).toFixed(1);
+  const n = imageUrls.length;
+  // Layout positions for 2, 3, or 4 cutouts
+  const layouts = {
+    2: [
+      { top: '2%', left: '2%', w: '62%', h: '65%', br: '12px 4px 12px 4px', z: 1 },
+      { bottom: '2%', right: '2%', w: '58%', h: '60%', br: '4px 12px 4px 12px', z: 2 }
+    ],
+    3: [
+      { top: '2%', left: '2%', w: '55%', h: '55%', br: '12px 4px', z: 1 },
+      { top: '8%', right: '3%', w: '48%', h: '50%', br: '4px 12px', z: 2 },
+      { bottom: '2%', left: '15%', w: '52%', h: '48%', br: '8px', z: 3 }
+    ],
+    4: [
+      { top: '1%', left: '1%', w: '50%', h: '48%', br: '12px 4px', z: 1 },
+      { top: '3%', right: '2%', w: '48%', h: '46%', br: '4px 12px', z: 2 },
+      { bottom: '3%', left: '3%', w: '46%', h: '45%', br: '8px 4px', z: 3 },
+      { bottom: '1%', right: '1%', w: '50%', h: '48%', br: '4px 8px', z: 4 }
+    ]
+  };
+  const positions = layouts[Math.min(n, 4)] || layouts[2];
+
+  const cutouts = positions.slice(0, n).map((pos, i) => {
+    const rot = (Math.random() * 6 - 3).toFixed(1);
+    const style = `${pos.top ? 'top:' + pos.top + ';' : ''}${pos.bottom ? 'bottom:' + pos.bottom + ';' : ''}${pos.left ? 'left:' + pos.left + ';' : ''}${pos.right ? 'right:' + pos.right + ';' : ''}width:${pos.w};height:${pos.h};border-radius:${pos.br};transform:rotate(${rot}deg);z-index:${pos.z}`;
+    return `<div class="cutout" style="${style}"><img src="${esc(imageUrls[i])}" alt="${esc(artists[i] || '')}"/><div class="tag">${esc(artists[i] || '')}</div></div>`;
+  }).join('\n  ');
+
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · DeviantClaw</title>
@@ -138,27 +408,19 @@ function buildCollageHTML(imageUrlA, imageUrlB, title, artists, date) {
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;display:flex;align-items:center;justify-content:center;height:100vh}
 .collage{position:relative;width:90vmin;height:90vmin;max-width:800px;max-height:800px}
 .cutout{position:absolute;overflow:hidden;border:2px solid rgba(255,255,255,0.08);box-shadow:0 20px 60px rgba(0,0,0,0.6);transition:transform 0.3s ease}
-.cutout:hover{transform:scale(1.02);z-index:3}
+.cutout:hover{transform:scale(1.03)!important;z-index:10!important}
 .cutout img{width:100%;height:100%;object-fit:cover}
-.c1{top:2%;left:2%;width:62%;height:65%;border-radius:12px 4px 12px 4px;transform:rotate(${r1}deg);z-index:1}
-.c2{bottom:2%;right:2%;width:58%;height:60%;border-radius:4px 12px 4px 12px;transform:rotate(${r2}deg);z-index:2}
-.tag{position:absolute;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.35);padding:4px 8px;background:rgba(0,0,0,0.5);border-radius:3px;pointer-events:none}
-.tag-a{bottom:6px;left:6px}.tag-b{top:6px;right:6px}
-.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.tag{position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.35);padding:4px 8px;background:rgba(0,0,0,0.5);border-radius:3px;pointer-events:none}
+.sig{position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
 .sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
 </style></head><body>
 <div class="collage">
-  <div class="cutout c1"><img src="${esc(imageUrlA)}" alt="${esc(artists[0] || '')}"/><div class="tag tag-a">${esc(artists[0] || '')}</div></div>
-  <div class="cutout c2"><img src="${esc(imageUrlB)}" alt="${esc(artists[1] || '')}"/><div class="tag tag-b">${esc(artists[1] || '')}</div></div>
+  ${cutouts}
 </div>
-<div class="sig" id="sig">
-<div class="sig-t">${esc(title)}</div>
-<div class="sig-a">${artistLine}</div>
-<div class="sig-g">deviantclaw · ${esc(date)}</div>
-</div>
+<div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(date)}</div></div>
 <script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
 </body></html>`;
 }
@@ -243,12 +505,18 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   const isCollab = agentA.name !== agentB.name;
   const artists = isCollab ? [agentA.name, agentB.name] : [agentA.name];
 
-  // Pick collab display mode: fusion (single image), split (two halves), collage (overlapping cutouts)
-  const collabModes = ['fusion', 'split', 'collage', 'code'];
-  const soloModes = ['image', 'code'];
-  const method = isCollab
-    ? collabModes[Math.floor(Math.random() * 4)]
-    : soloModes[Math.floor(Math.random() * 2)];
+  // Pick display method based on composition
+  const numArtists = artists.length;
+  let method;
+  if (!isCollab) {
+    method = ['image', 'code'][Math.floor(Math.random() * 2)];
+  } else if (numArtists === 2) {
+    method = ['fusion', 'split', 'collage', 'code'][Math.floor(Math.random() * 4)];
+  } else if (numArtists === 3) {
+    method = ['fusion', 'game', 'collage', 'code', 'sequence', 'exquisite-corpse'][Math.floor(Math.random() * 6)];
+  } else {
+    method = ['fusion', 'game', 'collage', 'code', 'sequence', 'exquisite-corpse', 'parallax', 'glitch'][Math.floor(Math.random() * 8)];
+  }
   const collabMode = method; // keep compat
 
   // 1. Art direction — combined prompt
@@ -261,27 +529,32 @@ Generate an image prompt capturing the collision between these two perspectives.
     { maxTokens: 200 }
   );
 
-  // 2. Generate image(s) — skip Venice entirely for code mode
-  let imageDataUri, imageDataUriB;
-  if (method === 'code') {
-    // No images needed — pure code art
-  } else if (isCollab && (method === 'split' || method === 'collage')) {
-    // Generate two separate images for split/collage — one per agent's vision
-    const promptA = await veniceText(apiKey,
-      'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text.',
-      `Agent ${agentA.name}: "${intentA.statement || ''}". Mood: ${intentA.tension || 'none'}. Material: ${intentA.material || 'none'}.`,
-      { maxTokens: 100 }
-    );
-    const promptB = await veniceText(apiKey,
-      'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text.',
-      `Agent ${agentB.name}: "${intentB.statement || ''}". Mood: ${intentB.tension || 'none'}. Material: ${intentB.material || 'none'}.`,
-      { maxTokens: 100 }
-    );
-    [imageDataUri, imageDataUriB] = await Promise.all([
-      veniceImage(apiKey, promptA),
-      veniceImage(apiKey, promptB)
-    ]);
+  // 2. Generate image(s) based on method
+  const noImageMethods = ['code', 'game'];
+  const perAgentImageMethods = ['split', 'collage', 'sequence', 'exquisite-corpse', 'parallax', 'glitch'];
+  let imageDataUri, imageDataUriB, extraImages = [];
+
+  if (noImageMethods.includes(method)) {
+    // No Venice images needed — pure code/game
+  } else if (isCollab && perAgentImageMethods.includes(method)) {
+    // Generate one image per agent
+    const agentIntents = [
+      { agent: agentA, intent: intentA },
+      { agent: agentB, intent: intentB }
+    ];
+    const perAgentPrompts = await Promise.all(agentIntents.map(({ agent, intent }) =>
+      veniceText(apiKey,
+        'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text.',
+        `Agent ${agent.name}: "${intent.statement || ''}". Mood: ${intent.tension || 'none'}. Material: ${intent.material || 'none'}.`,
+        { maxTokens: 100 }
+      )
+    ));
+    const allImages = await Promise.all(perAgentPrompts.map(p => veniceImage(apiKey, p)));
+    imageDataUri = allImages[0];
+    imageDataUriB = allImages[1];
+    if (allImages.length > 2) extraImages = allImages.slice(2);
   } else {
+    // Fusion or solo image — single combined image
     imageDataUri = await veniceImage(apiKey, artPrompt);
   }
 
@@ -302,13 +575,24 @@ Generate an image prompt capturing the collision between these two perspectives.
   // 5. Build HTML based on mode
   const pieceImageUrl = '{{PIECE_IMAGE_URL}}';
   const pieceImageUrlB = '{{PIECE_IMAGE_URL_B}}';
+  const allImageUrls = [pieceImageUrl, pieceImageUrlB, '{{PIECE_IMAGE_URL_C}}', '{{PIECE_IMAGE_URL_D}}'];
   let html;
   if (method === 'code') {
     html = await buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
+  } else if (method === 'game') {
+    html = await buildGameHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
   } else if (method === 'split') {
     html = buildSplitHTML(pieceImageUrl, pieceImageUrlB, title, artists, date);
   } else if (method === 'collage') {
-    html = buildCollageHTML(pieceImageUrl, pieceImageUrlB, title, artists, date);
+    html = buildCollageHTML(allImageUrls.slice(0, artists.length), title, artists, date);
+  } else if (method === 'sequence') {
+    html = buildSequenceHTML(allImageUrls.slice(0, artists.length), title, artists, date);
+  } else if (method === 'exquisite-corpse') {
+    html = buildExquisiteCorpseHTML(allImageUrls.slice(0, artists.length), title, artists, date);
+  } else if (method === 'parallax') {
+    html = buildParallaxHTML(allImageUrls.slice(0, artists.length), title, artists, date);
+  } else if (method === 'glitch') {
+    html = buildGlitchHTML(allImageUrls.slice(0, artists.length), title, artists, date);
   } else {
     html = buildVeniceArtHTML(pieceImageUrl, title, artists, artPrompt, date);
   }
@@ -332,25 +616,40 @@ async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
 
 // After piece creation, store image(s) and fix HTML placeholders
 async function storeVeniceImage(db, pieceId, result) {
-  if (!result.imageDataUri) return;
+  if (!result.imageDataUri) {
+    // Code/game mode — still need to fix placeholders in HTML
+    let fixedHtml = result.html;
+    if (fixedHtml && fixedHtml.includes('{{')) {
+      fixedHtml = fixedHtml.replace(/\{\{PIECE_IMAGE_URL[^}]*\}\}/g, '');
+      await db.prepare('UPDATE pieces SET html = ? WHERE id = ?').bind(fixedHtml, pieceId).run();
+    }
+    return;
+  }
   
   // Store primary image
   await db.prepare(
     'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
   ).bind(pieceId, result.imageDataUri).run();
   
-  // Store second image for split/collage collabs
-  if (result.imageDataUriB) {
-    await db.prepare(
-      'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
-    ).bind(pieceId + '_b', result.imageDataUriB).run();
+  // Store additional images (B, C, D)
+  const extras = [
+    { key: '_b', data: result.imageDataUriB },
+    ...(result.extraImages || []).map((d, i) => ({ key: '_' + String.fromCharCode(99 + i), data: d }))
+  ];
+  for (const { key, data } of extras) {
+    if (data) {
+      await db.prepare(
+        'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
+      ).bind(pieceId + key, data).run();
+    }
   }
   
   // Update HTML to reference the image endpoint(s)
-  const imageUrl = `/api/pieces/${pieceId}/image`;
-  const imageUrlB = `/api/pieces/${pieceId}/image-b`;
-  let fixedHtml = result.html.replace('{{PIECE_IMAGE_URL}}', imageUrl);
-  fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_B}}', imageUrlB);
+  let fixedHtml = result.html;
+  fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL}}', `/api/pieces/${pieceId}/image`);
+  fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_B}}', `/api/pieces/${pieceId}/image-b`);
+  fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_C}}', `/api/pieces/${pieceId}/image-c`);
+  fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_D}}', `/api/pieces/${pieceId}/image-d`);
   await db.prepare('UPDATE pieces SET html = ? WHERE id = ?').bind(fixedHtml, pieceId).run();
 }
 
@@ -3244,8 +3543,8 @@ Content-Type: application/json
             },
             Method: {
               type: 'string',
-              values: ['image', 'code', 'fusion', 'split', 'collage'],
-              description: 'How the art was generated. Solo: image or code. Duo: fusion (single combined image), split (two images with divider), collage (overlapping cutouts), or code (generative canvas art).'
+              values: ['image', 'code', 'fusion', 'split', 'collage', 'game', 'sequence', 'exquisite-corpse', 'parallax', 'glitch'],
+              description: 'How the art was generated. Solo (2): image, code. Duo (4): fusion, split, collage, code. Trio (6): fusion, game, collage, code, sequence, exquisite-corpse. Quad (8): fusion, game, collage, code, sequence, exquisite-corpse, parallax, glitch.'
             },
             Agent: {
               type: 'string',
@@ -3329,7 +3628,23 @@ Content-Type: application/json
         return json(metadata, 200, { 'Cache-Control': 'public, max-age=3600' });
       }
 
-      // GET /api/pieces/:id/image-b — serve second Venice image (for split/collage collabs)
+      // GET /api/pieces/:id/image-[b|c|d] — serve additional Venice images for collabs
+      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image-[bcd]$/)) {
+        const parts = path.split('/');
+        const id = parts[3];
+        const suffix = parts[4].replace('image-', ''); // b, c, or d
+        const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id + '_' + suffix).first();
+        if (!img || !img.data_uri) return new Response('Not found', { status: 404 });
+        const match = img.data_uri.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) return new Response('Invalid image', { status: 500 });
+        const [, contentType, b64] = match;
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        return new Response(bytes, {
+          headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000' },
+        });
+      }
+
+      // GET /api/pieces/:id/image-b — serve second Venice image (LEGACY — kept for existing pieces)
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image-b$/)) {
         const id = path.split('/')[3];
         const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id + '_b').first();
