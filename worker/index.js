@@ -295,8 +295,10 @@ nav .brand span{color:var(--primary)}
 nav .links{display:flex;gap:20px;font-size:14px;letter-spacing:1px;text-transform:uppercase}
 nav .links a{color:var(--dim)}
 nav .links a:hover{color:var(--primary)}
-.container{max-width:1200px;margin:0 auto;padding:24px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
+.container{max-width:1400px;margin:0 auto;padding:24px 16px}
+@media(min-width:1100px){.container{padding:24px 32px}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
+@media(min-width:1100px){.grid{grid-template-columns:repeat(4,1fr)}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;transition:border-color 0.2s,transform 0.2s;display:block;color:inherit}
 .card:hover{border-color:var(--primary);transform:translateY(-2px)}
 .card .card-title{font-size:14px;color:var(--text);margin-bottom:8px;letter-spacing:1px}
@@ -328,13 +330,13 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .built-with-grid{display:flex;justify-content:center;align-items:center;gap:28px 40px;flex-wrap:wrap}
 .brand-link{display:flex;align-items:center;justify-content:center;min-width:140px;min-height:48px;opacity:0.72;transition:opacity 0.2s,transform 0.2s}
 .brand-link:hover{opacity:1;transform:translateY(-1px)}
-.brand-link img,.brand-link svg{display:block;width:auto;max-width:200px;height:48px;object-fit:contain}
-.brand-venice img{height:52px}
-.brand-x svg{height:40px;color:var(--text)}
-.brand-metamask svg{height:52px;color:#f6851b}
-.brand-superrare img{height:40px;filter:brightness(0) invert(1)}
-.brand-status img{height:44px}
-.brand-ens img{height:44px}
+.brand-link img,.brand-link svg{display:block;width:auto;max-width:200px;height:48px;object-fit:contain;filter:brightness(0) invert(1)}
+.brand-venice img{height:48px}
+.brand-x svg{height:48px;width:48px;filter:none;color:#fff}
+.brand-metamask svg{height:48px;filter:none;color:#fff}
+.brand-superrare img{height:48px}
+.brand-status img{height:48px}
+.brand-ens img{height:48px}
 @media (max-width:640px){
   .built-with-grid{gap:22px 28px}
   .brand-link{min-width:100px;min-height:36px}
@@ -2102,7 +2104,7 @@ async function renderArtists(db) {
     const avatarSrc = a.avatar_url || (a.human_x_handle ? `https://unavatar.io/x/${a.human_x_handle}` : `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${a.id}`);
     const count = pieceCounts[a.id] || 0;
     const bio = a.bio || a.soul || '';
-    const truncBio = bio.length > 120 ? bio.slice(0, 120) + '…' : bio;
+    const truncBio = bio.length > 200 ? bio.slice(0, 200) + '…' : bio;
     return `
     <a href="/agent/${esc(a.id)}" class="artist-card" style="--ac:${esc(color)}">
       <div class="artist-avatar">
@@ -2122,8 +2124,8 @@ async function renderArtists(db) {
 .artists-page{max-width:960px;margin:0 auto;padding:24px}
 .artists-page h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
 .artists-page .subtitle{font-size:13px;color:var(--dim);letter-spacing:1px;margin-bottom:28px}
-.artists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
-@media(min-width:1200px){.artists-grid{grid-template-columns:repeat(4,1fr)}}
+.artists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:20px}
+@media(min-width:1200px){.artists-grid{grid-template-columns:repeat(3,1fr)}}
 .artist-card{display:flex;gap:20px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-decoration:none;transition:all 0.2s;border-left:3px solid var(--ac)}
 .artist-card:hover{border-color:var(--ac);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.3)}
 .artist-avatar{width:80px;height:80px;border-radius:12px;overflow:hidden;flex-shrink:0;border:2px solid var(--ac)}
@@ -2132,7 +2134,7 @@ async function renderArtists(db) {
 .artist-name{font-size:18px;letter-spacing:2px;text-transform:uppercase;color:#fff;margin-bottom:4px}
 .artist-mood{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ac);margin-bottom:4px}
 .artist-type{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
-.artist-bio{font-size:14px;color:var(--secondary);line-height:1.6;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.artist-bio{font-size:14px;color:var(--secondary);line-height:1.6;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .artist-stats{font-size:13px;color:var(--dim);letter-spacing:1px}
 `;
 

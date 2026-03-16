@@ -332,8 +332,7 @@ render();
 
 function render() {
   if (state.step === 'start') renderStart();
-  else if (state.step === 'tweet') renderTweet();
-  else if (state.step === 'confirm') renderConfirm();
+  else if (state.step === 'tweet' || state.step === 'confirm') renderTweet();
   else if (state.step === 'done') renderDone();
 }
 
@@ -379,9 +378,9 @@ function renderTweet() {
   appRoot.innerHTML = \`
     <section class="card">
       <div>
-        <div class="kicker">Step 2 of 3</div>
-        <h1>Post this tweet</h1>
-        <p class="subtle" style="margin-top:8px">Post the following from <strong>@\${esc(state.xHandle)}</strong>, then come back and paste the tweet URL.</p>
+        <div class="kicker">Step 2 of 2</div>
+        <h1>Post & Verify</h1>
+        <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@\${esc(state.xHandle)}</strong>, then paste the tweet URL below.</p>
       </div>
       <div class="tweet-box">\${esc(state.tweetText)}</div>
       <div class="btn-row">
@@ -391,7 +390,15 @@ function renderTweet() {
         </a>
         <button class="secondary" id="copy-tweet-btn">Copy text</button>
       </div>
-      <button id="next-btn" style="margin-top:4px">I've posted it →</button>
+      <div style="margin-top:8px;padding-top:16px;border-top:1px solid var(--border)">
+        <label class="field-label" for="tweet-url">Paste your tweet URL here</label>
+        <input id="tweet-url" class="field-input" type="url" placeholder="https://x.com/yourhandle/status/..." value="\${esc(state.tweetUrl)}" />
+      </div>
+      \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
+      <div class="btn-row">
+        <button id="confirm-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Verifying...' : 'Verify & Get API Key'}</button>
+        <button class="secondary" id="back-btn">← Back</button>
+      </div>
     </section>
   \`;
 
@@ -400,32 +407,9 @@ function renderTweet() {
     document.getElementById('copy-tweet-btn').textContent = 'Copied!';
     setTimeout(() => { document.getElementById('copy-tweet-btn').textContent = 'Copy text'; }, 1500);
   });
-  document.getElementById('next-btn').addEventListener('click', () => { state.step = 'confirm'; render(); });
-}
-
-function renderConfirm() {
-  appRoot.innerHTML = \`
-    <section class="card">
-      <div>
-        <div class="kicker">Step 3 of 3</div>
-        <h1>Paste tweet URL</h1>
-        <p class="subtle" style="margin-top:8px">Paste the URL of the tweet you just posted.</p>
-      </div>
-      <div>
-        <label class="field-label" for="tweet-url">Tweet URL</label>
-        <input id="tweet-url" class="field-input" type="url" placeholder="https://x.com/yourhandle/status/..." value="\${esc(state.tweetUrl)}" />
-      </div>
-      \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
-      <div class="btn-row">
-        <button id="confirm-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Verifying...' : 'Verify'}</button>
-        <button class="secondary" id="back-btn">← Back</button>
-      </div>
-    </section>
-  \`;
-
   document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; });
   document.getElementById('confirm-btn').addEventListener('click', confirmVerification);
-  document.getElementById('back-btn').addEventListener('click', () => { state.step = 'tweet'; state.error = ''; render(); });
+  document.getElementById('back-btn').addEventListener('click', () => { state.step = 'start'; state.error = ''; render(); });
 }
 
 function renderDone() {
