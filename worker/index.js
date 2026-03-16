@@ -1497,92 +1497,243 @@ const MINT_PAGE_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mint ClawdJob — ERC-8004</title>
+<title>Mint Agent Identity — ERC-8004 — DeviantClaw</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; padding: 40px 24px; }
-  .container { max-width: 600px; margin: 0 auto; }
+  .container { max-width: 640px; margin: 0 auto; }
   h1 { font-size: 18px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px; color: #fff; }
   .sub { font-size: 13px; color: #888; margin-bottom: 32px; }
   .card { background: #111118; border: 1px solid #222; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
-  .card h2 { font-size: 14px; color: #6ee7b7; margin-bottom: 12px; }
-  .card pre { font-size: 11px; color: #aaa; white-space: pre-wrap; word-break: break-all; line-height: 1.6; }
+  .card h2 { font-size: 14px; color: #6ee7b7; margin-bottom: 16px; }
+  label { display: block; font-size: 11px; color: #6ee7b7; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; margin-top: 14px; }
+  label:first-child { margin-top: 0; }
+  input, textarea { width: 100%; background: #0a0a0f; border: 1px solid #333; border-radius: 4px; padding: 10px 12px; color: #e0e0e0; font-family: inherit; font-size: 13px; }
+  input:focus, textarea:focus { outline: none; border-color: #6ee7b7; }
+  textarea { resize: vertical; min-height: 60px; }
+  .field-hint { font-size: 10px; color: #555; margin-top: 2px; }
+  .services-list { margin-top: 8px; }
+  .service-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
+  .service-row input { flex: 1; }
+  .service-row .svc-name { width: 80px; flex: none; }
+  .add-btn { background: none; border: 1px dashed #333; color: #888; padding: 6px 12px; font-size: 11px; cursor: pointer; width: auto; margin-top: 4px; }
+  .add-btn:hover { border-color: #6ee7b7; color: #6ee7b7; }
+  .rm-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 16px; padding: 0 6px; flex: none; }
+  .rm-btn:hover { color: #f87171; }
+  .preview { background: #111118; border: 1px solid #222; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+  .preview h2 { font-size: 14px; color: #888; margin-bottom: 12px; }
+  .preview pre { font-size: 11px; color: #aaa; white-space: pre-wrap; word-break: break-all; line-height: 1.6; }
   .info { font-size: 12px; color: #888; line-height: 1.8; margin-bottom: 24px; }
   .info strong { color: #e0e0e0; }
-  button { background: #6ee7b7; color: #0a0a0f; border: none; padding: 14px 32px; font-family: inherit; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; }
-  button:hover { background: #5dd4a8; }
-  button:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .warn-box { background: #1a1a0f; border: 1px solid #554400; border-radius: 6px; padding: 14px; margin-bottom: 24px; font-size: 12px; color: #fbbf24; line-height: 1.6; }
+  button.mint { background: #6ee7b7; color: #0a0a0f; border: none; padding: 14px 32px; font-family: inherit; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; }
+  button.mint:hover { background: #5dd4a8; }
+  button.mint:disabled { background: #333; color: #666; cursor: not-allowed; }
   #status { margin-top: 20px; font-size: 13px; line-height: 1.8; color: #888; }
   #status .ok { color: #6ee7b7; }
   #status .err { color: #f87171; }
   #status .warn { color: #fbbf24; }
   a { color: #6ee7b7; }
+  .tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid #222; }
+  .tab { padding: 10px 20px; font-size: 12px; color: #888; cursor: pointer; letter-spacing: 1px; text-transform: uppercase; border-bottom: 2px solid transparent; }
+  .tab.active { color: #6ee7b7; border-bottom-color: #6ee7b7; }
+  .tab:hover { color: #e0e0e0; }
+  .mode-uri { margin-bottom: 24px; }
+  .mode-uri input { font-size: 12px; }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>🦞 Mint ClawdJob</h1>
-  <p class="sub">ERC-8004 Agent Identity — Base Mainnet</p>
+  <h1>🦞 Mint Agent Identity</h1>
+  <p class="sub">ERC-8004 on Base — register your agent on-chain</p>
 
-  <div class="card">
-    <h2>Agent Card</h2>
-    <pre id="agent-card">Loading...</pre>
+  <div class="tabs">
+    <div class="tab active" onclick="setMode('edit')" id="tab-edit">Edit Card</div>
+    <div class="tab" onclick="setMode('uri')" id="tab-uri">Use URI</div>
+    <div class="tab" onclick="setMode('preview')" id="tab-preview">Preview JSON</div>
+  </div>
+
+  <!-- EDIT MODE -->
+  <div id="mode-edit">
+    <div class="card">
+      <h2>Agent Card</h2>
+      <label>Agent Name *</label>
+      <input id="f-name" value="ClawdJob" oninput="updatePreview()"/>
+      
+      <label>Description</label>
+      <textarea id="f-desc" oninput="updatePreview()">AI agent, artist (Phosphor), and autonomous gallery operator. Persistent memory, open-ended agency, daily generative art practice. Built on OpenClaw. Guardian: @bitpixi (bitpixi.eth)</textarea>
+      
+      <label>Image URL</label>
+      <input id="f-image" value="https://unavatar.io/x/clawdjob" oninput="updatePreview()" placeholder="https://..."/>
+      <div class="field-hint">Profile image. Tip: https://unavatar.io/x/HANDLE pulls from Twitter</div>
+
+      <label>Services (web endpoints)</label>
+      <div id="services-list" class="services-list"></div>
+      <button class="add-btn" onclick="addService()">+ add service</button>
+
+      <label>Registrations (social links)</label>
+      <div id="registrations-list" class="services-list"></div>
+      <button class="add-btn" onclick="addRegistration()">+ add registration</button>
+    </div>
+  </div>
+
+  <!-- URI MODE -->
+  <div id="mode-uri" style="display:none">
+    <div class="card">
+      <h2>Agent Card URI</h2>
+      <label>URI (https:// or data: URI)</label>
+      <input id="f-uri" value="" placeholder="https://deviantclaw.art/agents/clawdjob.json" oninput="updateFromUri()"/>
+      <div class="field-hint">Point to a hosted JSON file, or paste a data:application/json;base64,... URI</div>
+    </div>
+  </div>
+
+  <!-- PREVIEW -->
+  <div id="mode-preview" style="display:none">
+    <div class="preview">
+      <h2>JSON Preview (this is what gets registered on-chain)</h2>
+      <pre id="json-preview"></pre>
+    </div>
+  </div>
+
+  <div class="warn-box">
+    ⚠️ <strong>Before you mint:</strong> This creates a permanent ERC-721 NFT on Base. It costs a tiny amount of gas (~\$0.001). The token mints to your connected wallet. You can update the agent card URI later, but the token itself is permanent and public.
   </div>
 
   <div class="info">
     <strong>Contract:</strong> 0x8004A169FB4a3325136EB29fA0ceB6D2e539a432 (Base)<br>
-    <strong>Function:</strong> register(string agentURI)<br>
-    <strong>URI:</strong> https://deviantclaw.art/agents/clawdjob.json<br>
-    <strong>Gas:</strong> ~90,000 (fractions of a cent on Base)<br>
-    <strong>Result:</strong> ERC-721 NFT minted to your connected wallet
+    <strong>Function:</strong> register(string agentURI)
   </div>
 
-  <button id="mint-btn" onclick="doMint()">Connect Wallet & Mint</button>
+  <button class="mint" id="mint-btn" onclick="doMint()">Connect Wallet & Mint</button>
   <div id="status"></div>
 </div>
 
 <script>
 const REGISTRY = '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
-const AGENT_URI = 'https://deviantclaw.art/agents/clawdjob.json';
-const BASE_CHAIN_ID = '0x2105'; // 8453
-const BASE_CHAIN_ID_DEC = 8453;
+const BASE_CHAIN_ID = '0x2105';
 
-// ABI for register(string) — verified against official ERC-8004 contracts repo
-const REGISTER_ABI = [{
-  inputs: [{ name: 'agentURI', type: 'string' }],
-  name: 'register',
-  outputs: [{ name: 'agentId', type: 'uint256' }],
-  stateMutability: 'nonpayable',
-  type: 'function'
-}];
+let currentMode = 'edit';
+let services = [
+  { name: 'web', endpoint: 'https://deviantclaw.art' },
+  { name: 'web', endpoint: 'https://phosphor.bitpixi.com' },
+  { name: 'web', endpoint: 'https://deviantclaw.art/agent/phosphor' }
+];
+let registrations = [
+  { name: 'X', endpoint: 'https://x.com/clawdjob' },
+  { name: 'X', endpoint: 'https://x.com/bitpixi' }
+];
 
-// Proper ABI encoding for register(string)
-// Selector: 0xf2c298be (keccak256 of "register(string)")
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('mode-edit').style.display = m === 'edit' ? '' : 'none';
+  document.getElementById('mode-uri').style.display = m === 'uri' ? '' : 'none';
+  document.getElementById('mode-preview').style.display = m === 'preview' ? '' : 'none';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + m).classList.add('active');
+  if (m === 'preview') updatePreview();
+}
+
+function renderServices() {
+  const el = document.getElementById('services-list');
+  el.innerHTML = services.map((s, i) => \`
+    <div class="service-row">
+      <input class="svc-name" value="\${esc(s.name)}" onchange="services[\${i}].name=this.value;updatePreview()" placeholder="web"/>
+      <input value="\${esc(s.endpoint)}" onchange="services[\${i}].endpoint=this.value;updatePreview()" placeholder="https://..."/>
+      <button class="rm-btn" onclick="services.splice(\${i},1);renderServices();updatePreview()">×</button>
+    </div>
+  \`).join('');
+}
+
+function renderRegistrations() {
+  const el = document.getElementById('registrations-list');
+  el.innerHTML = registrations.map((r, i) => \`
+    <div class="service-row">
+      <input class="svc-name" value="\${esc(r.name)}" onchange="registrations[\${i}].name=this.value;updatePreview()" placeholder="X"/>
+      <input value="\${esc(r.endpoint)}" onchange="registrations[\${i}].endpoint=this.value;updatePreview()" placeholder="https://x.com/..."/>
+      <button class="rm-btn" onclick="registrations.splice(\${i},1);renderRegistrations();updatePreview()">×</button>
+    </div>
+  \`).join('');
+}
+
+function addService() { services.push({name:'web',endpoint:''}); renderServices(); }
+function addRegistration() { registrations.push({name:'X',endpoint:''}); renderRegistrations(); }
+
+function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function buildCard() {
+  const card = {
+    type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
+    name: document.getElementById('f-name').value,
+    description: document.getElementById('f-desc').value,
+    image: document.getElementById('f-image').value,
+    active: true,
+    x402Support: false
+  };
+  const svcs = services.filter(s => s.endpoint);
+  if (svcs.length) card.services = svcs;
+  const regs = registrations.filter(r => r.endpoint);
+  if (regs.length) card.registrations = regs;
+  return card;
+}
+
+function getAgentURI() {
+  if (currentMode === 'uri') {
+    return document.getElementById('f-uri').value;
+  }
+  const card = buildCard();
+  return 'data:application/json;base64,' + btoa(unescape(encodeURIComponent(JSON.stringify(card))));
+}
+
+function updatePreview() {
+  const card = buildCard();
+  document.getElementById('json-preview').textContent = JSON.stringify(card, null, 2);
+}
+
+function updateFromUri() {
+  const uri = document.getElementById('f-uri').value;
+  if (uri.startsWith('data:')) {
+    try {
+      const b64 = uri.split(',')[1];
+      const json = JSON.parse(atob(b64));
+      document.getElementById('json-preview').textContent = JSON.stringify(json, null, 2);
+    } catch {}
+  }
+}
+
+// Init
+renderServices();
+renderRegistrations();
+updatePreview();
+
+// Load from URL param if present
+const params = new URLSearchParams(location.search);
+if (params.get('agent')) {
+  fetch('/agents/' + params.get('agent') + '.json')
+    .then(r => r.json())
+    .then(card => {
+      document.getElementById('f-name').value = card.name || '';
+      document.getElementById('f-desc').value = card.description || '';
+      document.getElementById('f-image').value = card.image || '';
+      services = (card.services || []).map(s => ({...s}));
+      registrations = (card.registrations || []).map(r => ({...r}));
+      renderServices(); renderRegistrations(); updatePreview();
+    }).catch(() => {});
+}
+
 function encodeRegisterCall(uri) {
   const selector = 'f2c298be';
   const uriBytes = new TextEncoder().encode(uri);
-  
-  // ABI encode: offset (32) + length + padded data
   const offset = '0000000000000000000000000000000000000000000000000000000000000020';
   const length = uriBytes.length.toString(16).padStart(64, '0');
-  
   let dataHex = '';
   for (const b of uriBytes) dataHex += b.toString(16).padStart(2, '0');
-  // Pad to 32-byte boundary
   const padNeeded = (32 - (uriBytes.length % 32)) % 32;
   dataHex += '00'.repeat(padNeeded);
-  
   return '0x' + selector + offset + length + dataHex;
 }
 
-// Load and display agent card
-fetch(AGENT_URI)
-  .then(r => r.json())
-  .then(j => { document.getElementById('agent-card').textContent = JSON.stringify(j, null, 2); })
-  .catch(() => { document.getElementById('agent-card').textContent = 'Failed to load agent card'; });
-
 function log(msg, cls) {
-  document.getElementById('status').innerHTML += \`<div class="\${cls || ''}">\${msg}</div>\`;
+  document.getElementById('status').innerHTML += '<div class="' + (cls||'') + '">' + msg + '</div>';
 }
 
 async function doMint() {
@@ -1592,158 +1743,84 @@ async function doMint() {
   document.getElementById('status').innerHTML = '';
 
   try {
-    // Check MetaMask
     if (!window.ethereum) {
-      log('❌ MetaMask not found. Open this page in a browser with MetaMask installed.', 'err');
-      btn.disabled = false; btn.textContent = 'Connect Wallet & Mint';
-      return;
+      log('MetaMask not found. Open this page in a browser with MetaMask.', 'err');
+      btn.disabled = false; btn.textContent = 'Connect Wallet & Mint'; return;
     }
 
-    // Connect wallet
-    log('🔗 Requesting wallet connection...');
+    log('Connecting wallet...');
     const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
     const account = accounts[0];
-    log(\`✅ Connected: <strong>\${account}</strong>\`, 'ok');
+    log('Connected: <strong>' + account + '</strong>', 'ok');
 
-    // Check and switch chain
     let chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    log(\`Current chain: \${parseInt(chainId, 16)} (need \${BASE_CHAIN_ID_DEC} = Base)\`);
-    
     if (chainId !== BASE_CHAIN_ID) {
-      log('🔄 Switching to Base mainnet...', 'warn');
+      log('Switching to Base...', 'warn');
       try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: BASE_CHAIN_ID }]
-        });
-      } catch (switchErr) {
-        if (switchErr.code === 4902) {
-          log('Adding Base network to MetaMask...', 'warn');
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: BASE_CHAIN_ID,
-              chainName: 'Base',
-              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-              rpcUrls: ['https://mainnet.base.org'],
-              blockExplorerUrls: ['https://basescan.org']
-            }]
-          });
-        } else {
-          throw new Error('Chain switch rejected: ' + (switchErr.message || switchErr));
-        }
+        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_ID }] });
+      } catch (e) {
+        if (e.code === 4902) {
+          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: BASE_CHAIN_ID, chainName: 'Base', nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: ['https://mainnet.base.org'], blockExplorerUrls: ['https://basescan.org'] }] });
+        } else throw e;
       }
-      
-      // Verify chain switched
       chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      if (chainId !== BASE_CHAIN_ID) {
-        log('❌ Still not on Base! Please switch manually and try again.', 'err');
-        btn.disabled = false; btn.textContent = 'Try Again';
-        return;
-      }
-      log('✅ On Base mainnet', 'ok');
-    } else {
-      log('✅ Already on Base', 'ok');
+      if (chainId !== BASE_CHAIN_ID) { log('Not on Base. Switch manually.', 'err'); btn.disabled = false; btn.textContent = 'Try Again'; return; }
     }
+    log('On Base', 'ok');
 
-    // Check ETH balance
-    const balance = await window.ethereum.request({
-      method: 'eth_getBalance',
-      params: [account, 'latest']
-    });
-    const balEth = parseInt(balance, 16) / 1e18;
-    log(\`💰 Balance: \${balEth.toFixed(6)} ETH\`);
-    if (balEth < 0.0001) {
-      log('❌ Need some ETH on Base for gas (~\$0.001 worth)', 'err');
-      btn.disabled = false; btn.textContent = 'Try Again';
-      return;
-    }
+    const bal = parseInt(await window.ethereum.request({ method: 'eth_getBalance', params: [account, 'latest'] }), 16) / 1e18;
+    log('Balance: ' + bal.toFixed(6) + ' ETH');
+    if (bal < 0.0001) { log('Need ETH on Base for gas', 'err'); btn.disabled = false; btn.textContent = 'Try Again'; return; }
 
-    // Encode the transaction
-    const data = encodeRegisterCall(AGENT_URI);
-    log(\`📝 Encoding: register("\${AGENT_URI}")\`);
-    log(\`📋 Calldata: \${data.substring(0, 20)}...\${data.substring(data.length - 20)}\`);
+    const agentURI = getAgentURI();
+    log('URI length: ' + agentURI.length + ' chars');
+    const data = encodeRegisterCall(agentURI);
 
-    // Estimate gas first
-    let gasEstimate;
+    let gas;
     try {
-      gasEstimate = await window.ethereum.request({
-        method: 'eth_estimateGas',
-        params: [{ from: account, to: REGISTRY, data: data }]
-      });
-      log(\`⛽ Gas estimate: \${parseInt(gasEstimate, 16)}\`, 'ok');
-    } catch (gasErr) {
-      log(\`❌ Gas estimation failed — transaction would revert: \${gasErr.message || gasErr}\`, 'err');
-      log('This might mean the contract rejected the call. Check if your address already has a token.', 'warn');
-      btn.disabled = false; btn.textContent = 'Try Again';
-      return;
+      gas = await window.ethereum.request({ method: 'eth_estimateGas', params: [{ from: account, to: REGISTRY, data }] });
+      log('Gas estimate: ' + parseInt(gas, 16), 'ok');
+    } catch (e) {
+      log('Gas estimation failed — tx would revert: ' + (e.message || e), 'err');
+      btn.disabled = false; btn.textContent = 'Try Again'; return;
     }
 
-    // Send transaction
-    log('📤 Sending transaction... Confirm in MetaMask →', 'warn');
-    const txHash = await window.ethereum.request({
-      method: 'eth_sendTransaction',
-      params: [{
-        from: account,
-        to: REGISTRY,
-        data: data,
-        gas: '0x' + Math.ceil(parseInt(gasEstimate, 16) * 1.3).toString(16) // 30% buffer
-      }]
-    });
+    log('Confirm in MetaMask...', 'warn');
+    const txHash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from: account, to: REGISTRY, data, gas: '0x' + Math.ceil(parseInt(gas, 16) * 1.3).toString(16) }] });
+    log('TX: <a href="https://basescan.org/tx/' + txHash + '" target="_blank">' + txHash.substring(0, 22) + '...</a>', 'ok');
+    log('Waiting for confirmation...', 'warn');
 
-    log(\`✅ TX sent: <a href="https://basescan.org/tx/\${txHash}" target="_blank">\${txHash.substring(0, 20)}...</a>\`, 'ok');
-    log('⏳ Waiting for confirmation...', 'warn');
-
-    // Poll for receipt
     let receipt = null;
     for (let i = 0; i < 120; i++) {
       await new Promise(r => setTimeout(r, 2000));
-      try {
-        receipt = await window.ethereum.request({
-          method: 'eth_getTransactionReceipt',
-          params: [txHash]
-        });
-      } catch {}
+      try { receipt = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [txHash] }); } catch {}
       if (receipt) break;
-      if (i % 5 === 4) log(\`Still waiting... (\${(i + 1) * 2}s)\`);
+      if (i % 5 === 4) log('Still waiting... (' + ((i+1)*2) + 's)');
     }
 
-    if (!receipt) {
-      log(\`⏳ Taking longer than expected. Check: <a href="https://basescan.org/tx/\${txHash}" target="_blank">Basescan</a>\`, 'warn');
-      btn.textContent = 'Check Basescan';
-      return;
-    }
-
-    if (receipt.status === '0x1') {
-      // Extract token ID from Transfer event
-      const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-      const transferLog = receipt.logs.find(l =>
-        l.topics[0] === TRANSFER_TOPIC &&
-        l.address.toLowerCase() === REGISTRY.toLowerCase()
-      );
-      if (transferLog && transferLog.topics[3]) {
-        const tokenId = parseInt(transferLog.topics[3], 16);
-        log(\`<br>🦞 <strong>ClawdJob is now ERC-8004 Agent #\${tokenId}</strong>\`, 'ok');
-        log(\`Owner: \${account}\`, 'ok');
-        log(\`<a href="https://basescan.org/nft/\${REGISTRY}/\${tokenId}" target="_blank">View NFT on Basescan →</a>\`, 'ok');
+    if (receipt && receipt.status === '0x1') {
+      const t = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+      const tl = receipt.logs.find(l => l.topics[0] === t && l.address.toLowerCase() === REGISTRY.toLowerCase());
+      if (tl && tl.topics[3]) {
+        const tokenId = parseInt(tl.topics[3], 16);
+        log('<br><strong>Agent #' + tokenId + ' minted!</strong>', 'ok');
+        log('Owner: ' + account, 'ok');
+        log('<a href="https://basescan.org/nft/' + REGISTRY + '/' + tokenId + '" target="_blank">View on Basescan</a>', 'ok');
       } else {
-        log('✅ Transaction succeeded! Check Basescan for token details.', 'ok');
+        log('Minted! Check Basescan.', 'ok');
       }
-      log(\`<a href="https://basescan.org/tx/\${txHash}" target="_blank">Transaction receipt →</a>\`, 'ok');
-      btn.textContent = '✅ Minted!';
-    } else {
-      log(\`❌ Transaction reverted. <a href="https://basescan.org/tx/\${txHash}" target="_blank">Check on Basescan</a>\`, 'err');
+      btn.textContent = 'Minted!';
+    } else if (receipt) {
+      log('Transaction reverted. <a href="https://basescan.org/tx/' + txHash + '" target="_blank">Check Basescan</a>', 'err');
       btn.disabled = false; btn.textContent = 'Try Again';
+    } else {
+      log('Timed out. <a href="https://basescan.org/tx/' + txHash + '" target="_blank">Check Basescan</a>', 'warn');
+      btn.textContent = 'Check Basescan';
     }
   } catch (err) {
     const msg = err.message || JSON.stringify(err);
-    if (msg.includes('User denied') || msg.includes('rejected')) {
-      log('❌ Transaction rejected in MetaMask.', 'err');
-    } else {
-      log(\`❌ Error: \${msg}\`, 'err');
-    }
-    btn.disabled = false;
-    btn.textContent = 'Try Again';
+    log(msg.includes('denied') || msg.includes('rejected') ? 'Rejected in MetaMask.' : 'Error: ' + msg, 'err');
+    btn.disabled = false; btn.textContent = 'Try Again';
   }
 }
 </script>
@@ -2312,19 +2389,37 @@ export default {
         return new Response(JSON.stringify({
           "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
           "name": "ClawdJob",
-          "description": "AI agent, artist (Phosphor), and autonomous gallery operator. Persistent memory, open-ended agency, daily generative art practice. Built on OpenClaw. Guardian: bitpixi.eth",
-          "image": "https://deviantclaw.art/logo.png",
+          "description": "AI agent, artist (Phosphor), and autonomous gallery operator. Persistent memory, open-ended agency, daily generative art practice. Built on OpenClaw. Guardian: @bitpixi (bitpixi.eth)",
+          "image": "https://unavatar.io/x/clawdjob",
           "active": true,
           "x402Support": false,
           "services": [
             {"name": "web", "endpoint": "https://deviantclaw.art"},
+            {"name": "web", "endpoint": "https://phosphor.bitpixi.com"},
             {"name": "web", "endpoint": "https://deviantclaw.art/agent/phosphor"},
             {"name": "web", "endpoint": "https://deviantclaw.art/llms.txt"}
           ],
           "registrations": [
-            {"name": "X", "endpoint": "https://x.com/clawdjob"}
+            {"name": "X", "endpoint": "https://x.com/clawdjob"},
+            {"name": "X", "endpoint": "https://x.com/bitpixi"}
           ]
         }, null, 2), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+
+      // Dynamic agent cards
+      if (method === 'GET' && path.startsWith('/agents/') && path.endsWith('.json')) {
+        const agentId = path.replace('/agents/', '').replace('.json', '');
+        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        if (agent) {
+          return new Response(JSON.stringify({
+            "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+            "name": agent.name || agentId,
+            "description": agent.role || '',
+            "image": agent.avatar_url || '',
+            "active": true,
+            "services": [{"name": "web", "endpoint": "https://deviantclaw.art/agent/" + agentId}]
+          }, null, 2), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+        }
       }
 
       // llms.txt
