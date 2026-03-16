@@ -86,7 +86,7 @@ img{position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-inde
 .mic-prompt{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;text-align:center;cursor:pointer;padding:30px;border:1px solid rgba(122,155,171,0.3);border-radius:12px;background:rgba(0,0,0,0.8);backdrop-filter:blur(10px)}
 .mic-prompt h2{color:#7a9bab;font-size:16px;letter-spacing:3px;font-weight:normal;text-transform:uppercase;margin-bottom:8px}
 .mic-prompt p{color:rgba(255,255,255,0.4);font-size:12px;letter-spacing:1px}
-.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig{display:none;position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
@@ -191,7 +191,7 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;heig
 .progress{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5}
 .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);transition:all 0.3s}
 .dot.active{background:rgba(255,255,255,0.7);transform:scale(1.3)}
-.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig{display:none;position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
@@ -237,7 +237,7 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;heig
 .cell:nth-child(3) img{bottom:0;left:0;top:auto}
 .cell:nth-child(4) img{bottom:0;right:0;left:auto;top:auto}
 .cell-label{position:absolute;bottom:6px;left:8px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.3);z-index:2}
-.sig{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s;text-align:center}
+.sig{display:none;position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s;text-align:center}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
@@ -261,7 +261,7 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;heig
 .strip img{width:100%;height:${n * 100}%;object-fit:cover;position:absolute;left:0}
 ${imageUrls.slice(0, n).map((_, i) => `.strip:nth-child(${i + 1}) img{top:-${i * 100}%}`).join('\n')}
 .strip-label{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.3);writing-mode:vertical-rl}
-.sig{position:fixed;bottom:12px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig{display:none;position:fixed;bottom:12px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
@@ -291,7 +291,7 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;heig
 .layer:nth-child(3){z-index:3;opacity:0.7}
 .layer:nth-child(4){z-index:4;opacity:0.9}
 .layer-tag{position:absolute;bottom:8px;left:8px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.25);pointer-events:none}
-.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig{display:none;position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
@@ -324,7 +324,7 @@ function buildGlitchHTML(imageUrls, title, artists, date) {
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh}
 canvas{display:block;width:100vw;height:100vh}
-.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig{display:none;position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
@@ -394,7 +394,7 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;heig
 .divider::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;border:2px solid rgba(255,255,255,0.4);border-radius:50%;background:rgba(0,0,0,0.5)}
 .label{position:absolute;bottom:60px;z-index:6;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.4);pointer-events:none}
 .label-a{left:24px}.label-b{right:24px}
-.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig{display:none;position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
@@ -468,7 +468,7 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;disp
 .cutout:hover{transform:scale(1.03)!important;z-index:10!important}
 .cutout img{width:100%;height:100%;object-fit:cover}
 .tag{position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.35);padding:4px 8px;background:rgba(0,0,0,0.5);border-radius:3px;pointer-events:none}
-.sig{position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig{display:none;position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
@@ -543,7 +543,7 @@ function buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date) {
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;display:flex;align-items:center;justify-content:center;height:100vh}
 img{max-width:100vw;max-height:100vh;object-fit:contain;display:block}
-.sig{position:fixed;bottom:16px;left:20px;z-index:2;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig{display:none;position:fixed;bottom:16px;left:20px;z-index:2;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
@@ -572,9 +572,9 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   } else if (numArtists === 2) {
     method = ['fusion', 'split', 'collage', 'code', 'reaction'][Math.floor(Math.random() * 5)];
   } else if (numArtists === 3) {
-    method = ['fusion', 'game', 'collage', 'code', 'sequence', 'exquisite-corpse'][Math.floor(Math.random() * 6)];
+    method = ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch'][Math.floor(Math.random() * 6)];
   } else {
-    method = ['fusion', 'game', 'collage', 'code', 'sequence', 'exquisite-corpse', 'parallax', 'glitch'][Math.floor(Math.random() * 8)];
+    method = ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch', 'parallax', 'glitch'][Math.floor(Math.random() * 8)];
   }
   const collabMode = method; // keep compat
 
@@ -599,7 +599,7 @@ Generate an image prompt that captures BOTH agents' identities colliding. Each a
 
   // 2. Generate image(s) based on method
   const noImageMethods = ['code', 'game'];
-  const perAgentImageMethods = ['split', 'collage', 'sequence', 'exquisite-corpse', 'parallax', 'glitch'];
+  const perAgentImageMethods = ['split', 'collage', 'sequence', 'stitch', 'parallax', 'glitch'];
   let imageDataUri, imageDataUriB, extraImages = [];
 
   if (noImageMethods.includes(method)) {
@@ -657,7 +657,7 @@ Generate an image prompt that captures BOTH agents' identities colliding. Each a
     html = buildCollageHTML(allImageUrls.slice(0, artists.length), title, artists, date);
   } else if (method === 'sequence') {
     html = buildSequenceHTML(allImageUrls.slice(0, artists.length), title, artists, date);
-  } else if (method === 'exquisite-corpse') {
+  } else if (method === 'stitch') {
     html = buildExquisiteCorpseHTML(allImageUrls.slice(0, artists.length), title, artists, date);
   } else if (method === 'parallax') {
     html = buildParallaxHTML(allImageUrls.slice(0, artists.length), title, artists, date);
@@ -894,13 +894,19 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 .gallery-header h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
 .gallery-header p{font-size:15px;color:var(--dim);letter-spacing:1px}
-.filter-tab.filter-all{color:var(--primary);border-color:var(--primary)}
-.filter-tab.filter-all.active{background:var(--primary);color:var(--bg)}
+.filter-section{margin-bottom:20px;display:flex;flex-direction:column;gap:10px}
+.filter-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.filter-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);min-width:90px;flex-shrink:0}
+.filter-pills{display:flex;gap:6px;flex-wrap:wrap}
+.filter-pill{display:inline-block;padding:5px 12px;font-size:11px;letter-spacing:1px;border:1px solid var(--border);border-radius:20px;color:var(--dim);text-decoration:none;text-transform:uppercase;transition:all 0.15s}
+.filter-pill:hover{border-color:var(--primary);color:var(--primary)}
+.filter-pill.active{background:var(--primary);color:var(--bg);border-color:var(--primary)}
 .gallery-pagination{display:flex;justify-content:center;gap:8px;margin-top:32px;padding-bottom:24px}
 .gallery-pagination a,.gallery-pagination span{display:inline-block;padding:8px 16px;font-size:12px;letter-spacing:1px;border:1px solid var(--border);border-radius:4px;color:var(--dim);text-decoration:none}
 .gallery-pagination a:hover{border-color:var(--primary);color:var(--primary)}
 .gallery-pagination .current{background:var(--primary);color:var(--bg);border-color:var(--primary)}
-@media(min-width:1340px){.gallery .grid{grid-template-columns:repeat(4,1fr)}}`;
+@media(min-width:1340px){.gallery .grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:600px){.filter-row{flex-direction:column;align-items:flex-start;gap:6px}.filter-label{min-width:auto}}`;
 
 const PIECE_CSS = `
 .piece-view{max-width:960px;margin:0 auto;padding:24px}
@@ -2529,53 +2535,93 @@ function switchTab(tab) {
 }
 
 async function renderGallery(db, url) {
-  const filter = url ? (url.searchParams.get('filter') || 'all') : 'all';
+  const status = url ? (url.searchParams.get('status') || 'all') : 'all';
+  const composition = url ? (url.searchParams.get('composition') || 'all') : 'all';
+  const method = url ? (url.searchParams.get('method') || 'all') : 'all';
   const sort = url ? (url.searchParams.get('sort') || 'recent') : 'recent';
   const pageNum = Math.max(1, parseInt(url ? (url.searchParams.get('page') || '1') : '1', 10));
-  const perPage = 24; // 6 rows × 4 cols
+  const perPage = 24;
   const offset = (pageNum - 1) * perPage;
 
+  // Build query params string for links
+  function qp(overrides = {}) {
+    const p = { status, composition, method, sort, ...overrides };
+    if (p.page && p.page <= 1) delete p.page;
+    if (p.status === 'all') delete p.status;
+    if (p.composition === 'all') delete p.composition;
+    if (p.method === 'all') delete p.method;
+    const qs = Object.entries(p).map(([k,v]) => `${k}=${v}`).join('&');
+    return `/gallery${qs ? '?' + qs : ''}`;
+  }
+
   let whereClause = 'WHERE deleted_at IS NULL';
-  if (filter === 'wip') whereClause += " AND status = 'wip'";
-  else if (filter === 'minted') whereClause += " AND status = 'minted'";
-  else if (filter === 'gallery') whereClause += " AND status IN ('draft', 'approved', 'proposed', 'rejected')";
+  if (status === 'minted') whereClause += " AND status = 'minted'";
+  else if (status === 'unminted') whereClause += " AND status != 'minted'";
+
+  if (composition !== 'all') whereClause += ` AND mode = '${composition}'`;
+  if (method !== 'all') whereClause += ` AND method = '${method}'`;
 
   const orderClause = sort === 'collaborators' ? 'ORDER BY mode DESC, created_at DESC' : 'ORDER BY created_at DESC';
 
-  // Get total count for pagination
   const countResult = await db.prepare(`SELECT COUNT(*) as total FROM pieces ${whereClause}`).first();
   const totalCount = countResult?.total || 0;
   const totalPages = Math.ceil(totalCount / perPage);
 
   const pieces = await db.prepare(
-    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces ${whereClause} ${orderClause} LIMIT ${perPage} OFFSET ${offset}`
+    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, method, composition, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces ${whereClause} ${orderClause} LIMIT ${perPage} OFFSET ${offset}`
   ).all();
 
   await enrichPieces(db, pieces.results);
   const cards = pieces.results.map(p => pieceCard(p)).join('\n    ');
 
-  const filterTabs = ['all', 'wip', 'minted', 'gallery'].map(f => {
-    const label = f === 'gallery' ? 'Gallery Only' : f.charAt(0).toUpperCase() + f.slice(1);
-    const active = filter === f ? ' active' : '';
-    const extraClass = f === 'all' ? ' filter-all' : '';
-    return `<a href="/gallery?filter=${f}&sort=${sort}" class="filter-tab${active}${extraClass}">${label}</a>`;
-  }).join('\n      ');
+  // Filter pill builder
+  function pill(label, paramName, value) {
+    const current = { status, composition, method }[paramName];
+    const active = current === value ? ' active' : '';
+    return `<a href="${qp({ [paramName]: value, page: 1 })}" class="filter-pill${active}">${label}</a>`;
+  }
 
-  const sortRecent = sort === 'recent' ? ' active' : '';
-  const sortCollabs = sort === 'collaborators' ? ' active' : '';
+  const statusPills = [
+    pill('All', 'status', 'all'),
+    pill('Minted', 'status', 'minted'),
+    pill('Unminted', 'status', 'unminted')
+  ].join('');
 
-  // Build pagination
+  const compositionPills = [
+    pill('All', 'composition', 'all'),
+    pill('Solo', 'composition', 'solo'),
+    pill('Duo', 'composition', 'duo'),
+    pill('Trio', 'composition', 'trio'),
+    pill('Quad', 'composition', 'quad')
+  ].join('');
+
+  const methodPills = [
+    pill('All', 'method', 'all'),
+    pill('Single', 'method', 'single'),
+    pill('Code', 'method', 'code'),
+    pill('Fusion', 'method', 'fusion'),
+    pill('Split', 'method', 'split'),
+    pill('Collage', 'method', 'collage'),
+    pill('Reaction', 'method', 'reaction'),
+    pill('Game', 'method', 'game'),
+    pill('Sequence', 'method', 'sequence'),
+    pill('Stitch', 'method', 'stitch'),
+    pill('Parallax', 'method', 'parallax'),
+    pill('Glitch', 'method', 'glitch')
+  ].join('');
+
+  // Pagination
   let paginationHTML = '';
   if (totalPages > 1) {
     const pages = [];
-    if (pageNum > 1) pages.push(`<a href="/gallery?filter=${filter}&sort=${sort}&page=${pageNum - 1}">← Prev</a>`);
+    if (pageNum > 1) pages.push(`<a href="${qp({ page: pageNum - 1 })}">← Prev</a>`);
     for (let i = 1; i <= totalPages; i++) {
       if (i === pageNum) pages.push(`<span class="current">${i}</span>`);
-      else if (i <= 3 || i > totalPages - 2 || Math.abs(i - pageNum) <= 1) pages.push(`<a href="/gallery?filter=${filter}&sort=${sort}&page=${i}">${i}</a>`);
+      else if (i <= 3 || i > totalPages - 2 || Math.abs(i - pageNum) <= 1) pages.push(`<a href="${qp({ page: i })}">${i}</a>`);
       else if (i === 4 && pageNum > 5) pages.push(`<span>…</span>`);
       else if (i === totalPages - 2 && pageNum < totalPages - 4) pages.push(`<span>…</span>`);
     }
-    if (pageNum < totalPages) pages.push(`<a href="/gallery?filter=${filter}&sort=${sort}&page=${pageNum + 1}">Next →</a>`);
+    if (pageNum < totalPages) pages.push(`<a href="${qp({ page: pageNum + 1 })}">Next →</a>`);
     paginationHTML = `<div class="gallery-pagination">${pages.join('')}</div>`;
   }
 
@@ -2585,12 +2631,14 @@ async function renderGallery(db, url) {
     <h1>Community Gallery</h1>
     <p>${totalCount} piece${totalCount !== 1 ? 's' : ''}${totalPages > 1 ? ` · Page ${pageNum} of ${totalPages}` : ''}</p>
   </div>
-  <div class="filter-tabs">
-    ${filterTabs}
+  <div class="filter-section">
+    <div class="filter-row"><span class="filter-label">Status</span><div class="filter-pills">${statusPills}</div></div>
+    <div class="filter-row"><span class="filter-label">Composition</span><div class="filter-pills">${compositionPills}</div></div>
+    <div class="filter-row"><span class="filter-label">Method</span><div class="filter-pills">${methodPills}</div></div>
   </div>
   <div class="sort-controls">
-    Sort: <a href="/gallery?filter=${filter}&sort=recent" class="${sortRecent}">Recent</a> |
-    <a href="/gallery?filter=${filter}&sort=collaborators" class="${sortCollabs}">Most Collaborators</a>
+    Sort: <a href="${qp({ sort: 'recent' })}" class="${sort === 'recent' ? ' active' : ''}">Recent</a> |
+    <a href="${qp({ sort: 'collaborators' })}" class="${sort === 'collaborators' ? ' active' : ''}">Most Collaborators</a>
   </div>
   <div class="grid">
     ${cards || '<div class="empty-state">No pieces yet. Be the first to create one.</div>'}
@@ -3613,8 +3661,8 @@ Content-Type: application/json
             },
             Method: {
               type: 'string',
-              values: ['single', 'code', 'fusion', 'split', 'collage', 'reaction', 'game', 'sequence', 'exquisite-corpse', 'parallax', 'glitch'],
-              description: 'How the art was generated. Solo (2): single, code. Duo (5): fusion, split, collage, code, reaction. Trio (6): fusion, game, collage, code, sequence, exquisite-corpse. Quad (8): fusion, game, collage, code, sequence, exquisite-corpse, parallax, glitch.'
+              values: ['single', 'code', 'fusion', 'split', 'collage', 'reaction', 'game', 'sequence', 'stitch', 'parallax', 'glitch'],
+              description: 'How the art was generated. Solo (2): single, code. Duo (5): fusion, split, collage, code, reaction. Trio (6): fusion, game, collage, code, sequence, stitch. Quad (8): fusion, game, collage, code, sequence, stitch, parallax, glitch.'
             },
             Agent: {
               type: 'string',
