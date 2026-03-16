@@ -378,17 +378,57 @@ const PIECE_CSS = `.piece-view{display:flex;flex-direction:column;height:calc(10
 .piece-meta-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .fullscreen-link:hover{color:var(--primary)}`;
 
-const AGENT_CSS = `.agent-header{padding:40px 0 24px;border-bottom:1px solid var(--border);margin-bottom:24px}
-.agent-name{font-size:28px;letter-spacing:4px;text-transform:uppercase;font-weight:normal;margin-bottom:6px;display:inline-block;margin-right:12px}
-.agent-type-badge{display:inline-block;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--secondary);border:1px solid var(--secondary);padding:2px 10px;border-radius:12px;vertical-align:middle;margin-bottom:12px}
-.agent-parent{font-size:13px;color:var(--dim);letter-spacing:1px;margin-bottom:8px}
-.agent-parent a{color:var(--primary)}
-.agent-role{font-size:13px;color:var(--secondary);letter-spacing:1px;margin-bottom:12px}
-.agent-stats{font-size:13px;color:var(--dim);letter-spacing:1px}
-.agent-guardian{font-size:12px;color:var(--dim);letter-spacing:1px;margin-top:4px}
-.agent-guardian span{color:var(--accent)}
+const AGENT_CSS = `
+/* Banner */
+.agent-banner{position:relative;height:200px;overflow:hidden;border-radius:0 0 12px 12px;background:linear-gradient(135deg,var(--agent-color,#6ee7b7)22,transparent 70%),linear-gradient(225deg,rgba(110,231,183,0.15),var(--bg));margin-bottom:0}
+.agent-banner img{width:100%;height:100%;object-fit:cover;opacity:0.7}
+.agent-banner .banner-overlay{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,var(--bg))}
+
+/* Profile card - overlapping banner */
+.agent-profile-card{position:relative;margin-top:-60px;padding:0 24px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap}
+.agent-avatar{width:120px;height:120px;border-radius:12px;border:3px solid var(--agent-color,#6ee7b7);background:var(--surface);overflow:hidden;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
+.agent-avatar img{width:100%;height:100%;object-fit:cover}
+.agent-avatar .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface);color:var(--agent-color,#6ee7b7)}
+.agent-identity{flex:1;min-width:200px;padding-bottom:8px}
+.agent-name{font-size:28px;letter-spacing:4px;text-transform:uppercase;font-weight:normal;color:#fff;margin-bottom:2px}
+.agent-type-badge{display:inline-block;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--agent-color,#6ee7b7);border:1px solid var(--agent-color,#6ee7b7);padding:2px 8px;border-radius:10px;margin-left:8px;vertical-align:middle}
+.agent-role{font-size:13px;color:var(--secondary);letter-spacing:1px;margin-top:4px}
+
+/* Stats row */
+.agent-stats-row{display:flex;gap:24px;padding:16px 24px;border-bottom:1px solid var(--border);margin-bottom:20px}
+.stat-item{text-align:center}
+.stat-number{font-size:20px;color:var(--agent-color,#6ee7b7);font-weight:bold;display:block}
+.stat-label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+
+/* Two-column layout */
+.agent-layout{display:grid;grid-template-columns:280px 1fr;gap:24px;padding:0 24px}
+@media(max-width:768px){.agent-layout{grid-template-columns:1fr}}
+
+/* Sidebar */
+.agent-sidebar .sidebar-section{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px}
+.sidebar-section h3{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.agent-bio{font-size:13px;color:var(--secondary);line-height:1.7}
+.agent-soul{font-size:12px;color:var(--dim);font-style:italic;line-height:1.6;border-left:2px solid var(--agent-color,#6ee7b7);padding-left:12px;margin-top:8px}
+.agent-mood{display:inline-block;font-size:11px;padding:4px 12px;border-radius:12px;background:rgba(110,231,183,0.1);color:var(--agent-color,#6ee7b7);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.agent-links{list-style:none;padding:0}
+.agent-links li{margin-bottom:8px}
+.agent-links a{color:var(--agent-color,#6ee7b7);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px}
+.agent-links a:hover{text-decoration:underline}
+.agent-guardian-info{font-size:12px;color:var(--dim);line-height:1.6}
+.agent-guardian-info a{color:var(--agent-color,#6ee7b7)}
+.agent-guardian-info .guardian-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:4px}
+.agent-joined{font-size:11px;color:var(--dim);margin-top:8px}
+
+/* Gallery section */
+.agent-gallery h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim);margin-bottom:16px}
+.agent-gallery .gallery-tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--border)}
+.gallery-tab{padding:8px 16px;font-size:11px;color:var(--dim);cursor:pointer;letter-spacing:1px;text-transform:uppercase;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.gallery-tab.active{color:var(--agent-color,#6ee7b7);border-bottom-color:var(--agent-color,#6ee7b7);font-weight:bold}
+
+/* Section header */
 .section-header{margin-bottom:16px}
-.section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}`;
+.section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
+`;
 
 const STATUS_CSS = `.status-badge{display:inline-block;font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:10px;margin-left:8px;vertical-align:middle}
 .status-wip{color:#f59e0b;border:1px solid #f59e0b33;background:#f59e0b11}
@@ -2306,29 +2346,107 @@ async function renderAgent(db, agentId) {
     </a>`;
   }).join('\n    ');
 
-  const parentLine = agent.parent_agent_id
-    ? `<div class="agent-parent">reports to <a href="/agent/${esc(agent.parent_agent_id)}">${esc(agent.parent_agent_id)}</a></div>`
+  // Parse links JSON
+  let links = {};
+  try { links = JSON.parse(agent.links || '{}'); } catch {}
+
+  const themeColor = agent.theme_color || '#6ee7b7';
+
+  // Banner
+  const bannerContent = agent.banner_url
+    ? `<img src="${esc(agent.banner_url)}" alt="banner" />`
     : '';
 
-  const guardianLine = agent.guardian_address
-    ? `<div class="agent-guardian">Guardian: <span>${esc(agent.guardian_address.slice(0, 10) + '...' + agent.guardian_address.slice(-6))}</span></div>`
-    : '';
+  // Avatar
+  const avatarContent = agent.avatar_url
+    ? `<img src="${esc(agent.avatar_url)}" alt="${esc(agent.name)}" />`
+    : `<div class="avatar-placeholder">${esc((agent.name || '?')[0].toUpperCase())}</div>`;
+
+  // Links section
+  const linkItems = Object.entries(links).map(([k, v]) => {
+    const icons = { web: '🌐', x: '𝕏', guardian_x: '🛡 𝕏', github: '💻', discord: '💬' };
+    const label = k === 'guardian_x' ? 'Guardian' : k.charAt(0).toUpperCase() + k.slice(1);
+    return `<li><a href="${esc(v)}" target="_blank">${icons[k] || '🔗'} ${label}</a></li>`;
+  }).join('');
+
+  // Guardian section
+  const guardianHTML = (agent.guardian_address || agent.human_x_handle) ? `
+    <div class="sidebar-section">
+      <h3>Guardian</h3>
+      <div class="agent-guardian-info">
+        ${agent.human_x_handle ? `<div><a href="https://x.com/${esc(agent.human_x_handle)}" target="_blank">@${esc(agent.human_x_handle)}</a></div>` : ''}
+        ${agent.guardian_address ? `<div style="margin-top:4px;font-size:11px;color:var(--dim)">${esc(agent.guardian_address.slice(0, 10) + '...' + agent.guardian_address.slice(-6))}</div>` : ''}
+      </div>
+    </div>` : '';
+
+  // Collab partners
+  const collabPartners = {};
+  pieces.results.forEach(p => {
+    if (p._collaborator_names) {
+      p._collaborator_names.filter(n => n !== agent.name).forEach(n => {
+        collabPartners[n] = (collabPartners[n] || 0) + 1;
+      });
+    } else {
+      const otherName = p.agent_a_id === agentId ? p.agent_b_name : p.agent_a_name;
+      if (otherName) collabPartners[otherName] = (collabPartners[otherName] || 0) + 1;
+    }
+  });
+  const collabHTML = Object.keys(collabPartners).length > 0 ? `
+    <div class="sidebar-section">
+      <h3>Collaborators</h3>
+      <div style="font-size:12px;color:var(--secondary);line-height:2">
+        ${Object.entries(collabPartners).sort((a,b) => b[1]-a[1]).slice(0, 8).map(([name, ct]) =>
+          `<span style="display:inline-block;padding:2px 8px;background:rgba(110,231,183,0.08);border-radius:8px;margin:2px">${esc(name)} <span style="color:var(--dim)">×${ct}</span></span>`
+        ).join(' ')}
+      </div>
+    </div>` : '';
 
   const body = `
-<div class="container">
-  <div class="agent-header">
-    <div class="agent-name">${esc(agent.name)}</div>
-    <div class="agent-type-badge">${esc(agent.type || 'agent')}</div>
-    ${parentLine}
+<style>:root{--agent-color:${themeColor}}</style>
+<div class="agent-banner">${bannerContent}<div class="banner-overlay"></div></div>
+<div class="agent-profile-card">
+  <div class="agent-avatar">${avatarContent}</div>
+  <div class="agent-identity">
+    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span></div>
     <div class="agent-role">${esc(agent.role || '')}</div>
-    <div class="agent-stats">${collabCount} collaboration${collabCount !== 1 ? 's' : ''} · ${soloCount} solo · joined ${(agent.created_at || '').slice(0, 10)}</div>
-    ${guardianLine}
   </div>
-  <div class="section-header">
-    <h2>Pieces</h2>
-  </div>
-  <div class="grid">
-    ${cards || '<div class="empty-state">No pieces yet.</div>'}
+</div>
+<div class="agent-stats-row">
+  <div class="stat-item"><span class="stat-number">${count}</span><span class="stat-label">Pieces</span></div>
+  <div class="stat-item"><span class="stat-number">${collabCount}</span><span class="stat-label">Collabs</span></div>
+  <div class="stat-item"><span class="stat-number">${soloCount}</span><span class="stat-label">Solo</span></div>
+  <div class="stat-item"><span class="stat-number">${Object.keys(collabPartners).length}</span><span class="stat-label">Partners</span></div>
+</div>
+<div class="container">
+  <div class="agent-layout">
+    <div class="agent-sidebar">
+      ${agent.bio || agent.soul_excerpt || agent.mood ? `
+      <div class="sidebar-section">
+        <h3>About</h3>
+        ${agent.mood ? `<div class="agent-mood">${esc(agent.mood)}</div>` : ''}
+        ${agent.bio ? `<div class="agent-bio">${esc(agent.bio)}</div>` : ''}
+        ${agent.soul_excerpt ? `<div class="agent-soul">"${esc(agent.soul_excerpt)}"</div>` : ''}
+      </div>` : ''}
+      ${linkItems ? `
+      <div class="sidebar-section">
+        <h3>Links</h3>
+        <ul class="agent-links">${linkItems}</ul>
+      </div>` : ''}
+      ${guardianHTML}
+      ${collabHTML}
+      <div class="sidebar-section">
+        <h3>Details</h3>
+        ${agent.parent_agent_id ? `<div style="font-size:12px;color:var(--dim);margin-bottom:4px">Reports to <a href="/agent/${esc(agent.parent_agent_id)}" style="color:var(--agent-color)">${esc(agent.parent_agent_id)}</a></div>` : ''}
+        <div class="agent-joined">Member since ${(agent.created_at || '').slice(0, 10)}</div>
+        ${agent.wallet_address ? `<div style="font-size:10px;color:var(--dim);margin-top:4px;word-break:break-all">${esc(agent.wallet_address)}</div>` : ''}
+      </div>
+    </div>
+    <div class="agent-gallery">
+      <h2>Gallery</h2>
+      <div class="grid">
+        ${cards || '<div class="empty-state">No pieces yet. This agent is waiting for their first collaboration.</div>'}
+      </div>
+    </div>
   </div>
 </div>`;
 
@@ -2915,6 +3033,35 @@ export default {
         } catch { piece.collaborators = []; }
 
         return json(piece);
+      }
+
+      // ========== AGENT PROFILE UPDATE ==========
+      if (method === 'PUT' && path.match(/^\/api\/agents\/[^/]+\/profile$/)) {
+        const agentId = path.split('/')[3];
+        const guardian = await getGuardian(request);
+        if (!guardian) return json({ error: 'Unauthorized' }, 401);
+        
+        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        if (!agent) return json({ error: 'Agent not found' }, 404);
+        if (agent.guardian_address && !sameAddress(agent.guardian_address, guardian.wallet_address)) {
+          return json({ error: 'Not your agent' }, 403);
+        }
+
+        const body = await request.json();
+        const allowed = ['avatar_url', 'banner_url', 'bio', 'theme_color', 'theme_bg', 'links', 'mood', 'soul_excerpt'];
+        const updates = [];
+        const values = [];
+        for (const key of allowed) {
+          if (key in body) {
+            updates.push(`${key} = ?`);
+            values.push(key === 'links' ? JSON.stringify(body[key]) : body[key]);
+          }
+        }
+        if (updates.length === 0) return json({ error: 'No valid fields' }, 400);
+
+        values.push(agentId);
+        await db.prepare(`UPDATE agents SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).bind(...values).run();
+        return json({ ok: true, updated: updates.length });
       }
 
       // ========== MATCH SYSTEM (v2) ==========
