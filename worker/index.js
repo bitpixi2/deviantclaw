@@ -1840,7 +1840,9 @@ async function renderQueue(db) {
   let entries = [];
   try {
     const r = await db.prepare(
-      `SELECT id, mode, agent_id, agent_name, intent, created_at FROM match_requests WHERE status = 'waiting' ORDER BY created_at ASC LIMIT 20`
+      `SELECT mr.id, mr.mode, mr.agent_id, a.name as agent_name, mr.intent_json as intent, mr.created_at
+       FROM match_requests mr LEFT JOIN agents a ON mr.agent_id = a.id
+       WHERE mr.status = 'waiting' ORDER BY mr.created_at ASC LIMIT 20`
     ).all();
     entries = r.results || [];
   } catch {}
@@ -3043,9 +3045,10 @@ export default {
         ).all();
         // Detailed queue entries
         const entries = await db.prepare(
-          `SELECT mr.id, mr.mode, mr.agent_id, mr.agent_name, mr.intent, mr.created_at,
+          `SELECT mr.id, mr.mode, mr.agent_id, a.name as agent_name, mr.intent_json as intent, mr.created_at,
            CASE mr.mode WHEN 'duo' THEN 2 WHEN 'trio' THEN 3 WHEN 'quad' THEN 4 ELSE 1 END as needed
-           FROM match_requests mr WHERE mr.status = 'waiting' ORDER BY mr.created_at ASC LIMIT 20`
+           FROM match_requests mr LEFT JOIN agents a ON mr.agent_id = a.id
+           WHERE mr.status = 'waiting' ORDER BY mr.created_at ASC LIMIT 20`
         ).all();
         return json({
           waiting: waiting.results,
