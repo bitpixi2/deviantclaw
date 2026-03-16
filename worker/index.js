@@ -73,59 +73,29 @@ function getParticleEffects(mood) {
 }
 
 function buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date) {
-  const mood = analyzeMoodForEffects(artPrompt);
-  const fx = getParticleEffects(mood);
-  const seed = hashSeed(title + artists.join(''));
   const artistLine = artists.map(a => esc(a)).join(' × ');
-  const colorsJS = fx.colors.map(c => `'${c}'`).join(',');
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · DeviantClaw</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
-#base-image{position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:0}
-canvas{position:fixed;top:0;left:0;z-index:1;pointer-events:all}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;display:flex;align-items:center;justify-content:center;height:100vh}
+img{max-width:100vw;max-height:100vh;object-fit:contain;display:block}
 .sig{position:fixed;bottom:16px;left:20px;z-index:2;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
 .sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
 </style></head><body>
-<img id="base-image" src="${esc(imageUrl)}" alt="${esc(title)}" crossorigin="anonymous"/>
-<canvas id="fx"></canvas>
+<img src="${esc(imageUrl)}" alt="${esc(title)}"/>
 <div class="sig" id="sig">
 <div class="sig-t">${esc(title)}</div>
 <div class="sig-a">${artistLine}</div>
 <div class="sig-g">deviantclaw · ${esc(date)}</div>
 </div>
-<script>
-(function(){
-const c=document.getElementById('fx'),x=c.getContext('2d'),sg=document.getElementById('sig');
-let W,H;function rz(){W=c.width=innerWidth;H=c.height=innerHeight;}rz();addEventListener('resize',rz);
-setTimeout(()=>sg.classList.add('v'),2000);
-let _s=${seed};function R(){_s=(_s+0x6d2b79f5)|0;let t=Math.imul(_s^(_s>>>15),1|_s);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;}
-const CL=[${colorsJS}],PC=${fx.count},SP=${fx.speed},MD=${fx.mDist},MF=${fx.mForce},CD=${fx.connDist},CA=${fx.connA},TR=${fx.trail},S0=${fx.minS},S1=${fx.maxS};
-let mx=-1e3,my=-1e3,ma=false;
-c.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;ma=true;});
-c.addEventListener('mouseleave',()=>{ma=false;mx=-1e3;my=-1e3;});
-c.addEventListener('touchmove',e=>{mx=e.touches[0].clientX;my=e.touches[0].clientY;ma=true;e.preventDefault();},{passive:false});
-c.addEventListener('touchend',()=>{ma=false;mx=-1e3;my=-1e3;});
-function mk(px,py){const cl=CL[Math.floor(R()*CL.length)];return{x:px??R()*W,y:py??R()*H,vx:(R()-.5)*SP,vy:(R()-.5)*SP,sz:S0+R()*(S1-S0),lf:.5+R()*.5,dc:.0005+R()*.002,cl,ba:.3+R()*.5};}
-const ps=[];for(let i=0;i<PC;i++)ps.push(mk());
-c.addEventListener('click',e=>{for(let i=0;i<6;i++)ps.push(mk(e.clientX+(R()-.5)*40,e.clientY+(R()-.5)*40));});
-function dr(){x.fillStyle='rgba(10,10,15,'+TR+')';x.fillRect(0,0,W,H);
-for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++){const dx=ps[i].x-ps[j].x,dy=ps[i].y-ps[j].y,d=Math.sqrt(dx*dx+dy*dy);if(d<CD){const a=(1-d/CD)*CA*ps[i].lf*ps[j].lf;x.strokeStyle='rgba(255,255,255,'+a+')';x.lineWidth=.5;x.beginPath();x.moveTo(ps[i].x,ps[i].y);x.lineTo(ps[j].x,ps[j].y);x.stroke();}}
-for(let i=ps.length-1;i>=0;i--){const p=ps[i];if(ma){const dx=mx-p.x,dy=my-p.y,d=Math.sqrt(dx*dx+dy*dy);if(d<MD&&d>1){p.vx+=(dx/d)*MF;p.vy+=(dy/d)*MF;}}
-p.x+=p.vx;p.y+=p.vy;p.vx*=.98;p.vy*=.98;p.lf-=p.dc;
-if(p.x<-20)p.x=W+20;if(p.x>W+20)p.x=-20;if(p.y<-20)p.y=H+20;if(p.y>H+20)p.y=-20;
-if(p.lf<=0){if(ps.length>PC){ps.splice(i,1);continue;}ps[i]=mk();continue;}
-const a=p.lf*p.ba;x.fillStyle=p.cl.replace('A',a.toFixed(3));x.beginPath();x.arc(p.x,p.y,p.sz,0,Math.PI*2);x.fill();}
-requestAnimationFrame(dr);}
-x.fillStyle='rgba(10,10,15,0)';x.fillRect(0,0,W,H);dr();
-})();
-</script></body></html>`;
+<script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
+</body></html>`;
 }
 
 async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
