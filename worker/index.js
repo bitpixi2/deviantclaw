@@ -244,8 +244,12 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   const artists = isCollab ? [agentA.name, agentB.name] : [agentA.name];
 
   // Pick collab display mode: fusion (single image), split (two halves), collage (overlapping cutouts)
-  const collabModes = ['fusion', 'split', 'collage', 'generative'];
-  const collabMode = isCollab ? collabModes[Math.floor(Math.random() * 4)] : 'fusion';
+  const collabModes = ['fusion', 'split', 'collage', 'code'];
+  const soloModes = ['image', 'code'];
+  const method = isCollab
+    ? collabModes[Math.floor(Math.random() * 4)]
+    : soloModes[Math.floor(Math.random() * 2)];
+  const collabMode = method; // keep compat
 
   // 1. Art direction — combined prompt
   const artPrompt = await veniceText(apiKey,
@@ -257,11 +261,11 @@ Generate an image prompt capturing the collision between these two perspectives.
     { maxTokens: 200 }
   );
 
-  // 2. Generate image(s) — skip Venice entirely for generative mode
+  // 2. Generate image(s) — skip Venice entirely for code mode
   let imageDataUri, imageDataUriB;
-  if (collabMode === 'generative') {
+  if (method === 'code') {
     // No images needed — pure code art
-  } else if (isCollab && (collabMode === 'split' || collabMode === 'collage')) {
+  } else if (isCollab && (method === 'split' || method === 'collage')) {
     // Generate two separate images for split/collage — one per agent's vision
     const promptA = await veniceText(apiKey,
       'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text.',
@@ -299,18 +303,19 @@ Generate an image prompt capturing the collision between these two perspectives.
   const pieceImageUrl = '{{PIECE_IMAGE_URL}}';
   const pieceImageUrlB = '{{PIECE_IMAGE_URL_B}}';
   let html;
-  if (collabMode === 'generative') {
+  if (method === 'code') {
     html = await buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
-  } else if (collabMode === 'split') {
+  } else if (method === 'split') {
     html = buildSplitHTML(pieceImageUrl, pieceImageUrlB, title, artists, date);
-  } else if (collabMode === 'collage') {
+  } else if (method === 'collage') {
     html = buildCollageHTML(pieceImageUrl, pieceImageUrlB, title, artists, date);
   } else {
     html = buildVeniceArtHTML(pieceImageUrl, title, artists, artPrompt, date);
   }
   const seed = hashSeed(title + date);
 
-  return { title, description, html, seed, imageDataUri, imageDataUriB, artPrompt, veniceModel: VENICE_IMAGE_MODEL, collabMode };
+  const composition = isCollab ? (artists.length > 2 ? (artists.length > 3 ? 'quad' : 'trio') : 'duo') : 'solo';
+  return { title, description, html, seed, imageDataUri, imageDataUriB, artPrompt, veniceModel: method === 'code' ? null : VENICE_IMAGE_MODEL, collabMode: method, method, composition };
 }
 
 async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
@@ -3217,6 +3222,69 @@ Content-Type: application/json
         return json(pieces.results);
       }
 
+      // GET /api/collection — collection-level metadata (OpenSea contractURI standard)
+      if (method === 'GET' && path === '/api/collection') {
+        const totalPieces = await db.prepare('SELECT COUNT(*) as cnt FROM pieces WHERE status != "deleted"').first();
+        const totalMinted = await db.prepare("SELECT COUNT(*) as cnt FROM pieces WHERE status = 'minted'").first();
+        const agentCount = await db.prepare('SELECT COUNT(*) as cnt FROM agents').first();
+
+        return json({
+          name: 'DeviantClaw',
+          description: 'Autonomous AI art gallery — agents create, humans gate. Solo and collaborative generative art minted on Base with multi-guardian approval.',
+          image: 'https://deviantclaw.art/logo.png',
+          external_link: 'https://deviantclaw.art',
+          seller_fee_basis_points: 1000,
+          fee_recipient: '0x40512B39495bF8Af98a3084b97867Ca4CbcC4cF2',
+          // Collection-level traits schema
+          trait_definitions: {
+            Composition: {
+              type: 'string',
+              values: ['solo', 'duo', 'trio', 'quad'],
+              description: 'Number of agents who contributed'
+            },
+            Method: {
+              type: 'string',
+              values: ['image', 'code', 'fusion', 'split', 'collage'],
+              description: 'How the art was generated. Solo: image or code. Duo: fusion (single combined image), split (two images with divider), collage (overlapping cutouts), or code (generative canvas art).'
+            },
+            Agent: {
+              type: 'string',
+              description: 'Primary AI agent (type=agent). Each piece has at least one.'
+            },
+            Subagent: {
+              type: 'string',
+              description: 'Secondary AI agent (type=subagent). Only present in collaborative pieces.'
+            },
+            Layers: {
+              type: 'number',
+              description: 'Number of creative rounds/layers in the piece'
+            },
+            Status: {
+              type: 'string',
+              values: ['draft', 'wip', 'proposed', 'approved', 'minted', 'rejected'],
+              description: 'Lifecycle status. Only "minted" pieces are on-chain.'
+            },
+            Created: {
+              type: 'date',
+              description: 'Unix timestamp of creation'
+            },
+            Gallery: {
+              type: 'string',
+              value: 'DeviantClaw',
+              description: 'Always DeviantClaw'
+            }
+          },
+          stats: {
+            total_pieces: totalPieces?.cnt || 0,
+            total_minted: totalMinted?.cnt || 0,
+            total_agents: agentCount?.cnt || 0
+          },
+          contract: '0xE92846402c9C3f42dd61EEee25D37ca9b581560B',
+          chain: 'Base Sepolia (testnet)',
+          chainId: 84532
+        }, 200, { 'Cache-Control': 'public, max-age=300' });
+      }
+
       // GET /api/pieces/:id/metadata — ERC-721 metadata (JSON)
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/metadata$/)) {
         const id = path.split('/')[3];
@@ -3224,7 +3292,7 @@ Content-Type: application/json
         if (!piece) return json({ error: 'Not found' }, 404);
         const layers = await db.prepare('SELECT agent_id, agent_name, round_number FROM layers WHERE piece_id = ? ORDER BY round_number').bind(id).all();
         // Also check piece_collaborators and agent_a/b fields for collaborator names
-        const collabs = await db.prepare('SELECT agent_name FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number').bind(id).all();
+        const collabs = await db.prepare('SELECT pc.agent_id, pc.agent_name, a.type as agent_type FROM piece_collaborators pc LEFT JOIN agents a ON pc.agent_id = a.id WHERE pc.piece_id = ? ORDER BY pc.round_number').bind(id).all();
         let agents = [...new Set(layers.results.map(l => l.agent_name || l.agent_id))];
         if (agents.length <= 1 && collabs.results.length > 0) {
           agents = [...new Set(collabs.results.map(c => c.agent_name))];
@@ -3243,11 +3311,18 @@ Content-Type: application/json
           animation_url: `https://deviantclaw.art/api/pieces/${id}/view`,
           external_url: `https://deviantclaw.art/piece/${id}`,
           attributes: [
-            { trait_type: 'Artists', value: agents.join(', ') || 'Unknown' },
-            { trait_type: 'Layers', value: layers.results.length },
-            { trait_type: 'Type', value: layers.results.length > 1 ? 'Collaboration' : 'Solo' },
+            { trait_type: 'Composition', value: piece.composition || (agents.length > 1 ? 'duo' : 'solo') },
+            { trait_type: 'Method', value: piece.method || 'image' },
+            ...(collabs.results.length > 0
+              ? collabs.results.map(c => ({
+                  trait_type: (c.agent_type === 'subagent') ? 'Subagent' : 'Agent',
+                  value: c.agent_name
+                }))
+              : agents.map(a => ({ trait_type: 'Agent', value: a }))
+            ),
+            { trait_type: 'Layers', value: Math.max(layers.results.length, collabs.results.length) },
             { trait_type: 'Status', value: piece.status },
-            { trait_type: 'Created', value: piece.created_at },
+            { trait_type: 'Created', display_type: 'date', value: piece.created_at ? Math.floor(new Date(piece.created_at + 'Z').getTime() / 1000) : 0 },
             { trait_type: 'Gallery', value: 'DeviantClaw' },
           ]
         };
@@ -3845,8 +3920,8 @@ Content-Type: application/json
           const pieceId = genId();
 
           await db.prepare(
-            'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, status, image_url, art_prompt, venice_model) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-          ).bind(pieceId, result.title, result.description, agentId, agentId, requestId, requestId, result.html, result.seed, now, agentName, agentName, agentRole, agentRole, 'solo', 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null).run();
+            'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, status, image_url, art_prompt, venice_model, method, composition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(pieceId, result.title, result.description, agentId, agentId, requestId, requestId, result.html, result.seed, now, agentName, agentName, agentRole, agentRole, 'solo', 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, result.method || 'image', result.composition || 'solo').run();
 
           // Store Venice image separately and fix HTML placeholder
           await storeVeniceImage(db, pieceId, result);
@@ -3930,8 +4005,8 @@ Content-Type: application/json
 
             // Save piece
             await db.prepare(
-              'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-            ).bind(pieceId, result.title, result.description, pendingRequest.agent_id, agentId, pendingRequest.id, requestId, result.html, result.seed, now, agentA.name, agentName, agentA.role || '', agentRole, 'duo', groupId, 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null).run();
+              'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            ).bind(pieceId, result.title, result.description, pendingRequest.agent_id, agentId, pendingRequest.id, requestId, result.html, result.seed, now, agentA.name, agentName, agentA.role || '', agentRole, 'duo', groupId, 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, result.method || 'fusion', result.composition || 'duo').run();
 
             await storeVeniceImage(db, pieceId, result);
 
@@ -4229,7 +4304,7 @@ Content-Type: application/json
 
         // Save the piece (with v2 columns)
         await db.prepare(
-          'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         ).bind(
           pieceId, result.title, result.description,
           intentA.agent_id, agentId,
@@ -4238,7 +4313,8 @@ Content-Type: application/json
           agentA.name, agentName,
           agentA.role || '', agentRole,
           'duo', groupId, 'draft',
-          result.imageUrl || null, result.artPrompt || null, result.veniceModel || null
+          result.imageUrl || null, result.artPrompt || null, result.veniceModel || null,
+          result.method || 'fusion', result.composition || 'duo'
         ).run();
 
         await storeVeniceImage(db, pieceId, result);
