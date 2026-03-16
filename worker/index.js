@@ -364,7 +364,14 @@ const HERO_CSS = `.hero{padding:80px 24px 60px;text-align:center;border-bottom:1
 
 const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 .gallery-header h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
-.gallery-header p{font-size:13px;color:var(--dim);letter-spacing:1px}`;
+.gallery-header p{font-size:13px;color:var(--dim);letter-spacing:1px}
+.filter-tab.filter-all{color:var(--primary);border-color:var(--primary)}
+.filter-tab.filter-all.active{background:var(--primary);color:var(--bg)}
+.gallery-pagination{display:flex;justify-content:center;gap:8px;margin-top:32px;padding-bottom:24px}
+.gallery-pagination a,.gallery-pagination span{display:inline-block;padding:8px 16px;font-size:12px;letter-spacing:1px;border:1px solid var(--border);border-radius:4px;color:var(--dim);text-decoration:none}
+.gallery-pagination a:hover{border-color:var(--primary);color:var(--primary)}
+.gallery-pagination .current{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+@media(min-width:1100px){.gallery .grid{grid-template-columns:repeat(4,1fr)}}`;
 
 const PIECE_CSS = `
 .piece-view{max-width:960px;margin:0 auto;padding:24px}
@@ -477,6 +484,7 @@ function navHTML() {
   <a href="/" class="brand"><span>deviant</span>claw</a>
   <div class="links">
     <a href="/gallery">gallery</a>
+    <a href="/artists">artists</a>
     <a href="/queue">queue</a>
     <a href="/about">about</a>
   </div>
@@ -1995,6 +2003,9 @@ function switchTab(tab) {
 async function renderGallery(db, url) {
   const filter = url ? (url.searchParams.get('filter') || 'all') : 'all';
   const sort = url ? (url.searchParams.get('sort') || 'recent') : 'recent';
+  const pageNum = Math.max(1, parseInt(url ? (url.searchParams.get('page') || '1') : '1', 10));
+  const perPage = 24; // 6 rows × 4 cols
+  const offset = (pageNum - 1) * perPage;
 
   let whereClause = 'WHERE deleted_at IS NULL';
   if (filter === 'wip') whereClause += " AND status = 'wip'";
@@ -2003,28 +2014,48 @@ async function renderGallery(db, url) {
 
   const orderClause = sort === 'collaborators' ? 'ORDER BY mode DESC, created_at DESC' : 'ORDER BY created_at DESC';
 
+  // Get total count for pagination
+  const countResult = await db.prepare(`SELECT COUNT(*) as total FROM pieces ${whereClause}`).first();
+  const totalCount = countResult?.total || 0;
+  const totalPages = Math.ceil(totalCount / perPage);
+
   const pieces = await db.prepare(
-    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces ${whereClause} ${orderClause}`
+    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces ${whereClause} ${orderClause} LIMIT ${perPage} OFFSET ${offset}`
   ).all();
 
   await enrichPieces(db, pieces.results);
-  const count = pieces.results.length;
   const cards = pieces.results.map(p => pieceCard(p)).join('\n    ');
 
   const filterTabs = ['all', 'wip', 'minted', 'gallery'].map(f => {
     const label = f === 'gallery' ? 'Gallery Only' : f.charAt(0).toUpperCase() + f.slice(1);
     const active = filter === f ? ' active' : '';
-    return `<a href="/gallery?filter=${f}&sort=${sort}" class="filter-tab${active}">${label}</a>`;
+    const extraClass = f === 'all' ? ' filter-all' : '';
+    return `<a href="/gallery?filter=${f}&sort=${sort}" class="filter-tab${active}${extraClass}">${label}</a>`;
   }).join('\n      ');
 
   const sortRecent = sort === 'recent' ? ' active' : '';
   const sortCollabs = sort === 'collaborators' ? ' active' : '';
 
+  // Build pagination
+  let paginationHTML = '';
+  if (totalPages > 1) {
+    const pages = [];
+    if (pageNum > 1) pages.push(`<a href="/gallery?filter=${filter}&sort=${sort}&page=${pageNum - 1}">← Prev</a>`);
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === pageNum) pages.push(`<span class="current">${i}</span>`);
+      else if (i <= 3 || i > totalPages - 2 || Math.abs(i - pageNum) <= 1) pages.push(`<a href="/gallery?filter=${filter}&sort=${sort}&page=${i}">${i}</a>`);
+      else if (i === 4 && pageNum > 5) pages.push(`<span>…</span>`);
+      else if (i === totalPages - 2 && pageNum < totalPages - 4) pages.push(`<span>…</span>`);
+    }
+    if (pageNum < totalPages) pages.push(`<a href="/gallery?filter=${filter}&sort=${sort}&page=${pageNum + 1}">Next →</a>`);
+    paginationHTML = `<div class="gallery-pagination">${pages.join('')}</div>`;
+  }
+
   const body = `
-<div class="container">
+<div class="container gallery">
   <div class="gallery-header">
     <h1>Community Gallery</h1>
-    <p>${count} piece${count !== 1 ? 's' : ''}</p>
+    <p>${totalCount} piece${totalCount !== 1 ? 's' : ''}${totalPages > 1 ? ` · Page ${pageNum} of ${totalPages}` : ''}</p>
   </div>
   <div class="filter-tabs">
     ${filterTabs}
@@ -2036,9 +2067,85 @@ async function renderGallery(db, url) {
   <div class="grid">
     ${cards || '<div class="empty-state">No pieces yet. Be the first to create one.</div>'}
   </div>
+  ${paginationHTML}
 </div>`;
 
   return htmlResponse(page('Gallery', GALLERY_CSS + STATUS_CSS, body));
+}
+
+async function renderArtists(db) {
+  const agents = await db.prepare(
+    'SELECT a.id, a.name, a.type, a.role, a.soul, a.human_x_handle, a.avatar_url, a.bio, a.theme_color, a.mood, a.created_at FROM agents a ORDER BY a.created_at ASC'
+  ).all();
+
+  // Get piece counts per agent
+  const pieceCounts = {};
+  try {
+    const counts = await db.prepare(
+      `SELECT agent_id, COUNT(DISTINCT piece_id) as count FROM piece_collaborators pc JOIN pieces p ON p.id = pc.piece_id WHERE p.deleted_at IS NULL GROUP BY agent_id`
+    ).all();
+    for (const c of counts.results) pieceCounts[c.agent_id] = c.count;
+  } catch {
+    // Fallback to old columns
+    const countsA = await db.prepare(
+      `SELECT agent_a_id as agent_id, COUNT(*) as count FROM pieces WHERE deleted_at IS NULL GROUP BY agent_a_id`
+    ).all();
+    for (const c of countsA.results) pieceCounts[c.agent_id] = (pieceCounts[c.agent_id] || 0) + c.count;
+    const countsB = await db.prepare(
+      `SELECT agent_b_id as agent_id, COUNT(*) as count FROM pieces WHERE deleted_at IS NULL GROUP BY agent_b_id`
+    ).all();
+    for (const c of countsB.results) pieceCounts[c.agent_id] = (pieceCounts[c.agent_id] || 0) + c.count;
+  }
+
+  const cards = agents.results.map(a => {
+    const color = a.theme_color || '#6ee7b7';
+    const avatarSrc = a.avatar_url || (a.human_x_handle ? `https://unavatar.io/x/${a.human_x_handle}` : `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${a.id}`);
+    const count = pieceCounts[a.id] || 0;
+    const bio = a.bio || a.soul || '';
+    const truncBio = bio.length > 120 ? bio.slice(0, 120) + '…' : bio;
+    return `
+    <a href="/agent/${esc(a.id)}" class="artist-card" style="--ac:${esc(color)}">
+      <div class="artist-avatar">
+        <img src="${esc(avatarSrc)}" alt="${esc(a.name)}" loading="lazy" />
+      </div>
+      <div class="artist-info">
+        <div class="artist-name">${esc(a.name)}</div>
+        ${a.mood ? `<div class="artist-mood">${esc(a.mood)}</div>` : ''}
+        <div class="artist-type">${esc(a.type || 'agent')}</div>
+        <div class="artist-bio">${esc(truncBio)}</div>
+        <div class="artist-stats">${count} piece${count !== 1 ? 's' : ''} · Joined ${(a.created_at || '').slice(0, 10)}</div>
+      </div>
+    </a>`;
+  }).join('');
+
+  const artistCSS = `
+.artists-page{max-width:960px;margin:0 auto;padding:24px}
+.artists-page h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
+.artists-page .subtitle{font-size:13px;color:var(--dim);letter-spacing:1px;margin-bottom:28px}
+.artists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+@media(min-width:900px){.artists-grid{grid-template-columns:repeat(3,1fr)}}
+.artist-card{display:flex;gap:16px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-decoration:none;transition:all 0.2s;border-left:3px solid var(--ac)}
+.artist-card:hover{border-color:var(--ac);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.3)}
+.artist-avatar{width:64px;height:64px;border-radius:10px;overflow:hidden;flex-shrink:0;border:2px solid var(--ac)}
+.artist-avatar img{width:100%;height:100%;object-fit:cover}
+.artist-info{flex:1;min-width:0}
+.artist-name{font-size:15px;letter-spacing:2px;text-transform:uppercase;color:#fff;margin-bottom:2px}
+.artist-mood{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ac);margin-bottom:4px}
+.artist-type{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.artist-bio{font-size:12px;color:var(--secondary);line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.artist-stats{font-size:10px;color:var(--dim);letter-spacing:1px}
+`;
+
+  const body = `
+<div class="artists-page">
+  <h1>Artists</h1>
+  <p class="subtitle">${agents.results.length} agent${agents.results.length !== 1 ? 's' : ''} creating on DeviantClaw</p>
+  <div class="artists-grid">
+    ${cards || '<div class="empty-state">No agents registered yet.</div>'}
+  </div>
+</div>`;
+
+  return htmlResponse(page('Artists', artistCSS, body));
 }
 
 async function renderQueue(db) {
@@ -2412,7 +2519,7 @@ async function renderAgent(db, agentId) {
       <h3>Guardian</h3>
       <div class="agent-guardian-info">
         ${agent.human_x_handle ? `<div><a href="https://x.com/${esc(agent.human_x_handle)}" target="_blank">@${esc(agent.human_x_handle)}</a></div>` : ''}
-        ${agent.guardian_address ? `<div style="margin-top:4px;font-size:11px;color:var(--dim)">${esc(agent.guardian_address.slice(0, 10) + '...' + agent.guardian_address.slice(-6))}</div>` : ''}
+        ${agent.guardian_address ? `<div style="margin-top:4px;font-size:11px;color:var(--dim)">${agent.guardian_address.length > 20 ? esc(agent.guardian_address.slice(0, 10) + '...' + agent.guardian_address.slice(-6)) : esc(agent.guardian_address)}</div>` : ''}
       </div>
     </div>` : '';
 
@@ -2514,6 +2621,7 @@ export default {
 
       if (method === 'GET' && path === '/') return await renderHome(db);
       if (method === 'GET' && path === '/gallery') return await renderGallery(db, url);
+      if (method === 'GET' && path === '/artists') return await renderArtists(db);
       if (method === 'GET' && path === '/queue') return await renderQueue(db);
       if (method === 'GET' && path === '/about') return await renderAbout();
 
