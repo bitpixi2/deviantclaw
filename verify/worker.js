@@ -1,7 +1,4 @@
-import { JsonRpcProvider, getAddress, isAddress } from 'ethers';
-
-const APP_ASSET_VERSION = '20260316c';
-const DEFAULT_ENS_RPC_URL = 'https://ethereum-rpc.publicnode.com';
+const APP_ASSET_VERSION = '20260316d';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
 
 export default {
@@ -219,27 +216,14 @@ function randomCode() {
 
 function nowIso() { return new Date().toISOString(); }
 
-let ensProvider = null;
-let ensProviderUrl = '';
-
-function getEnsProvider(env) {
-  const rpcUrl = String(env.ENS_RPC_URL || DEFAULT_ENS_RPC_URL).trim();
-  if (!ensProvider || ensProviderUrl !== rpcUrl) {
-    ensProvider = new JsonRpcProvider(rpcUrl, 1, { staticNetwork: true });
-    ensProviderUrl = rpcUrl;
-  }
-  return ensProvider;
-}
-
 async function resolveGuardianIdentifier(value, env) {
   const raw = String(value || '').trim();
   if (!raw) return { address: null, ensName: null };
-  if (isAddress(raw)) return { address: normalizeAddress(getAddress(raw)), ensName: null };
-  if (!/^(?:[a-z0-9-]+\.)+eth$/i.test(raw)) return { address: null, ensName: null };
-  const provider = getEnsProvider(env);
-  const resolved = await provider.resolveName(raw);
-  if (!resolved) return { address: null, ensName: raw.toLowerCase() };
-  return { address: normalizeAddress(getAddress(resolved)), ensName: raw.toLowerCase() };
+  // Basic address check (0x + 40 hex chars)
+  if (/^0x[0-9a-fA-F]{40}$/.test(raw)) return { address: raw.toLowerCase(), ensName: null };
+  // ENS names stored as-is (no on-chain resolution without ethers)
+  if (/^(?:[a-z0-9-]+\.)+eth$/i.test(raw)) return { address: null, ensName: raw.toLowerCase() };
+  return { address: null, ensName: null };
 }
 
 function json(data, status = 200) {
