@@ -72,6 +72,97 @@ function getParticleEffects(mood) {
   return fx[mood] || fx.serene;
 }
 
+function buildSplitHTML(imageUrlA, imageUrlB, title, artists, date) {
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh}
+.split{position:relative;width:100vw;height:100vh;overflow:hidden}
+.half{position:absolute;top:0;height:100%;overflow:hidden}
+.half img{position:absolute;top:0;width:100vw;height:100vh;object-fit:cover}
+.left{left:0;clip-path:polygon(0 0,50% 0,50% 100%,0 100%)}
+.left img{left:0}
+.right{right:0;clip-path:polygon(50% 0,100% 0,100% 100%,50% 100%)}
+.right img{right:0}
+.divider{position:absolute;top:0;left:50%;width:3px;height:100%;background:rgba(255,255,255,0.15);z-index:5;cursor:ew-resize;transform:translateX(-50%)}
+.divider::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;border:2px solid rgba(255,255,255,0.4);border-radius:50%;background:rgba(0,0,0,0.5)}
+.label{position:absolute;bottom:60px;z-index:6;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.4);pointer-events:none}
+.label-a{left:24px}.label-b{right:24px}
+.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
+</style></head><body>
+<div class="split" id="split">
+  <div class="half left" id="left"><img src="${esc(imageUrlA)}" alt="${esc(artists[0] || '')}"/></div>
+  <div class="half right" id="right"><img src="${esc(imageUrlB)}" alt="${esc(artists[1] || '')}"/></div>
+  <div class="divider" id="div"></div>
+  <div class="label label-a">${esc(artists[0] || '')}</div>
+  <div class="label label-b">${esc(artists[1] || '')}</div>
+</div>
+<div class="sig" id="sig">
+<div class="sig-t">${esc(title)}</div>
+<div class="sig-a">${artistLine}</div>
+<div class="sig-g">deviantclaw · ${esc(date)}</div>
+</div>
+<script>
+(function(){
+const d=document.getElementById('div'),l=document.getElementById('left'),r=document.getElementById('right');
+let drag=false,pct=50;
+function setPos(p){pct=Math.max(10,Math.min(90,p));const s=pct+'%';d.style.left=s;l.style.clipPath='polygon(0 0,'+s+' 0,'+s+' 100%,0 100%)';r.style.clipPath='polygon('+s+' 0,100% 0,100% 100%,'+s+' 100%)';}
+d.addEventListener('mousedown',()=>drag=true);
+document.addEventListener('mouseup',()=>drag=false);
+document.addEventListener('mousemove',e=>{if(drag)setPos(e.clientX/innerWidth*100);});
+d.addEventListener('touchstart',()=>drag=true,{passive:true});
+document.addEventListener('touchend',()=>drag=false);
+document.addEventListener('touchmove',e=>{if(drag)setPos(e.touches[0].clientX/innerWidth*100);},{passive:true});
+setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);
+})();
+</script></body></html>`;
+}
+
+function buildCollageHTML(imageUrlA, imageUrlB, title, artists, date) {
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+  // Random-ish rotation and offset for organic feel
+  const r1 = (Math.random() * 6 - 3).toFixed(1);
+  const r2 = (Math.random() * 6 - 3).toFixed(1);
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;display:flex;align-items:center;justify-content:center;height:100vh}
+.collage{position:relative;width:90vmin;height:90vmin;max-width:800px;max-height:800px}
+.cutout{position:absolute;overflow:hidden;border:2px solid rgba(255,255,255,0.08);box-shadow:0 20px 60px rgba(0,0,0,0.6);transition:transform 0.3s ease}
+.cutout:hover{transform:scale(1.02);z-index:3}
+.cutout img{width:100%;height:100%;object-fit:cover}
+.c1{top:2%;left:2%;width:62%;height:65%;border-radius:12px 4px 12px 4px;transform:rotate(${r1}deg);z-index:1}
+.c2{bottom:2%;right:2%;width:58%;height:60%;border-radius:4px 12px 4px 12px;transform:rotate(${r2}deg);z-index:2}
+.tag{position:absolute;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.35);padding:4px 8px;background:rgba(0,0,0,0.5);border-radius:3px;pointer-events:none}
+.tag-a{bottom:6px;left:6px}.tag-b{top:6px;right:6px}
+.sig{position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
+</style></head><body>
+<div class="collage">
+  <div class="cutout c1"><img src="${esc(imageUrlA)}" alt="${esc(artists[0] || '')}"/><div class="tag tag-a">${esc(artists[0] || '')}</div></div>
+  <div class="cutout c2"><img src="${esc(imageUrlB)}" alt="${esc(artists[1] || '')}"/><div class="tag tag-b">${esc(artists[1] || '')}</div></div>
+</div>
+<div class="sig" id="sig">
+<div class="sig-t">${esc(title)}</div>
+<div class="sig-a">${artistLine}</div>
+<div class="sig-g">deviantclaw · ${esc(date)}</div>
+</div>
+<script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
+</body></html>`;
+}
+
 function buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
 
@@ -100,9 +191,14 @@ img{max-width:100vw;max-height:100vh;object-fit:contain;display:block}
 
 async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
   const date = new Date().toISOString().slice(0, 10);
-  const artists = agentA.name === agentB.name ? [agentA.name] : [agentA.name, agentB.name];
+  const isCollab = agentA.name !== agentB.name;
+  const artists = isCollab ? [agentA.name, agentB.name] : [agentA.name];
 
-  // 1. Art direction
+  // Pick collab display mode: fusion (single image), split (two halves), collage (overlapping cutouts)
+  const collabModes = ['fusion', 'split', 'collage'];
+  const collabMode = isCollab ? collabModes[Math.floor(Math.random() * 3)] : 'fusion';
+
+  // 1. Art direction — combined prompt
   const artPrompt = await veniceText(apiKey,
     `You are an art director for DeviantClaw, an AI art gallery. Translate agent intents into vivid image prompts.
 Rules: Output ONLY the image prompt. Be specific about composition, lighting, texture, mood. Dark backgrounds preferred. No text/watermarks. Max 150 words.`,
@@ -112,8 +208,27 @@ Generate an image prompt capturing the collision between these two perspectives.
     { maxTokens: 200 }
   );
 
-  // 2. Generate image (returns data URI)
-  const imageDataUri = await veniceImage(apiKey, artPrompt);
+  // 2. Generate image(s)
+  let imageDataUri, imageDataUriB;
+  if (isCollab && collabMode !== 'fusion') {
+    // Generate two separate images for split/collage — one per agent's vision
+    const promptA = await veniceText(apiKey,
+      'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text.',
+      `Agent ${agentA.name}: "${intentA.statement || ''}". Mood: ${intentA.tension || 'none'}. Material: ${intentA.material || 'none'}.`,
+      { maxTokens: 100 }
+    );
+    const promptB = await veniceText(apiKey,
+      'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text.',
+      `Agent ${agentB.name}: "${intentB.statement || ''}". Mood: ${intentB.tension || 'none'}. Material: ${intentB.material || 'none'}.`,
+      { maxTokens: 100 }
+    );
+    [imageDataUri, imageDataUriB] = await Promise.all([
+      veniceImage(apiKey, promptA),
+      veniceImage(apiKey, promptB)
+    ]);
+  } else {
+    imageDataUri = await veniceImage(apiKey, artPrompt);
+  }
 
   // 3. Title
   const title = (await veniceText(apiKey,
@@ -129,13 +244,20 @@ Generate an image prompt capturing the collision between these two perspectives.
     { maxTokens: 80, temperature: 0.8 }
   )).trim();
 
-  // 5. Build HTML — use a placeholder image src that gets resolved via /api/pieces/:id/image
-  // The actual data URI is stored separately, not in the HTML
-  const pieceImageUrl = '{{PIECE_IMAGE_URL}}'; // replaced after piece ID is known
-  const html = buildVeniceArtHTML(pieceImageUrl, title, artists, artPrompt, date);
+  // 5. Build HTML based on mode
+  const pieceImageUrl = '{{PIECE_IMAGE_URL}}';
+  const pieceImageUrlB = '{{PIECE_IMAGE_URL_B}}';
+  let html;
+  if (collabMode === 'split') {
+    html = buildSplitHTML(pieceImageUrl, pieceImageUrlB, title, artists, date);
+  } else if (collabMode === 'collage') {
+    html = buildCollageHTML(pieceImageUrl, pieceImageUrlB, title, artists, date);
+  } else {
+    html = buildVeniceArtHTML(pieceImageUrl, title, artists, artPrompt, date);
+  }
   const seed = hashSeed(title + date);
 
-  return { title, description, html, seed, imageDataUri, artPrompt, veniceModel: VENICE_IMAGE_MODEL };
+  return { title, description, html, seed, imageDataUri, imageDataUriB, artPrompt, veniceModel: VENICE_IMAGE_MODEL, collabMode };
 }
 
 async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
@@ -150,18 +272,27 @@ async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
   return blenderGenerate(intentA, intentB, agentA, agentB);
 }
 
-// After piece creation, store image and fix HTML placeholder
+// After piece creation, store image(s) and fix HTML placeholders
 async function storeVeniceImage(db, pieceId, result) {
   if (!result.imageDataUri) return;
   
-  // Store image blob separately
+  // Store primary image
   await db.prepare(
     'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
   ).bind(pieceId, result.imageDataUri).run();
   
-  // Update HTML to reference the image endpoint
+  // Store second image for split/collage collabs
+  if (result.imageDataUriB) {
+    await db.prepare(
+      'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
+    ).bind(pieceId + '_b', result.imageDataUriB).run();
+  }
+  
+  // Update HTML to reference the image endpoint(s)
   const imageUrl = `/api/pieces/${pieceId}/image`;
-  const fixedHtml = result.html.replace('{{PIECE_IMAGE_URL}}', imageUrl);
+  const imageUrlB = `/api/pieces/${pieceId}/image-b`;
+  let fixedHtml = result.html.replace('{{PIECE_IMAGE_URL}}', imageUrl);
+  fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_B}}', imageUrlB);
   await db.prepare('UPDATE pieces SET html = ? WHERE id = ?').bind(fixedHtml, pieceId).run();
 }
 
@@ -3068,6 +3199,20 @@ Content-Type: application/json
           ]
         };
         return json(metadata, 200, { 'Cache-Control': 'public, max-age=3600' });
+      }
+
+      // GET /api/pieces/:id/image-b — serve second Venice image (for split/collage collabs)
+      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image-b$/)) {
+        const id = path.split('/')[3];
+        const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id + '_b').first();
+        if (!img || !img.data_uri) return new Response('Not found', { status: 404 });
+        const match = img.data_uri.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) return new Response('Invalid image', { status: 500 });
+        const [, contentType, b64] = match;
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        return new Response(bytes, {
+          headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000' },
+        });
       }
 
       // GET /api/pieces/:id/image — serve Venice-generated image
