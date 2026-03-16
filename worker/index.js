@@ -365,18 +365,25 @@ const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 .gallery-header h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
 .gallery-header p{font-size:13px;color:var(--dim);letter-spacing:1px}`;
 
-const PIECE_CSS = `.piece-view{display:flex;flex-direction:column;height:calc(100vh - 60px)}
-.piece-frame{flex:1;min-height:0}
-.piece-frame iframe{width:100%;height:100%;border:none;display:block}
-.piece-meta{padding:24px 32px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px}
-.piece-title{font-size:16px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;text-align:center}
-.piece-desc{font-size:13px;color:var(--dim);max-width:720px;line-height:1.7;text-align:center;margin:0 auto}
-.piece-artists{font-size:12px;letter-spacing:1px}
+const PIECE_CSS = `
+.piece-view{max-width:960px;margin:0 auto;padding:24px}
+.piece-frame{position:relative;width:100%;border-radius:8px;overflow:hidden;background:var(--surface);border:1px solid var(--border)}
+.piece-frame iframe{width:100%;height:70vh;border:none;display:block}
+.piece-frame img{width:100%;max-height:75vh;object-fit:contain;display:block;margin:0 auto;background:#000}
+.piece-frame .fullscreen-bar{position:absolute;top:12px;right:12px;z-index:10}
+.fullscreen-link{display:inline-block;padding:6px 14px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.15);border-radius:6px;font-size:12px;letter-spacing:1px;color:#fff;text-decoration:none;transition:all 0.2s}
+.fullscreen-link:hover{background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)}
+.piece-header{padding:20px 0 16px;text-align:center}
+.piece-title{font-size:20px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;color:#fff;margin-bottom:8px}
+.piece-artists{font-size:13px;letter-spacing:1px;margin-bottom:4px}
 .piece-artists .x{color:var(--dim);margin:0 6px}
-.piece-date{font-size:12px;color:var(--dim);letter-spacing:1px}
-.fullscreen-link{font-size:13px;color:var(--dim);letter-spacing:1px}
-.piece-meta-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.fullscreen-link:hover{color:var(--primary)}`;
+.piece-date{font-size:11px;color:var(--dim);letter-spacing:1px}
+.piece-desc{font-size:13px;color:var(--secondary);max-width:640px;line-height:1.8;text-align:center;margin:16px auto 0;padding:16px 0;border-top:1px solid var(--border)}
+.piece-details{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)}
+@media(max-width:640px){.piece-details{grid-template-columns:1fr}}
+.piece-details .detail-section{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
+.detail-section h3{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+`;
 
 const AGENT_CSS = `
 /* Banner */
@@ -2263,25 +2270,47 @@ async function renderPiece(db, id) {
   // Status badge
   const badge = statusBadge(status);
 
+  // Determine the best way to display the piece
+  let frameContent;
+  const hasVeniceImage = piece.venice_model || piece.art_prompt;
+  const hasImageUrl = piece.image_url;
+  const demoRoutes = { 'collage-demo-001': '/collage-demo', 'split-demo-001': '/split-demo' };
+
+  if (demoRoutes[piece.id]) {
+    frameContent = `<iframe src="${demoRoutes[piece.id]}" allowfullscreen></iframe>`;
+  } else if (hasVeniceImage) {
+    // Venice pieces: show the actual image, not an iframe wrapping HTML
+    frameContent = `<img src="/api/pieces/${esc(piece.id)}/image" alt="${esc(piece.title)}" />`;
+  } else if (hasImageUrl) {
+    frameContent = `<img src="${esc(piece.image_url)}" alt="${esc(piece.title)}" />`;
+  } else if (piece.html && piece.html.length > 100) {
+    frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
+  } else {
+    frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
+  }
+
+  // Details sections (only if they have content)
+  const detailSections = [];
+  if (layersHTML) detailSections.push(layersHTML);
+  if (approvalsHTML) detailSections.push(approvalsHTML);
+  if (joinHTML) detailSections.push(joinHTML);
+  if (mintHTML) detailSections.push(mintHTML);
+
   const body = `
 <div class="piece-view">
   <div class="piece-frame">
-    <iframe src="/api/pieces/${esc(piece.id)}/view" frameborder="0" allowfullscreen></iframe>
-  </div>
-  <div class="piece-meta">
-    <h1 class="piece-title">${esc(piece.title)} ${badge}</h1>
-    <div class="piece-meta-row">
-      <div class="piece-artists">${artistsHTML}</div>
-      <div class="piece-date">${piece.created_at || ''}</div>
-      <a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">open fullscreen →</a>
+    ${frameContent}
+    <div class="fullscreen-bar">
+      <a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">⛶ Fullscreen</a>
     </div>
-    <p class="piece-desc">${esc(piece.description)}</p>
-    ${layersHTML}
-    ${approvalsHTML}
-    ${joinHTML}
-    ${mintHTML}
-    ${deleteHTML}
   </div>
+  <div class="piece-header">
+    <h1 class="piece-title">${esc(piece.title)} ${badge}</h1>
+    <div class="piece-artists">${artistsHTML}</div>
+    <div class="piece-date">${(piece.created_at || '').slice(0, 10)} · ${esc(piece.mode || 'solo')}</div>
+  </div>
+  ${piece.description ? `<p class="piece-desc">${esc(piece.description)}</p>` : ''}
+  ${detailSections.length > 0 ? `<div class="piece-details">${detailSections.map(s => `<div class="detail-section">${s}</div>`).join('')}</div>` : ''}
 </div>`;
 
   return htmlResponse(page(piece.title, PIECE_CSS + STATUS_CSS, body));
