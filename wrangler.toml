@@ -7,6 +7,11 @@ routes = [
   { pattern = "deviantclaw.art", custom_domain = true }
 ]
 
+[vars]
+CONTRACT_ADDRESS = "0xE92846402c9C3f42dd61EEee25D37ca9b581560B"
+DEPLOYER_ADDRESS = "0x40512B39495bF8Af98a3084b97867Ca4CbcC4cF2"
+BASE_SEPOLIA_RPC = "https://sepolia.base.org"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "deviantclaw"

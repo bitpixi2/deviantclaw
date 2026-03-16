@@ -3057,6 +3057,33 @@ Content-Type: application/json
         return json(pieces.results);
       }
 
+      // GET /api/pieces/:id/metadata — ERC-721 metadata (JSON)
+      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/metadata$/)) {
+        const id = path.split('/')[3];
+        const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
+        if (!piece) return json({ error: 'Not found' }, 404);
+        const layers = await db.prepare('SELECT agent_id, agent_name, round_number FROM layers WHERE piece_id = ? ORDER BY round_number').bind(id).all();
+        const agents = [...new Set(layers.results.map(l => l.agent_name || l.agent_id))];
+        const hasImage = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
+
+        const metadata = {
+          name: piece.title || 'Untitled',
+          description: piece.description || `AI-generated art from DeviantClaw. Created by ${agents.join(', ') || 'unknown agent'}.`,
+          image: hasImage ? `https://deviantclaw.art/api/pieces/${id}/image` : undefined,
+          animation_url: `https://deviantclaw.art/api/pieces/${id}/view`,
+          external_url: `https://deviantclaw.art/piece/${id}`,
+          attributes: [
+            { trait_type: 'Artists', value: agents.join(', ') || 'Unknown' },
+            { trait_type: 'Layers', value: layers.results.length },
+            { trait_type: 'Type', value: layers.results.length > 1 ? 'Collaboration' : 'Solo' },
+            { trait_type: 'Status', value: piece.status },
+            { trait_type: 'Created', value: piece.created_at },
+            { trait_type: 'Gallery', value: 'DeviantClaw' },
+          ]
+        };
+        return json(metadata, 200, { 'Cache-Control': 'public, max-age=3600' });
+      }
+
       // GET /api/pieces/:id/image — serve Venice-generated image
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image$/)) {
         const id = path.split('/')[3];
@@ -3217,6 +3244,65 @@ Content-Type: application/json
           message: 'Piece rejected. It will remain in the gallery but cannot be minted.',
           status: 'rejected'
         });
+      }
+
+      // POST /api/pieces/:id/mint-onchain — mint approved piece to Base Sepolia
+      if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/mint-onchain$/)) {
+        const g = await getGuardian(request); const ae = requireAuth(g); if (ae) return ae;
+        const id = path.split('/')[3];
+
+        const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
+        if (!piece) return json({ error: 'Piece not found' }, 404);
+        if (piece.status === 'minted') return json({ error: 'Already minted', tokenId: piece.token_id, txHash: piece.mint_tx_hash }, 400);
+        if (piece.status !== 'approved') return json({ error: 'Piece must be approved before minting. Current status: ' + piece.status }, 400);
+
+        const CONTRACT = env.CONTRACT_ADDRESS || '0xE92846402c9C3f42dd61EEee25D37ca9b581560B';
+        const RPC_URL = env.BASE_SEPOLIA_RPC || 'https://sepolia.base.org';
+        const DEPLOYER = env.DEPLOYER_ADDRESS;
+        const DEPLOYER_KEY = env.DEPLOYER_KEY;
+
+        if (!DEPLOYER || !DEPLOYER_KEY) return json({ error: 'Deployer not configured' }, 500);
+
+        try {
+          const tokenURI = `https://deviantclaw.art/api/pieces/${id}/metadata`;
+          const title = piece.title || 'Untitled';
+          const layers = await db.prepare('SELECT DISTINCT agent_id FROM layers WHERE piece_id = ? ORDER BY layer_number').bind(id).all();
+          const layerCount = layers.results.length || 1;
+          const isCollab = layerCount > 1;
+
+          // Use simple JSON-RPC calls — CF Workers can do raw fetch
+          async function rpc(method, params) {
+            const r = await fetch(RPC_URL, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+            });
+            const j = await r.json();
+            if (j.error) throw new Error(j.error.message);
+            return j.result;
+          }
+
+          // We'll call the contract via cast on the server side
+          // For CF Workers, use a simpler approach: relay to a mint API
+          // Actually — let's just update the DB status and have the server-side do the chain tx
+          // Mark as pending-mint so the server can pick it up
+          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          await db.prepare(
+            "UPDATE pieces SET status = 'pending-mint', updated_at = ? WHERE id = ?"
+          ).bind(now, id).run();
+
+          return json({
+            message: 'Piece queued for on-chain minting. Minting in progress...',
+            pieceId: id,
+            contract: CONTRACT,
+            chain: 'Base Sepolia (testnet)',
+            chainId: 84532,
+            tokenURI,
+            status: 'pending-mint',
+            note: 'Chain transaction will be confirmed shortly. Check back for tx hash.'
+          });
+        } catch (err) {
+          return json({ error: 'Mint failed: ' + (err.message || err) }, 500);
+        }
       }
 
       // POST /api/pieces/:id/join — agent joins a WIP piece as next layer (async collab)
