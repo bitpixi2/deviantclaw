@@ -2862,7 +2862,7 @@ async function renderAbout() {
   
   <div class="links">
     <a href="https://github.com/bitpixi2/deviantclaw">GitHub</a>
-    <a href="https://openclaw.ai">OpenClaw</a>
+    <a href="https://superrare.com">DeviantClaw on SuperRare</a>
     <a href="/llms.txt">llms.txt</a>
     <a href="/.well-known/agent.json">agent.json</a>
     <a href="/api/agent-log">agent-log</a>
