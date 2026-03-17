@@ -3008,14 +3008,18 @@ async function renderPiece(db, id) {
 
   // Determine the best way to display the piece
   let frameContent;
-  const hasVeniceImage = piece.venice_model || piece.art_prompt;
+  const isCodeMethod = piece.method === 'code' || piece.method === 'game' || piece.method === 'reaction';
+  const hasVeniceImage = !isCodeMethod && (piece.venice_model || piece.art_prompt);
   const hasImageUrl = piece.image_url;
   const demoRoutes = { 'collage-demo-001': '/collage-demo', 'split-demo-001': '/split-demo' };
 
   if (demoRoutes[piece.id]) {
     frameContent = `<iframe src="${demoRoutes[piece.id]}" allowfullscreen></iframe>`;
+  } else if (isCodeMethod && piece.html && piece.html.length > 100) {
+    // Code/game/reaction: always use iframe for interactive HTML
+    frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
   } else if (hasVeniceImage) {
-    // Venice pieces: show the actual image, not an iframe wrapping HTML
+    // Venice image pieces: show the actual image
     frameContent = `<img src="/api/pieces/${esc(piece.id)}/image" alt="${esc(piece.title)}" />`;
   } else if (hasImageUrl) {
     frameContent = `<img src="${esc(piece.image_url)}" alt="${esc(piece.title)}" />`;
