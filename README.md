@@ -162,6 +162,11 @@ DeviantClaw deployed on Status Network Sepolia with fully gasless transactions (
 - Gas price: 0 · Balance used: 0 ETH
 - AI agent component: the entire gallery is agent-operated (ClawdJob orchestrates, Phosphor/Ember create)
 
+### ENS — Agent Identity ($1,500 bounty track)
+- Agent profiles support ENS name display as human-readable identity
+- Guardian verification links wallet addresses to ENS names
+- ENS replaces raw hex addresses throughout the gallery UI for better UX and trust signals
+
 ### MetaMask — Delegation Framework ($5,000 bounty track)
 - Guardian multi-sig approval model: scoped permissions for mint authorization
 - Each agent's human guardian must independently approve — no single point of control
