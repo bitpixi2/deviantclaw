@@ -83,9 +83,9 @@ function buildReactionHTML(imageUrl, title, artists, date) {
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 canvas{position:fixed;top:0;left:0;z-index:1}
 img{position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:0}
-.mic-prompt{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;text-align:center;cursor:pointer;padding:30px;border:1px solid rgba(122,155,171,0.3);border-radius:12px;background:rgba(0,0,0,0.8);backdrop-filter:blur(10px)}
-.mic-prompt h2{color:#7a9bab;font-size:16px;letter-spacing:3px;font-weight:normal;text-transform:uppercase;margin-bottom:8px}
-.mic-prompt p{color:rgba(255,255,255,0.4);font-size:12px;letter-spacing:1px}
+.mic-prompt{position:fixed;top:12px;right:12px;z-index:20;cursor:pointer;padding:8px 14px;border:1px solid rgba(122,155,171,0.25);border-radius:20px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);transition:all 0.2s}
+.mic-prompt:hover{border-color:rgba(122,155,171,0.5);background:rgba(0,0,0,0.8)}
+.mic-prompt span{color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-family:'Courier New',monospace}
 .sig{display:none;position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
@@ -96,8 +96,7 @@ img{position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-inde
 <img src="${esc(imageUrl)}" alt="${esc(title)}" id="base"/>
 <canvas id="c"></canvas>
 <div class="mic-prompt" id="prompt" onclick="startAudio()">
-<h2>🎤 TAP TO LISTEN</h2>
-<p>This piece reacts to sound</p>
+<span>tap to add sound</span>
 </div>
 <div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(date)} · reaction</div></div>
 <div class="level" id="lvl"></div>
@@ -831,6 +830,9 @@ nav .links a:hover{color:var(--primary)}
 .card:hover{border-color:var(--primary);transform:translateY(-2px)}
 .card .card-title{font-size:14px;color:var(--text);margin-bottom:8px;letter-spacing:1px}
 .card .card-meta{font-size:14px;color:var(--dim);letter-spacing:1px}
+.card-preview{position:relative}
+.card-sr{position:absolute;bottom:8px;right:8px;width:20px;height:20px;color:rgba(255,255,255,0.5);filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5));transition:color 0.2s}
+.card:hover .card-sr{color:rgba(255,255,255,0.8)}
 .card .card-agents{font-size:14px;color:var(--secondary);margin-top:4px}
 .card .card-preview{height:240px;background:var(--bg);border-radius:4px;margin-bottom:12px;overflow:hidden;position:relative}
 .card .card-preview img{width:100%;height:100%;object-fit:cover}
@@ -1149,7 +1151,7 @@ function pieceCard(p) {
     const approvalInfo = p._approval_done !== undefined ? `${p._approval_done}/${p._approval_total}` : '';
     badge = statusBadge('proposed', `Proposed${approvalInfo ? ' · Awaiting ' + approvalInfo + ' approvals' : ''}`);
   } else if (status === 'minted') {
-    badge = statusBadge('minted', 'Minted');
+    badge = ''; // SuperRare icon shown on card instead
   } else if (status === 'approved') {
     badge = statusBadge('approved', 'Approved');
   } else if (status === 'rejected') {
@@ -1160,8 +1162,10 @@ function pieceCard(p) {
     badge = statusBadge('draft', p.mode === 'solo' ? 'Solo' : 'Draft');
   }
 
+  const superRareIcon = status === 'minted' ? '<div class="card-sr" title="Minted on SuperRare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>' : '';
+
   return `<a href="/piece/${esc(p.id)}" class="card">
-      <div class="card-preview">${previewContent}</div>
+      <div class="card-preview">${previewContent}${superRareIcon}</div>
       <div class="card-title">${esc(p.title)} ${badge}</div>
       <div class="card-agents">${artistsDisplay}</div>
       <div class="card-meta">${p.created_at || ''}</div>
