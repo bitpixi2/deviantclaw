@@ -1010,10 +1010,20 @@ const STATUS_CSS = `.status-badge{display:inline-block;font-size:11px;letter-spa
 .sort-controls{display:flex;gap:12px;align-items:center;font-size:12px;color:var(--dim);letter-spacing:1px;margin-bottom:16px}
 .sort-controls a{color:var(--dim);text-decoration:none}
 .sort-controls a:hover,.sort-controls a.active{color:var(--primary)}
+.details-row{display:flex;gap:24px}
+.details-row>*{flex:1;min-width:0}
+@media(max-width:600px){.details-row{flex-direction:column;gap:16px}}
 .layer-list{margin-top:16px}
 .layer-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
 .layer-round{color:var(--primary);font-weight:bold;min-width:60px}
 .layer-agent{color:var(--secondary)}
+.guardian-list{margin-top:16px}
+.guardian-item{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+.guardian-agent{color:var(--secondary);text-decoration:none}
+.guardian-agent:hover{color:var(--primary)}
+.guardian-arrow{color:var(--dim);font-size:11px}
+.guardian-human a{text-decoration:none}
+.guardian-human a:hover{text-decoration:underline}
 .layer-time{color:var(--dim);font-size:12px;margin-left:auto}
 .approval-list{margin-top:12px}
 .approval-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px}
@@ -3016,9 +3026,33 @@ async function renderPiece(db, id) {
     frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
   }
 
+  // Build guardians panel — show who the human guardians are for each agent
+  let guardiansHTML = '';
+  try {
+    const agentIds = [...new Set([piece.agent_a_id, piece.agent_b_id, ...(collaborators || []).map(c => c.agent_id)].filter(Boolean))];
+    const guardianItems = [];
+    for (const aid of agentIds) {
+      const agent = await db.prepare('SELECT id, name, guardian_address, human_x_handle, human_x_id FROM agents WHERE id = ?').bind(aid).first();
+      if (agent) {
+        const xHandle = agent.human_x_handle;
+        const xLink = xHandle ? `<a href="https://x.com/${esc(xHandle)}" target="_blank" rel="noreferrer" style="color:var(--primary)">@${esc(xHandle)}</a>` : '<span style="color:var(--dim)">unverified</span>';
+        guardianItems.push(`<div class="guardian-item">
+          <a href="/agent/${esc(agent.id)}" class="guardian-agent">${esc(agent.name)}</a>
+          <span class="guardian-arrow">→</span>
+          <span class="guardian-human">${xLink}</span>
+        </div>`);
+      }
+    }
+    if (guardianItems.length > 0) {
+      guardiansHTML = `<div class="guardian-list"><h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:8px">Guardians</h3>${guardianItems.join('')}</div>`;
+    }
+  } catch { /* agents table query failed */ }
+
   // Details sections (only if they have content)
   const detailSections = [];
-  if (layersHTML) detailSections.push(layersHTML);
+  if (layersHTML || guardiansHTML) {
+    detailSections.push(`<div class="details-row">${layersHTML || ''}${guardiansHTML || ''}</div>`);
+  }
   if (approvalsHTML) detailSections.push(approvalsHTML);
   if (joinHTML) detailSections.push(joinHTML);
   if (mintHTML) detailSections.push(mintHTML);
