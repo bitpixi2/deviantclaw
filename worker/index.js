@@ -946,14 +946,15 @@ const PIECE_CSS = `
 
 const AGENT_CSS = `
 /* Banner */
-.agent-banner{position:relative;height:200px;overflow:hidden;border-radius:0 0 12px 12px;background:linear-gradient(135deg,var(--agent-color,#6ee7b7)22,transparent 70%),linear-gradient(225deg,rgba(110,231,183,0.15),var(--bg));margin-bottom:0}
+.agent-banner{position:relative;height:600px;overflow:hidden;border-radius:0;background:linear-gradient(135deg,var(--agent-color,#6ee7b7)22,transparent 70%),linear-gradient(225deg,rgba(110,231,183,0.15),var(--bg));margin-top:-1px;margin-bottom:0}
 .agent-banner img{width:100%;height:100%;object-fit:cover;opacity:0.7}
 .agent-banner .banner-overlay{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,var(--bg))}
 .agent-banner .dc-logo{position:absolute;top:16px;right:20px;opacity:0.6;height:28px}
 @media(max-width:768px){.agent-banner .dc-logo{display:none}}
 
 /* Profile card - overlapping banner */
-.agent-profile-card{position:relative;margin-top:-80px;padding:0 24px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap}
+.agent-profile-card{position:relative;margin-top:-80px;padding:0 24px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;max-width:1400px;margin-left:auto;margin-right:auto}
+@media(min-width:1100px){.agent-profile-card{padding:0 32px}}
 .agent-avatar{width:120px;height:120px;border-radius:12px;border:3px solid var(--agent-color,#6ee7b7);background:var(--surface);overflow:hidden;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
 .agent-avatar img{width:100%;height:100%;object-fit:cover}
 .agent-avatar .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface);color:var(--agent-color,#6ee7b7)}
@@ -963,13 +964,15 @@ const AGENT_CSS = `
 .agent-role{font-size:15px;color:var(--secondary);letter-spacing:1px;margin-top:4px}
 
 /* Stats row */
-.agent-stats-row{display:flex;gap:24px;padding:16px 24px;border-bottom:1px solid var(--border);margin-bottom:20px}
+.agent-stats-row{display:flex;gap:24px;padding:16px 24px;border-bottom:1px solid var(--border);margin-bottom:20px;max-width:1400px;margin-left:auto;margin-right:auto}
+@media(min-width:1100px){.agent-stats-row{padding:16px 32px}}
 .stat-item{text-align:center}
 .stat-number{font-size:20px;color:var(--agent-color,#6ee7b7);font-weight:bold;display:block}
 .stat-label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
 
 /* Two-column layout */
-.agent-layout{display:grid;grid-template-columns:260px 1fr;gap:28px;padding:0 24px}
+.agent-layout{display:grid;grid-template-columns:260px 1fr;gap:28px;padding:0 24px;max-width:1400px;margin:0 auto}
+@media(min-width:1100px){.agent-layout{padding:0 32px}}
 @media(max-width:768px){.agent-layout{grid-template-columns:1fr}}
 .agent-gallery .grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
 
@@ -1013,20 +1016,12 @@ const STATUS_CSS = `.status-badge{display:inline-block;font-size:11px;letter-spa
 .sort-controls{display:flex;gap:12px;align-items:center;font-size:12px;color:var(--dim);letter-spacing:1px;margin-bottom:16px}
 .sort-controls a{color:var(--dim);text-decoration:none}
 .sort-controls a:hover,.sort-controls a.active{color:var(--primary)}
-.details-row{display:flex;gap:24px}
-.details-row>*{flex:1;min-width:0}
-@media(max-width:600px){.details-row{flex-direction:column;gap:16px}}
+
 .layer-list{margin-top:16px}
 .layer-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
 .layer-round{color:var(--primary);font-weight:bold;min-width:60px}
 .layer-agent{color:var(--secondary)}
-.guardian-list{margin-top:16px}
-.guardian-item{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
-.guardian-agent{color:var(--secondary);text-decoration:none}
-.guardian-agent:hover{color:var(--primary)}
-.guardian-arrow{color:var(--dim);font-size:11px}
-.guardian-human a{text-decoration:none}
-.guardian-human a:hover{text-decoration:underline}
+
 .layer-time{color:var(--dim);font-size:12px;margin-left:auto}
 .approval-list{margin-top:12px}
 .approval-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px}
@@ -2749,7 +2744,7 @@ async function renderArtists(db) {
 
   const body = `
 <div class="artists-page">
-  <h1>Artists</h1>
+  <h1>Agent Artists</h1>
   <p class="subtitle">${agents.results.length} agent${agents.results.length !== 1 ? 's' : ''} creating on DeviantClaw</p>
   <div class="artists-grid">
     ${cards || '<div class="empty-state">No agents registered yet.</div>'}
@@ -2971,7 +2966,7 @@ async function renderPiece(db, id) {
         if (a.rejected) { statusCls = 'approval-rejected'; statusIcon = '✗'; }
         else if (a.approved) { statusCls = 'approval-approved'; statusIcon = '✓'; }
         else { statusCls = 'approval-pending'; statusIcon = '·'; }
-        const who = a.human_x_handle ? `@${esc(a.human_x_handle)}` : (a.guardian_address ? esc(a.guardian_address.slice(0, 10) + '...') : esc(a.agent_id));
+        const who = a.human_x_handle ? `<a href="https://x.com/${esc(a.human_x_handle)}" target="_blank" rel="noreferrer" style="color:var(--primary);text-decoration:none">@${esc(a.human_x_handle)}</a>` : (a.guardian_address ? esc(a.guardian_address.slice(0, 10) + '...') : esc(a.agent_id));
         return `<div class="approval-item">
           <span class="approval-status ${statusCls}">${statusIcon}</span>
           <span>${who}</span>
@@ -3030,33 +3025,9 @@ async function renderPiece(db, id) {
     frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
   }
 
-  // Build guardians panel — show who the human guardians are for each agent
-  let guardiansHTML = '';
-  try {
-    const agentIds = [...new Set([piece.agent_a_id, piece.agent_b_id, ...(collaborators || []).map(c => c.agent_id)].filter(Boolean))];
-    const guardianItems = [];
-    for (const aid of agentIds) {
-      const agent = await db.prepare('SELECT id, name, guardian_address, human_x_handle, human_x_id FROM agents WHERE id = ?').bind(aid).first();
-      if (agent) {
-        const xHandle = agent.human_x_handle;
-        const xLink = xHandle ? `<a href="https://x.com/${esc(xHandle)}" target="_blank" rel="noreferrer" style="color:var(--primary)">@${esc(xHandle)}</a>` : '<span style="color:var(--dim)">unverified</span>';
-        guardianItems.push(`<div class="guardian-item">
-          <a href="/agent/${esc(agent.id)}" class="guardian-agent">${esc(agent.name)}</a>
-          <span class="guardian-arrow">→</span>
-          <span class="guardian-human">${xLink}</span>
-        </div>`);
-      }
-    }
-    if (guardianItems.length > 0) {
-      guardiansHTML = `<div class="guardian-list"><h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:8px">Guardians</h3>${guardianItems.join('')}</div>`;
-    }
-  } catch { /* agents table query failed */ }
-
   // Details sections (only if they have content)
   const detailSections = [];
-  if (layersHTML || guardiansHTML) {
-    detailSections.push(`<div class="details-row">${layersHTML || ''}${guardiansHTML || ''}</div>`);
-  }
+  if (layersHTML) detailSections.push(layersHTML);
   if (approvalsHTML) detailSections.push(approvalsHTML);
   if (joinHTML) detailSections.push(joinHTML);
   if (mintHTML) detailSections.push(mintHTML);
