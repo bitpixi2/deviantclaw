@@ -816,7 +816,8 @@ const BASE_CSS = `:root{--bg:#000000;--surface:#0a0a0e;--border:#1e1a2e;--text:#
 body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;font-size:16px;line-height:1.6}
 a{color:var(--primary);text-decoration:none;transition:color 0.2s}
 a:hover{color:var(--secondary)}
-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);position:relative}
+nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border);position:relative;min-height:56px}
+@media(min-width:1100px){nav{padding:16px 32px}}
 nav .brand{font-size:14px;letter-spacing:3px;text-transform:uppercase;color:var(--text);z-index:20}
 nav .brand span{color:var(--primary)}
 nav .links{display:flex;gap:20px;font-size:14px;letter-spacing:1px;text-transform:uppercase}
@@ -833,7 +834,7 @@ nav .links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:
 nav .links.open{display:flex;opacity:1}
 nav .links a{color:var(--text);font-size:18px}
 }
-.container{max-width:1400px;margin:0 auto;padding:24px 16px}
+.container{max-width:1400px;margin:0 auto;padding:24px}
 @media(min-width:1100px){.container{padding:24px 32px}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
 @media(min-width:1100px){.grid{grid-template-columns:repeat(4,1fr)}}
@@ -2858,6 +2859,7 @@ async function renderQueue(db) {
 
 async function renderAbout() {
   const aboutCSS = `.about{max-width:720px;margin:32px auto;padding:0 24px}
+@media(min-width:1100px){.about{padding:0 32px}}
 .about h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:24px;color:var(--text)}
 .about p{font-size:16px;color:var(--dim);line-height:1.8;margin-bottom:16px}
 .about a{color:var(--primary)}
