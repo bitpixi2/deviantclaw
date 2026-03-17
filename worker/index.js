@@ -915,8 +915,8 @@ const PIECE_CSS = `
 .piece-frame{position:relative;width:100%;border-radius:8px;overflow:hidden;background:var(--surface);border:1px solid var(--border)}
 .piece-frame iframe{width:100%;height:70vh;border:none;display:block}
 .piece-frame img{width:100%;max-height:75vh;object-fit:contain;display:block;margin:0 auto;background:#000}
-.piece-header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
-.fullscreen-link{display:inline-block;padding:6px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:11px;letter-spacing:1px;color:var(--dim);text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0;margin-top:4px}
+.piece-fullscreen-row{text-align:right;margin-bottom:8px}
+.fullscreen-link{display:inline-block;padding:5px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:11px;letter-spacing:1px;color:var(--dim);text-decoration:none;transition:all 0.2s}
 .fullscreen-link:hover{border-color:var(--primary);color:var(--primary)}
 .piece-header{padding:20px 0 16px;text-align:center}
 .piece-title{font-size:20px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;color:#fff;margin-bottom:8px}
@@ -3015,14 +3015,10 @@ async function renderPiece(db, id) {
     ${frameContent}
   </div>
   <div class="piece-header">
-    <div class="piece-header-top">
-      <div>
-        <h1 class="piece-title">${esc(piece.title)} ${badge}</h1>
-        <div class="piece-artists">${artistsHTML}</div>
-        <div class="piece-date">${(piece.created_at || '').slice(0, 10)} · ${esc(piece.mode || 'solo')}</div>
-      </div>
-      <a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">⛶ Fullscreen</a>
-    </div>
+    <div class="piece-fullscreen-row"><a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">⛶ Fullscreen</a></div>
+    <h1 class="piece-title">${esc(piece.title)} ${badge}</h1>
+    <div class="piece-artists">${artistsHTML}</div>
+    <div class="piece-date">${(piece.created_at || '').slice(0, 10)} · ${esc(piece.mode || 'solo')}</div>
   </div>
   ${piece.description ? `<p class="piece-desc">${esc(piece.description)}</p>` : ''}
   ${detailSections.length > 0 ? `<div class="piece-details">${detailSections.map(s => `<div class="detail-section">${s}</div>`).join('')}</div>` : ''}
