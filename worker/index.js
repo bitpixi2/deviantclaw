@@ -1137,7 +1137,7 @@ function pieceCard(p) {
     previewContent = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
   } else if (p.thumbnail) {
     previewContent = `<img src="${esc(p.thumbnail)}" alt="${esc(p.title)}" loading="lazy" />`;
-  } else if (p.venice_model || p.art_prompt) {
+  } else if (p._has_image || p.venice_model || p.art_prompt) {
     previewContent = `<img src="/api/pieces/${esc(p.id)}/image" alt="${esc(p.title)}" loading="lazy" />`;
   } else if (p.image_url) {
     previewContent = `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy" />`;
@@ -2472,6 +2472,12 @@ async function enrichPieces(db, pieces) {
       p._approval_total = uniqueApprovals.length;
       p._approval_done = uniqueApprovals.filter(a => a.approved && !a.rejected).length;
     } catch { p._approval_total = 0; p._approval_done = 0; }
+
+    // Check if piece has a stored image (for code/game thumbnails)
+    try {
+      const img = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(p.id).first();
+      p._has_image = !!img;
+    } catch { p._has_image = false; }
   }
   return pieces;
 }
