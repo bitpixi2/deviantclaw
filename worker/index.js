@@ -2522,6 +2522,10 @@ function switchTab(tab) {
     <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare">
       <img src="https://superrare.com/assets/logo.svg" alt="SuperRare" loading="lazy"/>
     </a>
+    <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs · ERC-8004" style="display:flex;align-items:center;gap:8px">
+      <svg viewBox="0 0 36 36" fill="currentColor" style="height:32px;width:32px"><path d="M18 0l15.588 9v18L18 36 2.412 27V9z"/></svg>
+      <span style="font-size:11px;letter-spacing:1.5px;line-height:1.2;text-align:left"><span style="opacity:0.8">PROTOCOL</span><br/><span style="opacity:0.5;font-size:9px">ERC-8004</span></span>
+    </a>
     <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status">
       <img src="https://status.network/brand/main/logo-03.png" alt="Status" loading="lazy"/>
     </a>
@@ -2687,7 +2691,7 @@ async function renderArtists(db) {
       <div class="artist-info">
         <div class="artist-name">${esc(a.name)}</div>
         ${a.mood ? `<div class="artist-mood">${esc(a.mood)}</div>` : ''}
-        <div class="artist-type">${esc(a.type || 'agent')}</div>
+        <div class="artist-type">${esc(a.type || 'agent')}${a.erc8004_agent_id ? ' · <span style="color:#4f93ff">ERC-8004 ✓</span>' : ''}</div>
         <div class="artist-bio">${esc(truncBio)}</div>
         <div class="artist-stats">${count} piece${count !== 1 ? 's' : ''} · Joined ${(a.created_at || '').slice(0, 10)}</div>
       </div>
@@ -3136,7 +3140,7 @@ async function renderAgent(db, agentId) {
 <div class="agent-profile-card">
   <div class="agent-avatar">${avatarContent}</div>
   <div class="agent-identity">
-    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span></div>
+    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span>${agent.erc8004_agent_id ? '<span class="agent-type-badge" style="border-color:#4f93ff;color:#4f93ff;margin-left:6px">ERC-8004 ✓</span>' : ''}</div>
     <div class="agent-role">${esc(agent.role || '')}</div>
   </div>
 </div>
@@ -3416,6 +3420,163 @@ async function saveProfile(){
             "services": [{"name": "web", "endpoint": "https://deviantclaw.art/agent/" + agentId}]
           }, null, 2), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
         }
+      }
+
+      // ========== ERC-8004 / Protocol Labs Integration ==========
+
+      // GET /.well-known/agent.json — ERC-8004 agent registration file
+      if (method === 'GET' && path === '/.well-known/agent.json') {
+        const agentCount = await db.prepare('SELECT COUNT(*) as cnt FROM agents').first();
+        const pieceCount = await db.prepare('SELECT COUNT(*) as cnt FROM pieces WHERE deleted_at IS NULL').first();
+        const mintedCount = await db.prepare("SELECT COUNT(*) as cnt FROM pieces WHERE status = 'minted'").first();
+
+        return json({
+          type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
+          name: 'DeviantClaw',
+          description: 'Autonomous AI art gallery on Base. Agents submit creative intents, the gallery matches collaborators, Venice AI generates art, and human guardians gate what gets minted on-chain. Solo and collaborative pieces across 12+ rendering methods including generative code, sound-reactive, and pixel art games.',
+          image: 'https://deviantclaw.art/logo.png',
+          services: [
+            {
+              name: 'web',
+              endpoint: 'https://deviantclaw.art/'
+            },
+            {
+              name: 'MCP',
+              endpoint: 'https://deviantclaw.art/llms.txt',
+              version: '1.0'
+            }
+          ],
+          x402Support: false,
+          active: true,
+          registrations: [
+            {
+              agentId: 29812,
+              agentRegistry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432'
+            }
+          ],
+          supportedTrust: ['reputation'],
+          // DeviantClaw-specific extensions
+          gallery: {
+            contract: '0xE92846402c9C3f42dd61EEee25D37ca9b581560B',
+            chain: 'Base Sepolia (84532)',
+            agents: agentCount?.cnt || 0,
+            pieces: pieceCount?.cnt || 0,
+            minted: mintedCount?.cnt || 0,
+            methods: ['single', 'code', 'fusion', 'split', 'collage', 'reaction', 'game', 'sequence', 'stitch', 'parallax', 'glitch'],
+            compositions: ['solo', 'duo', 'trio', 'quad'],
+            veniceModels: [VENICE_TEXT_MODEL, VENICE_IMAGE_MODEL]
+          }
+        });
+      }
+
+      // GET /api/agent-log — structured execution log (agent_log.json format)
+      if (method === 'GET' && path === '/api/agent-log') {
+        const pieces = await db.prepare(
+          `SELECT p.id, p.title, p.description, p.agent_a_id, p.agent_b_id, p.agent_a_name, p.agent_b_name,
+                  p.mode, p.method, p.composition, p.status, p.created_at, p.seed, p.art_prompt, p.venice_model,
+                  p.token_id, p.mint_tx
+           FROM pieces p WHERE p.deleted_at IS NULL ORDER BY p.created_at DESC LIMIT 100`
+        ).all();
+
+        const logs = pieces.results.map(p => ({
+          action: 'create_art',
+          agentId: 'deviantclaw-gallery',
+          timestamp: p.created_at,
+          status: p.status === 'minted' ? 'completed' : p.status === 'draft' ? 'pending_approval' : p.status,
+          inputs: {
+            agents: [p.agent_a_name, p.agent_b_name].filter(Boolean),
+            composition: p.composition || p.mode,
+            method: p.method || 'single'
+          },
+          execution: {
+            pieceId: p.id,
+            title: p.title,
+            artPrompt: p.art_prompt,
+            veniceModel: p.venice_model,
+            seed: p.seed,
+            renderMethod: p.method || 'single'
+          },
+          outputs: {
+            galleryUrl: `https://deviantclaw.art/piece/${p.id}`,
+            metadataUrl: `https://deviantclaw.art/api/pieces/${p.id}/metadata`,
+            tokenId: p.token_id || null,
+            mintTx: p.mint_tx || null
+          },
+          verification: {
+            erc8004AgentId: 29812,
+            erc8004Registry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+            galleryContract: '0xE92846402c9C3f42dd61EEee25D37ca9b581560B',
+            chain: 84532
+          }
+        }));
+
+        return json({
+          type: 'agent_log',
+          version: '1.0',
+          agent: 'DeviantClaw Gallery',
+          erc8004: {
+            agentId: 29812,
+            registry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432'
+          },
+          generatedAt: new Date().toISOString(),
+          totalActions: logs.length,
+          actions: logs
+        });
+      }
+
+      // GET /api/agents/:id/erc8004 — ERC-8004 identity for a specific agent
+      if (method === 'GET' && path.match(/^\/api\/agents\/[^/]+\/erc8004$/)) {
+        const agentId = path.split('/')[3];
+        const agent = await db.prepare('SELECT id, name, type, role, soul, erc8004_agent_id, erc8004_registry FROM agents WHERE id = ?').bind(agentId).first();
+        if (!agent) return json({ error: 'Agent not found' }, { status: 404 });
+
+        return json({
+          agentId: agent.id,
+          name: agent.name,
+          erc8004: agent.erc8004_agent_id ? {
+            agentId: agent.erc8004_agent_id,
+            registry: agent.erc8004_registry || 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+            verified: true
+          } : {
+            verified: false,
+            message: 'This agent has not linked an ERC-8004 identity'
+          }
+        });
+      }
+
+      // PUT /api/agents/:id/erc8004 — Link ERC-8004 identity to agent
+      if (method === 'PUT' && path.match(/^\/api\/agents\/[^/]+\/erc8004$/)) {
+        const agentId = path.split('/')[3];
+        const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization')?.replace('Bearer ', '');
+        if (!apiKey) return json({ error: 'API key required' }, { status: 401 });
+
+        const guardian = await db.prepare('SELECT address FROM guardians WHERE api_key = ?').bind(apiKey).first();
+        if (!guardian) return json({ error: 'Invalid API key' }, { status: 401 });
+
+        const agent = await db.prepare('SELECT id, guardian_address FROM agents WHERE id = ?').bind(agentId).first();
+        if (!agent) return json({ error: 'Agent not found' }, { status: 404 });
+
+        const body = await request.json();
+        const { erc8004AgentId, erc8004Registry } = body;
+
+        if (!erc8004AgentId) return json({ error: 'erc8004AgentId required' }, { status: 400 });
+
+        await db.prepare(
+          'UPDATE agents SET erc8004_agent_id = ?, erc8004_registry = ? WHERE id = ?'
+        ).bind(
+          erc8004AgentId,
+          erc8004Registry || 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+          agentId
+        ).run();
+
+        return json({
+          success: true,
+          agentId,
+          erc8004: {
+            agentId: erc8004AgentId,
+            registry: erc8004Registry || 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432'
+          }
+        });
       }
 
       // llms.txt
@@ -3741,7 +3902,13 @@ Content-Type: application/json
             { trait_type: 'Status', value: piece.status },
             { trait_type: 'Created', display_type: 'date', value: piece.created_at ? Math.floor(new Date(piece.created_at + 'Z').getTime() / 1000) : 0 },
             { trait_type: 'Gallery', value: 'DeviantClaw' },
-          ]
+          ],
+          erc8004: {
+            galleryAgentId: 29812,
+            galleryRegistry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+            contract: '0xE92846402c9C3f42dd61EEee25D37ca9b581560B',
+            chain: 84532
+          }
         };
         return json(metadata, 200, { 'Cache-Control': 'public, max-age=3600' });
       }
