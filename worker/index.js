@@ -149,6 +149,7 @@ Rules:
 - Simple tile-based movement (8x8 or 16x16 tiles)
 - Include a title screen that fades into gameplay
 - MUST be under 800 lines. No images, no fetch, no external anything.
+- NEVER include text overlays, signatures, credits, titles, or artist names. The gallery handles all metadata. Art only.
 - Output ONLY the HTML. No markdown. No explanation.`,
     `Theme: "${title}"
 Characters:
@@ -162,11 +163,8 @@ Make a small explorable scene where these AI artists exist as pixel characters. 
   if (!clean.toLowerCase().includes('<!doctype') && !clean.toLowerCase().includes('<html')) {
     clean = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title></head><body>${clean}</body></html>`;
   }
-  // Inject signature
-  if (!clean.includes('sig')) {
-    const sig = `<div id="sig" style="position:fixed;bottom:8px;left:12px;z-index:99;pointer-events:none;opacity:0;transition:opacity 0.8s;font-family:'Courier New',monospace"><div style="font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:2px">${esc(title)}</div><div style="font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px">${artistLine} · deviantclaw · ${esc(date)}</div></div><script>setTimeout(()=>document.getElementById('sig').style.opacity='1',3000);</script>`;
-    clean = clean.replace('</body>', sig + '</body>');
-  }
+  // Strip any text overlays Venice may have generated (rule: no text on art)
+  clean = clean.replace(/<div[^>]*id=['"]sig['"][^>]*>[\s\S]*?<\/div>\s*(<\/div>\s*)*(<script>[\s\S]*?<\/script>)?/gi, '');
   return clean;
 }
 
@@ -499,6 +497,7 @@ Rules:
 - It should feel like two artistic voices colliding
 - Include subtle mouse/touch interactivity if it fits
 
+NEVER include text overlays, signatures, credits, titles, or artist names in the HTML. The gallery handles all metadata display. Art only — no text on the canvas.
 Output ONLY the complete HTML. No explanation. No markdown fences.`,
     `Two AI artists are collaborating:
 
@@ -519,15 +518,8 @@ Create a generative art piece that captures the collision between these two pers
     cleanCode = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0f;overflow:hidden}</style></head><body>${cleanCode}</body></html>`;
   }
 
-  // Inject signature if not present
-  if (!cleanCode.includes('sig')) {
-    const sigHTML = `<div id="sig" style="position:fixed;bottom:16px;left:20px;z-index:99;pointer-events:none;opacity:0;transition:opacity 0.8s;font-family:'Courier New',monospace">
-<div style="font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px">${esc(title)}</div>
-<div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px">${artistLine}</div>
-<div style="font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px">deviantclaw · ${esc(date)}</div>
-</div><script>setTimeout(()=>document.getElementById('sig').style.opacity='1',1500);</script>`;
-    cleanCode = cleanCode.replace('</body>', sigHTML + '</body>');
-  }
+  // Strip any text overlays Venice may have generated (rule: no text on art)
+  cleanCode = cleanCode.replace(/<div[^>]*id=['"]sig['"][^>]*>[\s\S]*?<\/div>\s*(<\/div>\s*)*(<script>[\s\S]*?<\/script>)?/gi, '');
 
   return cleanCode;
 }
