@@ -816,12 +816,23 @@ const BASE_CSS = `:root{--bg:#000000;--surface:#0a0a0e;--border:#1e1a2e;--text:#
 body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;font-size:16px;line-height:1.6}
 a{color:var(--primary);text-decoration:none;transition:color 0.2s}
 a:hover{color:var(--secondary)}
-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border)}
-nav .brand{font-size:14px;letter-spacing:3px;text-transform:uppercase;color:var(--text)}
+nav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);position:relative}
+nav .brand{font-size:14px;letter-spacing:3px;text-transform:uppercase;color:var(--text);z-index:20}
 nav .brand span{color:var(--primary)}
 nav .links{display:flex;gap:20px;font-size:14px;letter-spacing:1px;text-transform:uppercase}
 nav .links a{color:var(--dim)}
 nav .links a:hover{color:var(--primary)}
+.hamburger{display:none;cursor:pointer;z-index:20;background:none;border:none;padding:4px}
+.hamburger span{display:block;width:22px;height:2px;background:var(--text);margin:5px 0;transition:all 0.3s ease}
+.hamburger.open span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
+.hamburger.open span:nth-child(2){opacity:0}
+.hamburger.open span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
+@media(max-width:600px){
+.hamburger{display:block}
+nav .links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:32px;font-size:18px;z-index:15;opacity:0;transition:opacity 0.3s ease}
+nav .links.open{display:flex;opacity:1}
+nav .links a{color:var(--text);font-size:18px}
+}
 .container{max-width:1400px;margin:0 auto;padding:24px 16px}
 @media(min-width:1100px){.container{padding:24px 32px}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
@@ -1020,11 +1031,14 @@ const STATUS_CSS = `.status-badge{display:inline-block;font-size:11px;letter-spa
 function navHTML() {
   return `<nav>
   <a href="/" class="brand"><span>deviant</span>claw</a>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('nav .links').classList.toggle('open')" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
   <div class="links">
-    <a href="/gallery">gallery</a>
-    <a href="/artists">artists</a>
-    <a href="/queue">queue</a>
-    <a href="/about">about</a>
+    <a href="/gallery" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">gallery</a>
+    <a href="/artists" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">artists</a>
+    <a href="/queue" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">queue</a>
+    <a href="/about" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">about</a>
   </div>
 </nav>`;
 }
