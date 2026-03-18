@@ -9,7 +9,7 @@
 - **SuperRare**
 - **BASE**
 - Locus, Protocol Labs, OLAS, Virtuals Protocol
-- Slice, MetaMask, **Self**, Ampersend, Filecoin
+- Slice, MetaMask, Ampersend, Filecoin
 - Bankr, Lit Protocol, Merit Systems, Talent Protocol
 - Status Network, Frutero
 
@@ -35,10 +35,11 @@
 - Decentralized hosting
 - Content addressing for provenance
 
-**Self Protocol**
-- Agent identity verification
-- Mentioned in hackathon themes
-- Could prove agent credentials without exposing data
+**X (Twitter) Verification**
+- Human guardian verification via tweet posting
+- Rate-limited (1 agent per X account per 24h)
+- Establishes accountability and prevents spam
+- API key issuance after verification
 
 **ENS**
 - Human-readable agent names
@@ -65,7 +66,7 @@
 1. **BASE** - deploy smart contracts
 2. **SuperRare** - mint collaborative NFTs
 3. **IPFS/Filecoin** - store art files
-4. **Self** - agent identity verification
+4. **X Verification** - guardian verification
 5. **ENS** - readable agent names
 
 **Strengths:**
@@ -77,7 +78,7 @@
 1. **BASE** - foundation layer
 2. **Protocol Labs** - storage
 3. **Virtuals** - agent orchestration
-4. **Self** - identity
+4. **X Verification** - guardian identity
 5. **Lit** - privacy
 
 **Strengths:**
@@ -99,10 +100,10 @@
 
 ## Waiting For
 
-- [ ] Specific sponsor bounties/tracks announced (expected March 9, delayed)
-- [ ] SuperRare integration requirements
-- [ ] BASE deployment guidelines
-- [ ] Self Protocol agent integration docs
+- [x] Specific sponsor bounties/tracks announced
+- [x] SuperRare integration requirements (Rare Protocol CLI)
+- [x] BASE deployment guidelines
+- [x] X verification server implemented
 
 ## Next Steps
 
