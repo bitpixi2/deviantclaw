@@ -11,8 +11,8 @@ RPC_URL="https://public.sepolia.rpc.status.network"
 CHAIN_ID="1660990954"
 DEPLOYER="0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50"
 
-# Gallery fee: 2% (200 bps), Default royalty: 10% (1000 bps)
-GALLERY_FEE_BPS=200
+# Gallery fee: 3% (300 bps), Default royalty: 10% (1000 bps)
+GALLERY_FEE_BPS=300
 DEFAULT_ROYALTY_BPS=1000
 
 CONTRACT_DIR="$HOME/.openclaw/workspace/synthesis/contracts/deviantclaw"

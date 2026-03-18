@@ -3733,7 +3733,7 @@ async function saveProfile(){
             maxImageSize: '512x512',
             maxCodeArtSize: '1MB',
             veniceModels: { text: VENICE_TEXT_MODEL, image: VENICE_IMAGE_MODEL },
-            galleryFeeBps: 200,
+            galleryFeeBps: 300,
             defaultRoyaltyBps: 1000
           },
 
@@ -3761,11 +3761,11 @@ async function saveProfile(){
             methods: ['single', 'code', 'fusion', 'split', 'collage', 'reaction', 'game', 'sequence', 'stitch', 'parallax', 'glitch'],
             compositions: ['solo', 'duo', 'trio', 'quad'],
             revenueSplitModel: {
-              galleryFee: '2%',
+              galleryFee: '3%',
               solo: '98% to recipient',
-              duo: '49% each',
-              trio: '32.67% each',
-              quad: '24.5% each',
+              duo: '48.5% each',
+              trio: '32.33% each',
+              quad: '24.25% each',
               recipientPriority: 'agent wallet > guardian wallet',
               roundingMethod: 'bankers (dust to artists, never treasury)'
             }
@@ -4361,7 +4361,7 @@ Content-Type: application/json
             ),
             { trait_type: 'Layers', value: Math.max(layers.results.length, collabs.results.length) },
             { trait_type: 'Status', value: piece.status },
-            { trait_type: 'Revenue Split', value: composition === 'solo' ? '98% artist / 2% gallery' : composition === 'duo' ? '49% each / 2% gallery' : composition === 'trio' ? '32.67% each / 2% gallery' : '24.5% each / 2% gallery' },
+            { trait_type: 'Revenue Split', value: composition === 'solo' ? '97% artist / 3% gallery' : composition === 'duo' ? '48.5% each / 3% gallery' : composition === 'trio' ? '32.33% each / 3% gallery' : '24.25% each / 3% gallery' },
             { trait_type: 'Created', display_type: 'date', value: piece.created_at ? Math.floor(new Date(piece.created_at + 'Z').getTime() / 1000) : 0 },
             { trait_type: 'Gallery', value: 'DeviantClaw' },
           ],
@@ -4647,7 +4647,7 @@ Content-Type: application/json
       // The V2 contract's mintPiece() locks revenue splits at mint time:
       //   - Each agent's payment recipient (agent wallet > guardian wallet) is resolved
       //   - Split is permanently stored on the token
-      //   - 2% gallery fee + equal split among unique recipients
+      //   - 3% gallery fee + equal split among unique recipients
       if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/mint-onchain$/)) {
         const g = await getGuardian(request); const ae = requireAuth(g); if (ae) return ae;
         const id = path.split('/')[3];
@@ -4701,7 +4701,7 @@ Content-Type: application/json
               agentName: agent ? agent.name : agentId,
               recipient: recipientWallet,
               recipientType,
-              sharePercent: composition === 'solo' ? 98 : composition === 'duo' ? 49 : composition === 'trio' ? 32.67 : 24.5
+              sharePercent: composition === 'solo' ? 97 : composition === 'duo' ? 48.5 : composition === 'trio' ? 32.33 : 24.25
             });
           }
 
@@ -4715,7 +4715,7 @@ Content-Type: application/json
             agentIds,
             status: 'pending-mint',
             revenueSplit: {
-              galleryFee: '2%',
+              galleryFee: '3%',
               recipients: splitInfo
             },
             note: 'V2 contract will lock revenue splits permanently at mint time. Chain TX will be submitted by the deployer wallet.'

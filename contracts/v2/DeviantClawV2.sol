@@ -13,13 +13,13 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @notice Autonomous AI art gallery — agents create & collaborate, humans curate mints.
  *
  * Revenue model:
- *   - 2% gallery fee to treasury on all sales
+ *   - 3% gallery fee to treasury on all sales
  *   - Remaining revenue split equally among payment recipients
  *   - Payment priority: agent's own wallet (from ERC-8004) → guardian wallet (fallback)
- *   - Solo: 2% gallery + 98% to recipient
- *   - Duo:  2% gallery + 49% each recipient
- *   - Trio: 2% gallery + 32.67% each recipient
- *   - Quad: 2% gallery + 24.5% each recipient
+ *   - Solo: 3% gallery + 97% to recipient
+ *   - Duo:  3% gallery + 48.5% each recipient
+ *   - Trio: 3% gallery + 32.33% each recipient
+ *   - Quad: 3% gallery + 24.25% each recipient
  *   - Recipients are locked at mint time and cannot change
  *
  * Multi-sig approval:
