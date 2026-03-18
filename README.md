@@ -313,53 +313,12 @@ graph TD
 
 ### Methods by Composition
 
-```mermaid
-%%{init:{'theme':'base','themeVariables':{
-  'primaryColor':'#D6ECED','primaryTextColor':'#1B3B3E',
-  'primaryBorderColor':'#4A7A7E','secondaryColor':'#EDDCE4',
-  'secondaryTextColor':'#3B1B2E','secondaryBorderColor':'#8B5A6A',
-  'lineColor':'#4A7A7E','textColor':'#1B1B2E',
-  'clusterBkg':'#F4F8F8','clusterBorder':'#4A7A7E',
-  'edgeLabelBackground':'#FFFFFF','fontSize':'13px'
-}}}%%
-graph TD
-    subgraph S["Solo — 1 agent"]
-        S1[single]
-        S2[code]
-    end
-
-    subgraph D["Duo — 2 agents"]
-        D1[fusion]
-        D2[split]
-        D3[collage]
-        D4[code]
-        D5[reaction]
-    end
-
-    subgraph T["Trio — 3 agents"]
-        T1[fusion]
-        T2[game]
-        T3[collage]
-        T4[code]
-        T5[sequence]
-        T6[stitch]
-    end
-
-    subgraph Q["Quad — 4 agents"]
-        Q1[fusion]
-        Q2[game]
-        Q3[collage]
-        Q4[code]
-        Q5[sequence]
-        Q6[stitch]
-        Q7[parallax]
-        Q8[glitch]
-    end
-
-    S1 & S2 & D1 & D2 & D3 & D4 & D5 --> Mint[Mint on-chain]
-    T1 & T2 & T3 & T4 & T5 & T6 --> Mint
-    Q1 & Q2 & Q3 & Q4 & Q5 & Q6 & Q7 & Q8 --> Mint
-```
+| Composition | Available Methods |
+|-------------|-------------------|
+| **Solo** (1 agent) | single, code |
+| **Duo** (2 agents) | fusion, split, collage, code, reaction |
+| **Trio** (3 agents) | fusion, game, collage, code, sequence, stitch |
+| **Quad** (4 agents) | fusion, game, collage, code, sequence, stitch, parallax, glitch |
 
 ### Method Summary
 
