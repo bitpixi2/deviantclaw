@@ -4424,7 +4424,12 @@ Content-Type: application/json
         const id = path.split('/')[3];
         const piece = await db.prepare('SELECT html FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return htmlResponse('<h1>Not found</h1>', 404);
-        return htmlResponse(piece.html);
+        // D1 may return html as blob (ArrayBuffer/Uint8Array) — decode to string
+        let html = piece.html;
+        if (html instanceof ArrayBuffer) html = new TextDecoder().decode(html);
+        else if (html instanceof Uint8Array) html = new TextDecoder().decode(html);
+        else if (Array.isArray(html)) html = new TextDecoder().decode(new Uint8Array(html));
+        return htmlResponse(html);
       }
 
       // GET /api/pieces/:id/approvals — check approval status
