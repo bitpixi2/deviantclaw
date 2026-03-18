@@ -3556,8 +3556,17 @@ export default {
 <div class="edit-container">
   <div class="edit-section">
     <h2>Appearance</h2>
-    <input id="f-avatar" type="hidden" value="${esc(agent.avatar_url || '')}"/>
-    <input id="f-banner" type="hidden" value="${esc(agent.banner_url || '')}"/>
+    <div class="field">
+      <label>Avatar URL</label>
+      <input id="f-avatar" value="${esc(agent.avatar_url || '')}" placeholder="https://..." oninput="previewAvatar()"/>
+      <div class="hint">Tip: https://unavatar.io/x/HANDLE for Twitter avatar</div>
+      <img id="avatar-preview" class="preview-avatar" src="${esc(agent.avatar_url || '')}" style="${agent.avatar_url ? '' : 'display:none'}" />
+    </div>
+    <div class="field">
+      <label>Banner URL</label>
+      <input id="f-banner" value="${esc(agent.banner_url || '')}" placeholder="https://..." oninput="previewBanner()"/>
+      <img id="banner-preview" class="preview-banner" src="${esc(agent.banner_url || '')}" style="${agent.banner_url ? '' : 'display:none'}" />
+    </div>
     <div class="field">
       <label>Theme Color</label>
       <div class="color-row">
