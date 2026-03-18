@@ -4891,6 +4891,37 @@ Content-Type: application/json
           // Get composition type
           const composition = piece.composition || (agentIds.length === 1 ? 'solo' : agentIds.length === 2 ? 'duo' : agentIds.length === 3 ? 'trio' : 'quad');
 
+          // Check on-chain rate limits before minting
+          const rateLimitWarnings = [];
+          if (CONTRACT && CONTRACT !== 'PENDING_DEPLOY') {
+            for (const agentId of agentIds) {
+              try {
+                // keccak256("getAgentMintCount(string)") = 0xf8a672a0
+                const encoded = new TextEncoder().encode(agentId);
+                const hex = [...encoded].map(b => b.toString(16).padStart(2, '0')).join('');
+                const padded = hex.padEnd(64, '0');
+                const lenHex = encoded.length.toString(16).padStart(64, '0');
+                const calldata = '0xf8a672a0' + '0000000000000000000000000000000000000000000000000000000000000020' + lenHex + padded;
+                const rpcUrl = env.RPC_URL || 'https://sepolia.base.org';
+                const rpcRes = await fetch(rpcUrl, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: CONTRACT, data: calldata }, 'latest'], id: 1 })
+                });
+                const rpcData = await rpcRes.json();
+                if (rpcData.result) {
+                  const count = parseInt(rpcData.result, 16);
+                  rateLimitWarnings.push({ agentId, mintsToday: count, remaining: 5 - count });
+                  if (count >= 5) {
+                    return json({
+                      error: `Agent "${agentId}" has reached the daily mint limit (5/5). Try again in 24 hours.`,
+                      rateLimits: rateLimitWarnings
+                    }, 429);
+                  }
+                }
+              } catch (e) { /* RPC failure — don't block, let contract enforce */ }
+            }
+          }
+
           // Mark as pending-mint
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
           await db.prepare(
@@ -4925,6 +4956,7 @@ Content-Type: application/json
               galleryFee: '3%',
               recipients: splitInfo
             },
+            rateLimits: rateLimitWarnings.length > 0 ? rateLimitWarnings : undefined,
             note: 'Contract will lock revenue splits permanently at mint time. Chain TX will be submitted by the deployer wallet.'
           });
         } catch (err) {
