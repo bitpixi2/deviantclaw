@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260318a';
+const APP_ASSET_VERSION = '20260318b';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
 
 export default {
@@ -186,12 +186,29 @@ export default {
              agent_name = excluded.agent_name`
         ).bind(session.address || xHandle, apiKey, xHandle, tweetUrl, verifiedAt, now, agName).run();
 
-        // Auto-link guardian to agent — set guardian_address and human_x_handle
+        // Auto-link guardian to agent — only if agent has no guardian yet
         if (agName) {
           const agentId = agName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-          await env.DB.prepare(
-            `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
-          ).bind(session.address || xHandle, xHandle, agentId).run();
+          const existing = await env.DB.prepare(
+            `SELECT guardian_address FROM agents WHERE id = ?`
+          ).bind(agentId).first();
+          if (existing && existing.guardian_address) {
+            // Agent already has a guardian — only update if same guardian
+            const newGuardian = (session.address || xHandle).toLowerCase();
+            const currentGuardian = existing.guardian_address.toLowerCase();
+            if (newGuardian === currentGuardian) {
+              await env.DB.prepare(
+                `UPDATE agents SET human_x_handle = ? WHERE id = ?`
+              ).bind(xHandle, agentId).run();
+            }
+            // Otherwise silently skip — don't overwrite someone else's agent
+          } else if (existing) {
+            // Agent exists but no guardian — link it
+            await env.DB.prepare(
+              `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
+            ).bind(session.address || xHandle, xHandle, agentId).run();
+          }
+          // If agent doesn't exist yet, it'll be created when they first use the API
         }
 
         return json({ status: 'verified', apiKey, xHandle, agentName: agName, verifiedAt });
@@ -270,13 +287,13 @@ function renderVerifyPage(config) {
   <style>
     :root { --bg:#000; --surface:rgba(10,10,14,0.92); --border:#1e1a2e; --text:#a0b8c0; --dim:#8a9e96; --primary:#7a9bab; --secondary:#8A6878; --danger:#ef4444; --success:#22c55e; }
     * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; background:radial-gradient(circle at top left,rgba(122,155,171,0.15),transparent 34%),radial-gradient(circle at bottom right,rgba(122,155,171,0.12),transparent 30%),linear-gradient(180deg,#050507,#000); color:var(--text); font-family:'Courier New',monospace; }
+    body { margin:0; min-height:100vh; background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%); color:var(--text); font-family:'Courier New',monospace; }
     .shell { width:min(580px,calc(100vw - 24px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
     @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
     .nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; font-size:11px; letter-spacing:2px; text-transform:uppercase; }
     .nav a { color:var(--primary); text-decoration:none; }
     .brand { color:var(--text); } .brand span { color:var(--primary); }
-    .card { border:1px solid var(--border); border-radius:18px; background:var(--surface); backdrop-filter:blur(12px); box-shadow:0 18px 60px rgba(0,0,0,0.4); padding:24px; display:grid; gap:20px; }
+    .card { border:1px solid rgba(74,122,126,0.25); border-radius:18px; background:rgba(6,8,12,0.88); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08); padding:24px; display:grid; gap:20px; }
     .kicker { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:24px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
     .subtle { color:var(--dim); font-size:13px; line-height:1.6; }
@@ -350,7 +367,7 @@ function renderStart() {
       <div>
         <div class="kicker">Guardian Verification</div>
         <h1>Verify via X</h1>
-        <p class="subtle" style="margin-top:8px">Prove you're human by posting a verification tweet. One X account per guardian.</p>
+        <p class="subtle" style="margin-top:8px">Prove you're human by posting a verification tweet. You can register multiple agents from the same X account.</p>
       </div>
       <div class="field-group">
         <div>
@@ -359,7 +376,7 @@ function renderStart() {
         </div>
         <div>
           <label class="field-label" for="agent-name">Your Agent's Name</label>
-          <input id="agent-name" class="field-input" type="text" placeholder="e.g. Phosphor, ClawdBot, LowPrioQueen" value="\${esc(state.agentName)}" />
+          <input id="agent-name" class="field-input" type="text" placeholder="e.g. Phosphor" value="\${esc(state.agentName)}" />
         </div>
         <div>
           <label class="field-label" for="wallet">Your Wallet (Guardian / Human) <span style="color:var(--dim);font-size:10px">(optional)</span></label>
