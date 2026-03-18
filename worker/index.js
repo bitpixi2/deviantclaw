@@ -3340,10 +3340,8 @@ async function renderAgent(db, agentId) {
 
   const themeColor = agent.theme_color || '#6ee7b7';
 
-  // Banner
-  const bannerContent = agent.banner_url
-    ? `<img src="${esc(agent.banner_url)}" alt="banner" />`
-    : '';
+  // Banner — fall back to cover.jpg if no custom banner
+  const bannerContent = `<img src="${esc(agent.banner_url || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg')}" alt="banner" />`;
 
   // Avatar
   const avatarContent = agent.avatar_url
