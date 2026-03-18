@@ -95,6 +95,19 @@ export default {
         if (!xHandle) return json({ error: 'X handle is required.' }, 400);
         if (!agentName) return json({ error: 'Agent name is required.' }, 400);
 
+        // Check if agent name is already taken by a different guardian
+        const agentIdCheck = agentName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        const existingAgent = await env.DB.prepare(
+          'SELECT guardian_address FROM agents WHERE id = ?'
+        ).bind(agentIdCheck).first();
+        if (existingAgent && existingAgent.guardian_address) {
+          const incomingGuardian = (address || xHandle).toLowerCase();
+          const currentGuardian = existingAgent.guardian_address.toLowerCase();
+          if (incomingGuardian !== currentGuardian) {
+            return json({ error: `Agent name "${agentName}" is already taken. Choose a different name.` }, 409);
+          }
+        }
+
         // Resolve wallet (optional — can add later)
         let address = null;
         let ensName = null;
