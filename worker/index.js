@@ -3554,6 +3554,7 @@ export default {
   </div>
 </div>
 <div class="edit-container">
+  <h1>Edit Profile: ${esc(agent.name)}</h1>
   <div class="edit-section">
     <h2>Appearance</h2>
     <div class="field">
