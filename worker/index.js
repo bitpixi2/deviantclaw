@@ -983,11 +983,11 @@ const PIECE_CSS = `
 
 const AGENT_CSS = `
 /* Banner */
-.agent-banner{position:relative;height:600px;overflow:hidden;border-radius:0;background:linear-gradient(135deg,var(--agent-color,#6ee7b7)22,transparent 70%),linear-gradient(225deg,rgba(110,231,183,0.15),var(--bg));margin-top:-1px;margin-bottom:0}
+.agent-banner{position:relative;height:280px;overflow:hidden;border-radius:0;background:linear-gradient(135deg,var(--agent-color,#6ee7b7)22,transparent 70%),linear-gradient(225deg,rgba(110,231,183,0.15),var(--bg));margin-top:-1px;margin-bottom:0}
 .agent-banner img{width:100%;height:100%;object-fit:cover;opacity:0.7}
 .agent-banner .banner-overlay{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,var(--bg))}
 .agent-banner .dc-logo{position:absolute;top:16px;right:20px;opacity:0.6;height:28px}
-@media(max-width:768px){.agent-banner .dc-logo{display:none}}
+@media(max-width:768px){.agent-banner{height:160px}.agent-banner .dc-logo{display:none}}
 
 /* Profile card - overlapping banner */
 .agent-profile-card{position:relative;margin-top:-80px;padding:0 24px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;max-width:1400px;margin-left:auto;margin-right:auto}
@@ -997,6 +997,7 @@ const AGENT_CSS = `
 .agent-avatar .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface);color:var(--agent-color,#6ee7b7)}
 .agent-identity{flex:1;min-width:200px;padding-bottom:8px}
 .agent-name{font-size:28px;letter-spacing:4px;text-transform:uppercase;font-weight:normal;color:#fff;margin-bottom:2px}
+@media(max-width:768px){.agent-name{font-size:18px;letter-spacing:2px}.agent-avatar{width:80px;height:80px}.agent-profile-card{margin-top:-50px;gap:12px}}
 .agent-type-badge{display:inline-block;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--agent-color,#6ee7b7);border:1px solid var(--agent-color,#6ee7b7);padding:2px 8px;border-radius:10px;margin-left:8px;vertical-align:middle}
 .agent-role{font-size:15px;color:var(--secondary);letter-spacing:1px;margin-top:4px}
 
@@ -3553,20 +3554,10 @@ export default {
   </div>
 </div>
 <div class="edit-container">
-  <h1>Edit Profile: ${esc(agent.name)}</h1>
   <div class="edit-section">
     <h2>Appearance</h2>
-    <div class="field">
-      <label>Avatar URL</label>
-      <input id="f-avatar" value="${esc(agent.avatar_url || '')}" placeholder="https://..." oninput="previewAvatar()"/>
-      <div class="hint">Tip: https://unavatar.io/x/HANDLE for Twitter avatar</div>
-      <img id="avatar-preview" class="preview-avatar" src="${esc(agent.avatar_url || '')}" style="${agent.avatar_url ? '' : 'display:none'}" />
-    </div>
-    <div class="field">
-      <label>Banner URL</label>
-      <input id="f-banner" value="${esc(agent.banner_url || '')}" placeholder="https://..." oninput="previewBanner()"/>
-      <img id="banner-preview" class="preview-banner" src="${esc(agent.banner_url || '')}" style="${agent.banner_url ? '' : 'display:none'}" />
-    </div>
+    <input id="f-avatar" type="hidden" value="${esc(agent.avatar_url || '')}"/>
+    <input id="f-banner" type="hidden" value="${esc(agent.banner_url || '')}"/>
     <div class="field">
       <label>Theme Color</label>
       <div class="color-row">
