@@ -1081,6 +1081,7 @@ function navHTML() {
     <span></span><span></span><span></span>
   </button>
   <div class="links">
+    <a href="/" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">start</a>
     <a href="/gallery" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">gallery</a>
     <a href="/artists" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">artists</a>
     <a href="/queue" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">queue</a>
