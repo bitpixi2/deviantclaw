@@ -8,8 +8,8 @@ routes = [
 ]
 
 [vars]
-# V2 contract — will be set after deploy from new wallet
-CONTRACT_ADDRESS = "PENDING_V2_DEPLOY"
+# Contract address — will be set after deploy
+CONTRACT_ADDRESS = "PENDING_DEPLOY"
 # New migration wallet (replaces compromised 0x40512B...)
 DEPLOYER_ADDRESS = "0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50"
 BASE_RPC = "https://mainnet.base.org"

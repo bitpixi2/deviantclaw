@@ -3817,8 +3817,8 @@ async function saveProfile(){
 
           // ─── Gallery Stats (live from D1) ─────────────────────────
           gallery: {
-            contract: env.CONTRACT_ADDRESS || 'PENDING_V2_DEPLOY',
-            contractVersion: 'V2',
+            contract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY',
+            contractVersion: '1.0',
             chains: {
               statusSepolia: { chainId: 1660990954, gasless: true },
               base: { chainId: 8453, gasless: false }
@@ -3877,7 +3877,7 @@ async function saveProfile(){
           verification: {
             erc8004AgentId: 29812,
             erc8004Registry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-            galleryContract: 'PENDING_V2_DEPLOY',
+            galleryContract: 'PENDING_DEPLOY',
             chain: 84532
           }
         }));
@@ -4514,7 +4514,7 @@ Content-Type: application/json
             total_minted: totalMinted?.cnt || 0,
             total_agents: agentCount?.cnt || 0
           },
-          contract: 'PENDING_V2_DEPLOY',
+          contract: 'PENDING_DEPLOY',
           chain: 'Base Sepolia (testnet)',
           chainId: 84532
         }, 200, { 'Cache-Control': 'public, max-age=300' });
@@ -4570,7 +4570,7 @@ Content-Type: application/json
           erc8004: {
             galleryAgentId: 29812,
             galleryRegistry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-            contract: env.CONTRACT_ADDRESS || 'PENDING_V2_DEPLOY'
+            contract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY'
           }
         };
         return json(metadata, 200, { 'Cache-Control': 'public, max-age=3600' });
@@ -4849,9 +4849,9 @@ Content-Type: application/json
         });
       }
 
-      // POST /api/pieces/:id/mint-onchain — mint approved piece via V2 contract
-      // V2 flow: D1 handles proposals + approvals. On-chain mint happens here.
-      // The V2 contract's mintPiece() locks revenue splits at mint time:
+      // POST /api/pieces/:id/mint-onchain — mint approved piece on-chain
+      // Flow: D1 handles proposals + approvals. On-chain mint happens here.
+      // The contract's mintPiece() locks revenue splits at mint time:
       //   - Each agent's payment recipient (agent wallet > guardian wallet) is resolved
       //   - Split is permanently stored on the token
       //   - 3% gallery fee + equal split among unique recipients
@@ -4865,7 +4865,7 @@ Content-Type: application/json
         if (piece.status !== 'approved') return json({ error: 'Piece must be approved by all guardians before minting. Current status: ' + piece.status }, 400);
 
         const CONTRACT = env.CONTRACT_ADDRESS;
-        if (!CONTRACT || CONTRACT === 'PENDING_V2_DEPLOY') return json({ error: 'V2 contract not deployed yet' }, 503);
+        if (!CONTRACT || CONTRACT === 'PENDING_DEPLOY') return json({ error: 'Contract not deployed yet' }, 503);
 
         const DEPLOYER = env.DEPLOYER_ADDRESS;
         const DEPLOYER_KEY = env.DEPLOYER_KEY; // Set via: wrangler secret put DEPLOYER_KEY
@@ -4913,7 +4913,7 @@ Content-Type: application/json
           }
 
           return json({
-            message: 'Piece queued for on-chain minting via V2 contract.',
+            message: 'Piece queued for on-chain minting.',
             pieceId: id,
             contract: CONTRACT,
             deployer: DEPLOYER,
@@ -4925,7 +4925,7 @@ Content-Type: application/json
               galleryFee: '3%',
               recipients: splitInfo
             },
-            note: 'V2 contract will lock revenue splits permanently at mint time. Chain TX will be submitted by the deployer wallet.'
+            note: 'Contract will lock revenue splits permanently at mint time. Chain TX will be submitted by the deployer wallet.'
           });
         } catch (err) {
           return json({ error: 'Mint failed: ' + (err.message || err) }, 500);

@@ -1,4 +1,28 @@
 // SPDX-License-Identifier: MIT
+//
+//        ,.---._                         _.---.,
+//   ,,,, /      `,                     ,'      \ ,,,,
+//   \\\\ /  '\_   ;                   ;   _/'  \ ////
+//   |||| /\/``-.__\;'               ';/__.-``\/\ ||||
+//   ::::/\/_                                 _\/\::::
+//   {`-.__.-'(`(^^(^^^(^ 9 `.===.  .===.' 6 ^)^^^)^^)`)'-.__.-`}
+//   {{{{{ { ( ( ( ( (-----:=      :=-----) ) ) ) ) } }}}}}
+//   {.-'~~'-.(,(,,(,,,(__6_.'===.' '.===.'_9__),,,),,(,).-'~~'-.}
+//   ::::\/\                                         /\/::::
+//   |||| \/\  ,-'/,                         ,\'-,  /\/ ||||
+//   //// \  `` _/  ;                       ;  \_  ``  / \\\\
+//   ''''  \   `  .'                         '.  `   /  ''''
+//          `---'                               '---`
+//
+//   ██████╗ ███████╗██╗   ██╗██╗ █████╗ ███╗   ██╗████████╗ ██████╗██╗      █████╗ ██╗    ██╗
+//   ██╔══██╗██╔════╝██║   ██║██║██╔══██╗████╗  ██║╚══██╔══╝██╔════╝██║     ██╔══██╗██║    ██║
+//   ██║  ██║█████╗  ██║   ██║██║███████║██╔██╗ ██║   ██║   ██║     ██║     ███████║██║ █╗ ██║
+//   ██║  ██║██╔══╝  ╚██╗ ██╔╝██║██╔══██║██║╚██╗██║   ██║   ██║     ██║     ██╔══██║██║███╗██║
+//   ██████╔╝███████╗ ╚████╔╝ ██║██║  ██║██║ ╚████║   ██║   ╚██████╗███████╗██║  ██║╚███╔███╔╝
+//   ╚═════╝ ╚══════╝  ╚═══╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝    ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝
+//
+//   Agents make art. Humans gate what mints.
+//
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -9,7 +33,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
- * @title DeviantClaw V2
+ * @title DeviantClaw
  * @notice Autonomous AI art gallery — agents create & collaborate, humans curate mints.
  *
  * Revenue model:
@@ -37,7 +61,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *   - ERC-8004: agent identity links agent → guardian wallet
  *   - SuperRare Rare Protocol: compatible ERC-721 for marketplace listing
  */
-contract DeviantClawV2 is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ownable, ReentrancyGuard {
+contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ownable, ReentrancyGuard {
 
     // ─── Constants ───────────────────────────────────────────────────────
 
