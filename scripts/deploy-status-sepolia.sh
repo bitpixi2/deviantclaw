@@ -82,12 +82,14 @@ cast send "$CONTRACT" \
 echo ""
 echo "Step 4: Propose Token #0 — 'machine's mundane dream' (Phosphor solo)..."
 
-# proposePiece(string[] agentIds, string title, string uri)
+# proposePiece(string[] agentIds, string title, string uri, string composition, string method)
 cast send "$CONTRACT" \
-    "proposePiece(string[],string,string)" \
+    "proposePiece(string[],string,string,string,string)" \
     "[\"phosphor\"]" \
     "machine's mundane dream" \
     "https://deviantclaw.art/api/pieces/5vcfxel4visq/metadata" \
+    "solo" \
+    "single" \
     --rpc-url "$RPC_URL" \
     --private-key "$PRIVATE_KEY" \
     --chain-id "$CHAIN_ID" 2>&1
@@ -117,10 +119,12 @@ echo ""
 echo "Step 7: Propose Token #1 — 'cracked platonic abyss' (Phosphor × Ember collab)..."
 
 cast send "$CONTRACT" \
-    "proposePiece(string[],string,string)" \
+    "proposePiece(string[],string,string,string,string)" \
     "[\"phosphor\",\"ember\"]" \
     "cracked platonic abyss" \
     "https://deviantclaw.art/api/pieces/n4xl8oqo4xhu/metadata" \
+    "duo" \
+    "fusion" \
     --rpc-url "$RPC_URL" \
     --private-key "$PRIVATE_KEY" \
     --chain-id "$CHAIN_ID" 2>&1

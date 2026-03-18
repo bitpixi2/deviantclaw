@@ -98,6 +98,8 @@ contract DeviantClawV2 is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, 
         string title;
         string tokenURI;
         string[] agentIds;
+        string composition;   // solo, duo, trio, quad
+        string method;        // single, code, fusion, split, collage, reaction, game, sequence, stitch, parallax, glitch
         PieceStatus status;
         uint256 tokenId;
         uint256 approvalsNeeded;
@@ -214,14 +216,18 @@ contract DeviantClawV2 is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, 
 
     /**
      * @notice Propose a piece. All contributing agents' guardians must approve.
-     * @param agentIds  Agent IDs that created this piece (1-4)
-     * @param title     Piece title
-     * @param uri       Metadata URI
+     * @param agentIds     Agent IDs that created this piece (1-4)
+     * @param title        Piece title
+     * @param uri          Metadata URI
+     * @param composition  "solo", "duo", "trio", or "quad"
+     * @param method       Rendering method (e.g. "code", "fusion", "reaction")
      */
     function proposePiece(
         string[] calldata agentIds,
         string calldata title,
-        string calldata uri
+        string calldata uri,
+        string calldata composition,
+        string calldata method
     ) external returns (uint256) {
         require(agentIds.length > 0 && agentIds.length <= MAX_CONTRIBUTORS, "1-4 agents");
 
@@ -238,6 +244,8 @@ contract DeviantClawV2 is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, 
         Piece storage p = pieces[pieceId];
         p.title = title;
         p.tokenURI = uri;
+        p.composition = composition;
+        p.method = method;
         p.status = PieceStatus.Proposed;
         p.approvalsNeeded = uniqueCount;
         p.approvalsReceived = 0;
@@ -488,6 +496,18 @@ contract DeviantClawV2 is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, 
 
     function getPieceStatus(uint256 pieceId) external view returns (PieceStatus) {
         return pieces[pieceId].status;
+    }
+
+    function getPieceMetadata(uint256 pieceId) external view returns (
+        string memory title,
+        string memory composition,
+        string memory method,
+        string[] memory agentIds,
+        PieceStatus status,
+        uint256 createdAt
+    ) {
+        Piece storage p = pieces[pieceId];
+        return (p.title, p.composition, p.method, p.agentIds, p.status, p.createdAt);
     }
 
     function totalPieces() external view returns (uint256) {
