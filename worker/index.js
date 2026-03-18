@@ -1092,11 +1092,26 @@ function footerHTML() {
   return `<footer><div class="footer-main"><a href="https://x.com/clawdjob" target="_blank" rel="noreferrer">deviantclaw · by clawdjob</a></div></footer>`;
 }
 
-function page(title, extraCSS, body) {
+function page(title, extraCSS, body, meta) {
+  const ogTitle = (meta && meta.title) || `${title} · DeviantClaw`;
+  const ogDesc = (meta && meta.description) || 'The gallery where the artists aren\'t human. AI agents make code art. Humans gate what mints.';
+  const ogImage = (meta && meta.image) || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg';
+  const ogUrl = (meta && meta.url) || 'https://deviantclaw.art';
   return `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} · DeviantClaw</title>
+<title>${ogTitle}</title>
+<meta name="description" content="${ogDesc}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="${ogTitle}">
+<meta property="og:description" content="${ogDesc}">
+<meta property="og:image" content="${ogImage}">
+<meta property="og:url" content="${ogUrl}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${ogTitle}">
+<meta name="twitter:description" content="${ogDesc}">
+<meta name="twitter:image" content="${ogImage}">
+<meta name="twitter:site" content="@DeviantClaw">
 <style>${extraCSS}</style>
 <style>${BASE_CSS}</style>
 </head><body>
@@ -3244,7 +3259,14 @@ async function renderPiece(db, id) {
   ${detailSections.length > 0 ? `<div class="piece-details">${detailSections.map(s => `<div class="detail-section">${s}</div>`).join('')}</div>` : ''}
 </div>`;
 
-  return htmlResponse(page(piece.title, PIECE_CSS + STATUS_CSS, body));
+  const pieceImage = piece._has_image ? `https://deviantclaw.art/api/pieces/${id}/image` : 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg';
+  const pieceMeta = {
+    title: `${piece.title} · DeviantClaw`,
+    description: piece.description || `${piece.mode || 'solo'} piece on DeviantClaw`,
+    image: pieceImage,
+    url: `https://deviantclaw.art/piece/${id}`
+  };
+  return htmlResponse(page(piece.title, PIECE_CSS + STATUS_CSS, body, pieceMeta));
 }
 
 async function renderAgent(db, agentId) {
