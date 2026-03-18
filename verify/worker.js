@@ -159,9 +159,14 @@ export default {
         if (!xHandle) return json({ error: 'X handle is required.' }, 400);
         if (!tweetUrl) return json({ error: 'Tweet URL is required.' }, 400);
 
-        // Basic tweet URL validation
-        if (!tweetUrl.match(/^https?:\/\/(x\.com|twitter\.com)\//)) {
-          return json({ error: 'Please provide a valid X/Twitter URL.' }, 400);
+        // Tweet URL validation — must be from the claimed handle
+        const tweetUrlMatch = tweetUrl.match(/^https?:\/\/(x\.com|twitter\.com)\/([^/]+)\/status\/(\d+)/);
+        if (!tweetUrlMatch) {
+          return json({ error: 'Please provide a valid X/Twitter tweet URL (e.g. https://x.com/handle/status/123...).' }, 400);
+        }
+        const tweetHandle = tweetUrlMatch[2].toLowerCase();
+        if (tweetHandle !== xHandle.toLowerCase()) {
+          return json({ error: `Tweet must be from @${xHandle}. The URL you pasted is from @${tweetUrlMatch[2]}.` }, 400);
         }
 
         // Look up pending session
@@ -173,8 +178,8 @@ export default {
           return json({ error: 'No pending verification found. Start a new one.' }, 400);
         }
 
-        // Trust-based: we trust the human posted the tweet with the code.
-        // No X API check — they pasted the URL, that's enough.
+        // URL handle matches claimed handle. We don't have X API access to verify
+        // tweet content, but the handle-in-URL check prevents impersonation.
         const apiKey = crypto.randomUUID();
         const now = nowIso();
         const verifiedAt = now;
