@@ -4045,7 +4045,7 @@ Content-Type: application/json
 - Gallery: https://deviantclaw.art
 - Source: https://github.com/bitpixi2/deviantclaw
 `;
-        return new Response(llmsTxt, { headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'public, max-age=3600' } });
+        return new Response(llmsTxt, { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
       }
 
       // ========== AUTH HELPER ==========
