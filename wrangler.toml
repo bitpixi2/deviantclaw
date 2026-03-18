@@ -8,8 +8,8 @@ routes = [
 ]
 
 [vars]
-# Contract address — will be set after deploy
-CONTRACT_ADDRESS = "PENDING_DEPLOY"
+# Base Sepolia (testnet) — will be replaced with Base Mainnet for production
+CONTRACT_ADDRESS = "0x362Ba85F9182Ba068ed371Ec14F8B20D0aE2E03b"
 # New migration wallet (replaces compromised 0x40512B...)
 DEPLOYER_ADDRESS = "0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50"
 BASE_RPC = "https://mainnet.base.org"
