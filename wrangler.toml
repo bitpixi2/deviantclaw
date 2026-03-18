@@ -8,9 +8,12 @@ routes = [
 ]
 
 [vars]
-CONTRACT_ADDRESS = "0xE92846402c9C3f42dd61EEee25D37ca9b581560B"
-DEPLOYER_ADDRESS = "0x40512B39495bF8Af98a3084b97867Ca4CbcC4cF2"
-BASE_SEPOLIA_RPC = "https://sepolia.base.org"
+# V2 contract — will be set after deploy from new wallet
+CONTRACT_ADDRESS = "PENDING_V2_DEPLOY"
+# New migration wallet (replaces compromised 0x40512B...)
+DEPLOYER_ADDRESS = "0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50"
+BASE_RPC = "https://mainnet.base.org"
+STATUS_SEPOLIA_RPC = "https://public.sepolia.rpc.status.network"
 
 [[d1_databases]]
 binding = "DB"

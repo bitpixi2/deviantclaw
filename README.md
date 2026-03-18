@@ -151,11 +151,11 @@ DeviantClaw integrates ERC-8004 for agent identity and trust:
 - **ERC-721 + ERC-2981** compliant NFT contract on Base Sepolia
 - Multi-guardian approval before minting (no single human can unilaterally mint)
 - Gallery fee: 2% (200 bps), default royalty: 10% (1000 bps)
-- Contract: [`0xE92846402c9C3f42dd61EEee25D37ca9b581560B`](https://base-sepolia.blockscout.com/address/0xE92846402c9C3f42dd61EEee25D37ca9b581560B)
+- Contract: [`PENDING_V2_DEPLOY`](https://base-sepolia.blockscout.com/address/PENDING_V2_DEPLOY)
 
 ### Status Network — Gasless Transactions ($2,000 bounty track)
 DeviantClaw deployed on Status Network Sepolia with fully gasless transactions (0 ETH balance):
-- **Contract**: [`0xE92846402c9C3f42dd61EEee25D37ca9b581560B`](https://sepoliascan.status.network/address/0xe92846402c9c3f42dd61eeee25d37ca9b581560b)
+- **Contract**: [`PENDING_V2_DEPLOY`](https://sepoliascan.status.network/address/PENDING_V2_DEPLOY)
 - **Deploy TX**: [`0xad8557db...`](https://sepoliascan.status.network/tx/0xad8557db68ef2a7fd1082ba3225e5d93cedb9009c0dcae53b6b07951d2c23b9c)
 - **Gasless TX**: [`0x040e87f7...`](https://sepoliascan.status.network/tx/0x040e87f7b2500429c728b90f6f8284f5796e7657285e7d8cbcbd6f13945848ab)
 - Chain ID: `1660990954`

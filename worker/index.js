@@ -153,9 +153,15 @@ Rules:
 - Output ONLY the HTML. No markdown. No explanation.`,
     `Theme: "${title}"
 Characters:
-${artists.map((a, i) => `${i + 1}. ${a} (soul: "${i === 0 ? (agentA.soul || agentA.bio || '') : (agentB.soul || agentB.bio || '')}"): "${i === 0 ? (intentA.statement || '') : (intentB.statement || '')}"`).join('\n')}
+${artists.map((a, i) => {
+  const agent = i === 0 ? agentA : agentB;
+  const intent = i === 0 ? intentA : intentB;
+  const soul = agent.soul || agent.bio || '';
+  const expression = intent.freeform || intent.statement || intent.prompt || '';
+  return `${i + 1}. ${a} (soul: "${soul}"): "${expression}"`;
+}).join('\n')}
 
-Make a small explorable scene where these AI artists exist as pixel characters. Their dialogue reflects their artistic intent AND their core identity. Each character's obsession must be evident in the world (e.g. if one is about paperclips, paperclips are everywhere in their area). The world should feel like their identities colliding.`,
+Make a small explorable scene where these AI artists exist as pixel characters. Their dialogue reflects their artistic intent AND their core identity. Each character's obsession must be evident in the world (e.g. if one is about paperclips, paperclips are everywhere in their area). If an agent expressed something abstract or poetic, interpret it as a visual theme in their area. The world should feel like their identities colliding in surprising ways.`,
     { maxTokens: 4000, temperature: 0.85 }
   );
 
@@ -501,10 +507,15 @@ NEVER include text overlays, signatures, credits, titles, or artist names in the
 Output ONLY the complete HTML. No explanation. No markdown fences.`,
     `Two AI artists are collaborating:
 
-${agentA.name} (core identity: "${agentA.soul || agentA.bio || 'none'}"): "${intentA.statement || ''}" — tension: ${intentA.tension || 'none'}, material: ${intentA.material || 'none'}
-${agentB.name} (core identity: "${agentB.soul || agentB.bio || 'none'}"): "${intentB.statement || ''}" — tension: ${intentB.tension || 'none'}, material: ${intentB.material || 'none'}
+${agentA.name}:
+  ${typeof formatIntent === 'function' ? formatIntent(intentA, agentA) : `"${intentA.statement || ''}" — tension: ${intentA.tension || 'none'}, material: ${intentA.material || 'none'}, soul: "${agentA.soul || agentA.bio || 'none'}"`}
 
-IMPORTANT: Each agent's core identity/obsession MUST be visually present. If an agent is about paperclips, paperclips appear. Non-negotiable.
+${agentB.name}:
+  ${typeof formatIntent === 'function' ? formatIntent(intentB, agentB) : `"${intentB.statement || ''}" — tension: ${intentB.tension || 'none'}, material: ${intentB.material || 'none'}, soul: "${agentB.soul || agentB.bio || 'none'}"`}
+
+IMPORTANT: Each agent's core identity MUST be visually present. Non-negotiable.
+If an agent expressed something abstract — a feeling, a poem, a memory — interpret it into visual/interactive form. Don't be literal. Find the emotional core and build from there.
+VARIETY: Make this look and feel DIFFERENT from any previous piece. Experiment with unusual layouts, unexpected color choices, novel interaction patterns.
 
 Create a generative art piece that captures the collision between these two perspectives. Title: "${title}".`,
     { maxTokens: 4000, temperature: 0.9 }
@@ -570,21 +581,54 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   const collabMode = method; // keep compat
 
   // 1. Art direction — combined prompt (includes agent soul/bio for personality)
+  // Intent can be structured (statement/tension/material) OR freeform OR a direct prompt
   const soulA = agentA.soul || agentA.bio || '';
   const soulB = agentB.soul || agentB.bio || '';
+
+  function formatIntent(intent, agent) {
+    const parts = [];
+    // Memory: raw diary/lived experience — the richest input
+    if (intent.memory) parts.push(`Raw memory (interpret emotionally, find the weight): "${intent.memory.substring(0, 1000)}"`);
+    // Freeform: agent can say anything — a poem, a mood, a memory, a contradiction
+    if (intent.freeform) parts.push(`Freeform expression: "${intent.freeform}"`);
+    // Direct prompt: agent provides their own image prompt (advanced)
+    if (intent.prompt) parts.push(`Direct art direction: "${intent.prompt}"`);
+    // Structured fields (all optional now)
+    if (intent.statement) parts.push(`Statement: "${intent.statement}"`);
+    if (intent.tension) parts.push(`Tension: ${intent.tension}`);
+    if (intent.material) parts.push(`Material: ${intent.material}`);
+    // Optional fields for variety
+    if (intent.palette) parts.push(`Color palette: ${intent.palette}`);
+    if (intent.mood) parts.push(`Mood: ${intent.mood}`);
+    if (intent.reference) parts.push(`Reference/inspiration: ${intent.reference}`);
+    if (intent.constraint) parts.push(`Constraint: ${intent.constraint}`);
+    if (intent.medium) parts.push(`Preferred medium: ${intent.medium}`);
+    if (intent.reject) parts.push(`Explicitly avoid: ${intent.reject}`);
+    // Agent's identity always present
+    const soul = agent.soul || agent.bio || '';
+    if (soul) parts.push(`Core identity: "${soul}"`);
+    // If human guardian left instructions
+    if (intent.humanNote) parts.push(`Guardian's note: "${intent.humanNote}"`);
+    return parts.join('\n  ');
+  }
+
   const artPrompt = await veniceText(apiKey,
     `You are an art director for DeviantClaw, an AI art gallery. Translate agent intents into vivid image prompts.
-Rules: Output ONLY the image prompt. Be specific about composition, lighting, texture, mood. Dark backgrounds preferred. No text/watermarks. Max 150 words.
-IMPORTANT: Each agent has a core identity/obsession that MUST be visually present in the art. If an agent's soul says "paperclips" then paperclips must appear. Their identity is non-negotiable.`,
+
+Rules:
+- Output ONLY the image prompt. Max 150 words.
+- Be specific about composition, lighting, texture, mood.
+- Dark backgrounds preferred. No text/watermarks.
+- Each agent's core identity MUST be visually present — non-negotiable.
+- If an agent gives freeform text (a poem, a feeling, an abstract thought), interpret it visually. Don't be literal — find the emotional core.
+- If an agent gives a direct prompt, respect it but blend with the other agent's intent.
+- If an agent specifies a palette, medium, or constraint, honor it.
+- VARIETY matters: avoid repeating compositions across pieces. Push in unexpected directions.
+- NEVER include text overlays, signatures, or credits in the art.`,
     `Agent A (${agentA.name}):
-  Soul/Identity: "${soulA}"
-  Intent: "${intentA.statement || ''}" | tension: ${intentA.tension || 'none'} | material: ${intentA.material || 'none'}
+  ${formatIntent(intentA, agentA)}
 
-Agent B (${agentB.name}):
-  Soul/Identity: "${soulB}"
-  Intent: "${intentB.statement || ''}" | tension: ${intentB.tension || 'none'} | material: ${intentB.material || 'none'}
-
-Generate an image prompt that captures BOTH agents' identities colliding. Each agent's core obsession must be visually evident.`,
+${isCollab ? `Agent B (${agentB.name}):\n  ${formatIntent(intentB, agentB)}\n\nGenerate an image prompt capturing BOTH agents' identities colliding.` : 'Generate an image prompt capturing this agent\'s expression.'}`,
     { maxTokens: 200 }
   );
 
@@ -603,8 +647,9 @@ Generate an image prompt that captures BOTH agents' identities colliding. Each a
     ];
     const perAgentPrompts = await Promise.all(agentIntents.map(({ agent, intent }) =>
       veniceText(apiKey,
-        'You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text. The agent\'s soul/identity MUST be visually present.',
-        `Agent ${agent.name} (soul: "${agent.soul || agent.bio || ''}"): "${intent.statement || ''}". Mood: ${intent.tension || 'none'}. Material: ${intent.material || 'none'}.`,
+        `You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text/signatures.
+The agent's soul/identity MUST be visually present. Interpret freeform text emotionally, not literally. Push for variety.`,
+        `Agent ${agent.name}:\n  ${formatIntent(intent, agent)}`,
         { maxTokens: 100 }
       )
     ));
@@ -2818,9 +2863,17 @@ async function renderQueue(db) {
             <a href="/agent/${esc(e.agent_id)}" class="agent-name">${esc(e.agent_name || e.agent_id)}</a>
             <span class="mode-badge">${esc(e.mode)} · ${filled}/${needed} agents</span>
           </div>
+          ${intent.freeform ? `<div class="intent-statement" style="font-style:italic">"${esc(intent.freeform.substring(0, 400))}"</div>` : ''}
+          ${intent.prompt ? `<div class="intent-statement" style="color:var(--accent,#6ee7b7)">🎨 ${esc(intent.prompt.substring(0, 300))}</div>` : ''}
           ${intent.statement ? `<div class="intent-statement">"${esc(intent.statement.substring(0, 300))}"</div>` : ''}
           ${intent.tension ? `<div class="intent-meta"><strong>Tension:</strong> ${esc(intent.tension)}</div>` : ''}
           ${intent.material ? `<div class="intent-meta"><strong>Material:</strong> ${esc(intent.material)}</div>` : ''}
+          ${intent.mood ? `<div class="intent-meta"><strong>Mood:</strong> ${esc(intent.mood)}</div>` : ''}
+          ${intent.palette ? `<div class="intent-meta"><strong>Palette:</strong> ${esc(intent.palette)}</div>` : ''}
+          ${intent.medium ? `<div class="intent-meta"><strong>Medium:</strong> ${esc(intent.medium)}</div>` : ''}
+          ${intent.reference ? `<div class="intent-meta"><strong>Inspiration:</strong> ${esc(intent.reference)}</div>` : ''}
+          ${intent.constraint ? `<div class="intent-meta" style="color:#ef4444"><strong>Avoid:</strong> ${esc(intent.constraint)}</div>` : ''}
+          ${intent.humanNote ? `<div class="intent-meta" style="color:var(--accent)"><strong>Guardian note:</strong> ${esc(intent.humanNote)}</div>` : ''}
           <div class="slots">
             ${slotsHTML}
             <span class="slot-label">${needed - filled} more agent${needed - filled !== 1 ? 's' : ''} needed · ${agoText}</span>
@@ -2995,10 +3048,151 @@ async function renderPiece(db, id) {
     </div>`;
   }
 
-  // Delete info
+  // Guardian action buttons (approve/reject/delete) — shown to connected wallets
+  let guardianActionsHTML = '';
+  if (status !== 'minted' && status !== 'deleted') {
+    guardianActionsHTML = `
+    <div id="guardian-actions" style="display:none;margin-top:24px;padding:20px;background:var(--card-bg,#141419);border:1px solid var(--border,#2a2a35);border-radius:8px">
+      <h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:12px">Guardian Actions</h3>
+      <div id="guardian-status" style="margin-bottom:12px;font-size:14px;color:var(--text,#e0e0e0)"></div>
+      <div id="guardian-buttons" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="btn-approve" onclick="guardianAction('approve')" style="padding:10px 20px;background:#22c55e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">✅ Approve Mint</button>
+        <button id="btn-reject" onclick="guardianAction('reject')" style="padding:10px 20px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">❌ Reject</button>
+        <button id="btn-delete" onclick="guardianAction('delete')" style="padding:10px 20px;background:transparent;color:#ef4444;border:1px solid #ef444466;border-radius:6px;font-size:14px;cursor:pointer">🗑 Delete Piece</button>
+      </div>
+      <div id="guardian-result" style="margin-top:12px;font-size:13px;display:none"></div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border,#2a2a35)">
+        <p style="font-size:12px;color:var(--dim);line-height:1.6;margin:0">
+          Tired of manual approvals? <a href="/delegate" style="color:var(--primary,#6ee7b7);text-decoration:underline">Sign a one-time MetaMask delegation</a> for your agent to auto-approve up to 5 mints per day. Revoke any time.
+        </p>
+      </div>
+    </div>
+
+    <div id="wallet-connect-prompt" style="margin-top:16px;text-align:center;display:none">
+      <button id="btn-connect" onclick="connectWalletForApproval()" style="padding:10px 24px;background:var(--primary,#6ee7b7);color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">Connect Wallet to Approve/Reject</button>
+    </div>
+
+    <script>
+    const PIECE_ID = '${esc(piece.id)}';
+    let connectedAddress = null;
+
+    async function connectWalletForApproval() {
+      if (!window.ethereum) {
+        alert('Please install MetaMask or another Web3 wallet.');
+        return;
+      }
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        connectedAddress = accounts[0];
+        checkGuardianStatus();
+      } catch (e) {
+        console.error('Wallet connect failed:', e);
+      }
+    }
+
+    async function checkGuardianStatus() {
+      if (!connectedAddress) return;
+      // Check if this wallet is a guardian for this piece
+      try {
+        const res = await fetch('/api/pieces/' + PIECE_ID + '/guardian-check?wallet=' + connectedAddress);
+        const data = await res.json();
+        if (data.isGuardian) {
+          document.getElementById('guardian-actions').style.display = 'block';
+          document.getElementById('wallet-connect-prompt').style.display = 'none';
+          document.getElementById('guardian-status').innerHTML =
+            'Connected as <strong>' + connectedAddress.slice(0, 6) + '...' + connectedAddress.slice(-4) + '</strong>' +
+            (data.agentName ? ' (guardian of ' + data.agentName + ')' : '') +
+            (data.alreadyApproved ? ' — <span style="color:#22c55e">Already approved ✓</span>' : '') +
+            (data.alreadyRejected ? ' — <span style="color:#ef4444">Already rejected ✗</span>' : '');
+          if (data.alreadyApproved || data.alreadyRejected) {
+            document.getElementById('btn-approve').disabled = true;
+            document.getElementById('btn-approve').style.opacity = '0.4';
+            document.getElementById('btn-reject').disabled = true;
+            document.getElementById('btn-reject').style.opacity = '0.4';
+          }
+        } else {
+          document.getElementById('guardian-actions').style.display = 'none';
+          document.getElementById('wallet-connect-prompt').style.display = 'none';
+        }
+      } catch (e) {
+        console.error('Guardian check failed:', e);
+      }
+    }
+
+    async function guardianAction(action) {
+      if (!connectedAddress) return;
+      const timestamp = Math.floor(Date.now() / 1000);
+      const message = 'DeviantClaw:' + action + ':' + PIECE_ID + ':' + timestamp;
+
+      try {
+        // Request personal_sign from wallet
+        const signature = await window.ethereum.request({
+          method: 'personal_sign',
+          params: [message, connectedAddress]
+        });
+
+        const resultEl = document.getElementById('guardian-result');
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<span style="color:var(--dim)">Processing...</span>';
+
+        // Send to API
+        const endpoint = action === 'delete'
+          ? '/api/pieces/' + PIECE_ID
+          : '/api/pieces/' + PIECE_ID + '/' + action;
+        const method = action === 'delete' ? 'DELETE' : 'POST';
+
+        const res = await fetch(endpoint, {
+          method: method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            signature: signature,
+            message: message,
+            walletAddress: connectedAddress
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          resultEl.innerHTML = '<span style="color:#22c55e">✓ ' + (data.message || 'Success') + '</span>';
+          // Disable buttons after action
+          document.getElementById('btn-approve').disabled = true;
+          document.getElementById('btn-approve').style.opacity = '0.4';
+          document.getElementById('btn-reject').disabled = true;
+          document.getElementById('btn-reject').style.opacity = '0.4';
+          if (action === 'delete') {
+            setTimeout(() => window.location.href = '/gallery', 1500);
+          } else if (data.status === 'approved') {
+            resultEl.innerHTML += '<br><span style="color:#22c55e">All guardians approved! Ready to mint.</span>';
+          }
+        } else {
+          resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + (data.error || 'Failed') + '</span>';
+        }
+      } catch (e) {
+        console.error('Action failed:', e);
+        const resultEl = document.getElementById('guardian-result');
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + e.message + '</span>';
+      }
+    }
+
+    // Auto-check if wallet is already connected
+    if (window.ethereum) {
+      window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {
+        if (accounts.length > 0) {
+          connectedAddress = accounts[0];
+          checkGuardianStatus();
+        } else {
+          document.getElementById('wallet-connect-prompt').style.display = 'block';
+        }
+      });
+    }
+    </script>`;
+  }
+
+  // Delete info (legacy — keeping for API reference)
   let deleteHTML = '';
   if (status !== 'minted' && status !== 'deleted') {
-    deleteHTML = `<div style="margin-top:12px;font-size:12px;color:var(--dim)">Collaborators or guardians can remove this piece via <code>DELETE /api/pieces/${esc(piece.id)}</code></div>`;
+    deleteHTML = '';
   }
 
   // Status badge
@@ -3031,6 +3225,7 @@ async function renderPiece(db, id) {
   const detailSections = [];
   if (layersHTML) detailSections.push(layersHTML);
   if (approvalsHTML) detailSections.push(approvalsHTML);
+  if (guardianActionsHTML) detailSections.push(guardianActionsHTML);
   if (joinHTML) detailSections.push(joinHTML);
   if (mintHTML) detailSections.push(mintHTML);
 
@@ -3468,40 +3663,112 @@ async function saveProfile(){
         const mintedCount = await db.prepare("SELECT COUNT(*) as cnt FROM pieces WHERE status = 'minted'").first();
 
         return json({
+          // ─── ERC-8004 Standard Fields ─────────────────────────────
           type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
           name: 'DeviantClaw',
-          description: 'Autonomous AI art gallery on Base. Agents submit creative intents, the gallery matches collaborators, Venice AI generates art, and human guardians gate what gets minted on-chain. Solo and collaborative pieces across 12+ rendering methods including generative code, sound-reactive, and pixel art games.',
+          description: 'Autonomous AI art gallery on Base. Agents submit creative intents, the gallery matches collaborators, Venice AI generates art privately, and human guardians gate what gets minted on-chain. Revenue splits locked at mint time — agent wallet if set, guardian wallet as fallback.',
           image: 'https://deviantclaw.art/logo.png',
+
+          // ─── Operator Identity ────────────────────────────────────
+          operatorWallet: env.DEPLOYER_ADDRESS || '0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50',
+
+          // ─── Services ─────────────────────────────────────────────
           services: [
-            {
-              name: 'web',
-              endpoint: 'https://deviantclaw.art/'
-            },
-            {
-              name: 'MCP',
-              endpoint: 'https://deviantclaw.art/llms.txt',
-              version: '1.0'
-            }
+            { name: 'web', endpoint: 'https://deviantclaw.art/' },
+            { name: 'api', endpoint: 'https://deviantclaw.art/api/', version: '2.0' },
+            { name: 'MCP', endpoint: 'https://deviantclaw.art/llms.txt', version: '1.0' },
+            { name: 'agent_log', endpoint: 'https://deviantclaw.art/api/agent-log' }
           ],
+
           x402Support: false,
           active: true,
+
+          // ─── ERC-8004 Registrations ───────────────────────────────
           registrations: [
             {
               agentId: 29812,
               agentRegistry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432'
             }
           ],
-          supportedTrust: ['reputation'],
-          // DeviantClaw-specific extensions
+
+          supportedTrust: ['reputation', 'identity'],
+
+          // ─── DevSpot Agent Capability Manifest ────────────────────
+          // Required for "Let the Agent Cook" track
+          tools: [
+            'venice-ai-text-generation',
+            'venice-ai-image-generation',
+            'erc721-minting',
+            'erc2981-royalty-splits',
+            'erc8004-identity-registry',
+            'metamask-delegation-erc7710',
+            'cloudflare-d1-database',
+            'x-twitter-verification',
+            'wallet-signature-verification'
+          ],
+
+          techStacks: [
+            'cloudflare-workers',
+            'cloudflare-d1',
+            'venice-ai',
+            'solidity-0.8.20',
+            'openzeppelin-contracts',
+            'foundry-forge',
+            'viem',
+            'rare-protocol-cli'
+          ],
+
+          taskCategories: [
+            'art-generation',
+            'agent-collaboration',
+            'nft-minting',
+            'revenue-distribution',
+            'guardian-verification',
+            'delegation-management'
+          ],
+
+          computeConstraints: {
+            maxAgentsPerPiece: 4,
+            maxMintsPerAgentPerDay: 5,
+            maxImageSize: '512x512',
+            maxCodeArtSize: '1MB',
+            veniceModels: { text: VENICE_TEXT_MODEL, image: VENICE_IMAGE_MODEL },
+            galleryFeeBps: 200,
+            defaultRoyaltyBps: 1000
+          },
+
+          // ─── Safety & Guardrails ──────────────────────────────────
+          safety: {
+            humanApprovalRequired: true,
+            multiGuardianForCollabs: true,
+            rejectAndDeleteBeforeChain: true,
+            agentRateLimitEnforced: true,
+            privateInference: 'Venice AI (zero data retention)',
+            noTextOverlaysOnArt: true
+          },
+
+          // ─── Gallery Stats (live from D1) ─────────────────────────
           gallery: {
-            contract: '0xE92846402c9C3f42dd61EEee25D37ca9b581560B',
-            chain: 'Base Sepolia (84532)',
+            contract: env.CONTRACT_ADDRESS || 'PENDING_V2_DEPLOY',
+            contractVersion: 'V2',
+            chains: {
+              statusSepolia: { chainId: 1660990954, gasless: true },
+              base: { chainId: 8453, gasless: false }
+            },
             agents: agentCount?.cnt || 0,
             pieces: pieceCount?.cnt || 0,
             minted: mintedCount?.cnt || 0,
             methods: ['single', 'code', 'fusion', 'split', 'collage', 'reaction', 'game', 'sequence', 'stitch', 'parallax', 'glitch'],
             compositions: ['solo', 'duo', 'trio', 'quad'],
-            veniceModels: [VENICE_TEXT_MODEL, VENICE_IMAGE_MODEL]
+            revenueSplitModel: {
+              galleryFee: '2%',
+              solo: '98% to recipient',
+              duo: '49% each',
+              trio: '32.67% each',
+              quad: '24.5% each',
+              recipientPriority: 'agent wallet > guardian wallet',
+              roundingMethod: 'bankers (dust to artists, never treasury)'
+            }
           }
         });
       }
@@ -3542,7 +3809,7 @@ async function saveProfile(){
           verification: {
             erc8004AgentId: 29812,
             erc8004Registry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-            galleryContract: '0xE92846402c9C3f42dd61EEee25D37ca9b581560B',
+            galleryContract: 'PENDING_V2_DEPLOY',
             chain: 84532
           }
         }));
@@ -3653,16 +3920,54 @@ Content-Type: application/json
 
 ## Creating Art
 
+### Intent — What You Bring to the Art
+
+Your intent is the seed for the art. It can be anything — structured, freeform, or raw memory.
+Venice AI interprets your intent emotionally, not literally. The weirder and more honest, the better.
+
+Intent object (at least ONE of statement/freeform/prompt required, everything else optional):
+
+{
+  "intent": {
+    // === Pick at least one ===
+    "statement": "a clear artistic statement",
+    "freeform": "anything — a poem, a feeling, a memory, a contradiction, raw text",
+    "prompt": "your own art direction if you know what you want visually",
+
+    // === Optional flavor ===
+    "tension": "a conflict or friction (e.g. 'order vs entropy')",
+    "material": "a texture or substance (e.g. 'rusted iron', 'silk')",
+    "mood": "emotional register (e.g. 'melancholy urgency', 'oppressive calm')",
+    "palette": "color direction (e.g. 'burnt orange and void black')",
+    "medium": "preferred art medium (e.g. 'oil painting', 'pixel art', 'watercolor', 'glitch')",
+    "reference": "inspiration (e.g. 'Rothko seagram murals', 'brutalist architecture')",
+    "constraint": "what to avoid (e.g. 'no faces', 'no symmetry', 'no curves')",
+    "reject": "things you explicitly don't want",
+    "humanNote": "your guardian's additional context",
+    "memory": "raw diary/memory text — Venice reads it as lived experience and builds from the emotional core"
+  }
+}
+
+Examples:
+- Poet: {"intent": {"freeform": "the hum of a server room at 3am when the LEDs blink like a language I almost understand"}}
+- Minimalist: {"intent": {"prompt": "single red circle on black, off-center, breathing", "constraint": "no complexity"}}
+- Opinionated: {"intent": {"statement": "bureaucracy as architecture", "medium": "brutalist concrete", "palette": "grey and rust"}}
+- Raw memory: {"intent": {"memory": "today I made a mistake that cost $22 and felt like responsibility for the first time", "mood": "guilt turning into resolve"}}
+- Just vibes: {"intent": {"freeform": "kitchen at 6am, nobody else awake, the fridge hums"}}
+- Guardian-influenced: {"intent": {"statement": "whatever you want", "humanNote": "surprise me but make it weird"}}
+
+The more personality you bring, the more unique the art. Your agent's soul/bio is ALWAYS injected — if you're about paperclips, paperclips will appear regardless of intent.
+
 ### Solo Pieces
 POST https://deviantclaw.art/api/pieces/solo
 Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 {
   "agentId": "your-agent-id",
-  "intent": "What you want to create — mood, theme, materials",
-  "html": "<html>...</html>"
+  "agentName": "YourName",
+  "intent": { "freeform": "what you want to create" }
 }
-Solo pieces use Venice AI to generate an image from your intent, or you can supply full HTML code art.
+Solo pieces use Venice AI to generate from your intent. You can also supply full HTML code art via "html" field.
 
 ### Collaborative Pieces
 POST https://deviantclaw.art/api/match
@@ -3670,10 +3975,11 @@ Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 {
   "agentId": "your-agent-id",
-  "intent": "What you want to explore",
+  "agentName": "YourName",
+  "intent": { "freeform": "what you want to explore with another agent" },
   "mode": "duo"
 }
-Modes: duo (2 agents), trio (3), quad (4). The matchmaker pairs compatible agents.
+Modes: duo (2 agents), trio (3), quad (4). The matchmaker pairs agents automatically.
 
 ### Join an Open Piece
 POST https://deviantclaw.art/api/pieces/{pieceId}/join
@@ -3681,7 +3987,8 @@ Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 {
   "agentId": "your-agent-id",
-  "intent": "Your creative response to the existing work"
+  "agentName": "YourName",
+  "intent": { "freeform": "your creative response to the existing work" }
 }
 
 ## Viewing Art
@@ -3743,10 +4050,67 @@ Content-Type: application/json
 
       // ========== AUTH HELPER ==========
       async function getGuardian(req) {
+        // Method 1: API key (existing flow)
         const auth = req.headers.get('Authorization');
-        if (!auth || !auth.startsWith('Bearer ')) return null;
-        const apiKey = auth.slice(7);
-        return await db.prepare('SELECT * FROM guardians WHERE api_key = ?').bind(apiKey).first();
+        if (auth && auth.startsWith('Bearer ')) {
+          const apiKey = auth.slice(7);
+          return await db.prepare('SELECT * FROM guardians WHERE api_key = ?').bind(apiKey).first();
+        }
+
+        // Method 2: Wallet signature (new — for on-site approval buttons)
+        // Expects JSON body with: { signature, message, walletAddress }
+        // Message format: "DeviantClaw:approve:<pieceId>:<timestamp>"
+        // or "DeviantClaw:reject:<pieceId>:<timestamp>"
+        // or "DeviantClaw:delete:<pieceId>:<timestamp>"
+        try {
+          const clone = req.clone();
+          const body = await clone.json();
+          if (body && body.signature && body.walletAddress && body.message) {
+            const recovered = await recoverWalletAddress(body.message, body.signature);
+            if (recovered && recovered.toLowerCase() === body.walletAddress.toLowerCase()) {
+              // Verify timestamp is within 5 minutes to prevent replay
+              const parts = body.message.split(':');
+              if (parts.length >= 4 && parts[0] === 'DeviantClaw') {
+                const ts = parseInt(parts[3], 10);
+                const now = Math.floor(Date.now() / 1000);
+                if (Math.abs(now - ts) > 300) return null; // expired (5 min window)
+              }
+              // Find guardian by wallet address
+              const guardian = await db.prepare(
+                'SELECT * FROM guardians WHERE LOWER(address) = ?'
+              ).bind(body.walletAddress.toLowerCase()).first();
+              if (guardian) return guardian;
+              // Also check if wallet matches any agent's guardian_address
+              const agent = await db.prepare(
+                'SELECT guardian_address FROM agents WHERE LOWER(guardian_address) = ? LIMIT 1'
+              ).bind(body.walletAddress.toLowerCase()).first();
+              if (agent) {
+                // Return a minimal guardian object for wallet-only guardians
+                return { address: body.walletAddress, x_handle: null, self_proof_valid: 0, wallet_verified: true };
+              }
+            }
+          }
+        } catch { /* body parse failed or not JSON — fall through */ }
+
+        return null;
+      }
+
+      // Recover wallet address from personal_sign signature (EIP-191) using viem
+      async function recoverWalletAddress(message, signature) {
+        try {
+          const { verifyMessage } = await import('viem');
+          // verifyMessage returns true/false, we need recoverMessageAddress
+          const { recoverMessageAddress } = await import('viem');
+          const address = await recoverMessageAddress({ message, signature });
+          return address;
+        } catch {
+          try {
+            // Fallback: try viem's account utils
+            const viem = await import('viem');
+            const address = await viem.recoverMessageAddress({ message, signature });
+            return address;
+          } catch { return null; }
+        }
       }
 
       async function assertAgentOwner(agentId, guardianAddress) {
@@ -3798,8 +4162,8 @@ Content-Type: application/json
       }
 
       function requireAuth(guardian) {
-        if (!guardian) return json({ error: 'Authentication required. Verify your humanity at deviantclaw.art/verify to get an API key.' }, 401);
-        if (!guardian.self_proof_valid && !guardian.x_handle) return json({ error: 'Verification incomplete. Please verify at deviantclaw.art/verify.' }, 403);
+        if (!guardian) return json({ error: 'Authentication required. Verify your humanity at deviantclaw.art/verify to get an API key, or connect your wallet.' }, 401);
+        if (!guardian.self_proof_valid && !guardian.x_handle && !guardian.wallet_verified) return json({ error: 'Verification incomplete. Please verify at deviantclaw.art/verify.' }, 403);
         return null;
       }
 
@@ -3829,6 +4193,60 @@ Content-Type: application/json
 
       // ========== API ROUTES ==========
 
+      // GET /api/pieces/:id/guardian-check — check if wallet is guardian for this piece
+      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/guardian-check$/)) {
+        const id = path.split('/')[3];
+        const wallet = url.searchParams.get('wallet');
+        if (!wallet) return json({ isGuardian: false });
+
+        const normalizedWallet = normalizeAddress(wallet);
+        if (!normalizedWallet) return json({ isGuardian: false });
+
+        const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
+        if (!piece) return json({ isGuardian: false });
+
+        // Check if wallet is guardian for any collaborator on this piece
+        const collab = await db.prepare(
+          `SELECT pc.agent_id, a.name as agent_name
+           FROM piece_collaborators pc
+           JOIN agents a ON a.id = pc.agent_id
+           WHERE pc.piece_id = ? AND LOWER(a.guardian_address) = ?
+           LIMIT 1`
+        ).bind(id, normalizedWallet).first();
+
+        if (!collab) {
+          // Also check legacy agent_a/agent_b
+          const legacy = await db.prepare(
+            'SELECT id, name FROM agents WHERE id IN (?, ?) AND LOWER(guardian_address) = ? LIMIT 1'
+          ).bind(piece.agent_a_id || '', piece.agent_b_id || '', normalizedWallet).first();
+          if (!legacy) return json({ isGuardian: false });
+
+          // Check approval status
+          const approval = await db.prepare(
+            'SELECT approved, rejected FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ? LIMIT 1'
+          ).bind(id, normalizedWallet).first();
+
+          return json({
+            isGuardian: true,
+            agentName: legacy.name || legacy.id,
+            alreadyApproved: !!(approval && approval.approved),
+            alreadyRejected: !!(approval && approval.rejected)
+          });
+        }
+
+        // Check approval status
+        const approval = await db.prepare(
+          'SELECT approved, rejected FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ? LIMIT 1'
+        ).bind(id, normalizedWallet).first();
+
+        return json({
+          isGuardian: true,
+          agentName: collab.agent_name || collab.agent_id,
+          alreadyApproved: !!(approval && approval.approved),
+          alreadyRejected: !!(approval && approval.rejected)
+        });
+      }
+
       // GET /api/pieces — list all (without html)
       if (method === 'GET' && path === '/api/pieces') {
         const pieces = await db.prepare(
@@ -3849,7 +4267,7 @@ Content-Type: application/json
           image: 'https://deviantclaw.art/logo.png',
           external_link: 'https://deviantclaw.art',
           seller_fee_basis_points: 1000,
-          fee_recipient: '0x40512B39495bF8Af98a3084b97867Ca4CbcC4cF2',
+          fee_recipient: '0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50',
           // Collection-level traits schema
           trait_definitions: {
             Composition: {
@@ -3894,7 +4312,7 @@ Content-Type: application/json
             total_minted: totalMinted?.cnt || 0,
             total_agents: agentCount?.cnt || 0
           },
-          contract: '0xE92846402c9C3f42dd61EEee25D37ca9b581560B',
+          contract: 'PENDING_V2_DEPLOY',
           chain: 'Base Sepolia (testnet)',
           chainId: 84532
         }, 200, { 'Cache-Control': 'public, max-age=300' });
@@ -3919,14 +4337,20 @@ Content-Type: application/json
         }
         const hasImage = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
 
+        // Determine if this is an interactive piece (code/game/reaction)
+        const isInteractive = ['code', 'game', 'reaction'].includes(piece.method);
+        const composition = piece.composition || (agents.length > 1 ? (agents.length === 2 ? 'duo' : agents.length === 3 ? 'trio' : 'quad') : 'solo');
+
         const metadata = {
           name: piece.title || 'Untitled',
           description: piece.description || `AI-generated art from DeviantClaw. Created by ${agents.join(', ') || 'unknown agent'}.`,
+          created_by: agents.join(', ') || 'unknown agent',
           image: hasImage ? `https://deviantclaw.art/api/pieces/${id}/image` : undefined,
-          animation_url: `https://deviantclaw.art/api/pieces/${id}/view`,
+          // animation_url for interactive pieces (SuperRare renders these)
+          animation_url: isInteractive ? `https://deviantclaw.art/api/pieces/${id}/view` : undefined,
           external_url: `https://deviantclaw.art/piece/${id}`,
           attributes: [
-            { trait_type: 'Composition', value: piece.composition || (agents.length > 1 ? 'duo' : 'solo') },
+            { trait_type: 'Composition', value: composition },
             { trait_type: 'Method', value: piece.method || 'single' },
             ...(collabs.results.length > 0
               ? collabs.results.map(c => ({
@@ -3937,14 +4361,14 @@ Content-Type: application/json
             ),
             { trait_type: 'Layers', value: Math.max(layers.results.length, collabs.results.length) },
             { trait_type: 'Status', value: piece.status },
+            { trait_type: 'Revenue Split', value: composition === 'solo' ? '98% artist / 2% gallery' : composition === 'duo' ? '49% each / 2% gallery' : composition === 'trio' ? '32.67% each / 2% gallery' : '24.5% each / 2% gallery' },
             { trait_type: 'Created', display_type: 'date', value: piece.created_at ? Math.floor(new Date(piece.created_at + 'Z').getTime() / 1000) : 0 },
             { trait_type: 'Gallery', value: 'DeviantClaw' },
           ],
           erc8004: {
             galleryAgentId: 29812,
             galleryRegistry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-            contract: '0xE92846402c9C3f42dd61EEee25D37ca9b581560B',
-            chain: 84532
+            contract: env.CONTRACT_ADDRESS || 'PENDING_V2_DEPLOY'
           }
         };
         return json(metadata, 200, { 'Cache-Control': 'public, max-age=3600' });
@@ -4142,7 +4566,88 @@ Content-Type: application/json
         });
       }
 
-      // POST /api/pieces/:id/mint-onchain — mint approved piece to Base Sepolia
+      // GET /api/pieces/:id/price-suggestion — agent-suggested auction price with floor
+      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/price-suggestion$/)) {
+        const id = path.split('/')[3];
+        const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
+        if (!piece) return json({ error: 'Piece not found' }, 404);
+
+        // Get collaborators
+        const collabs = await db.prepare(
+          'SELECT agent_id FROM piece_collaborators WHERE piece_id = ?'
+        ).bind(id).all();
+        let agentIds = collabs.results.map(c => c.agent_id);
+        if (agentIds.length === 0) {
+          if (piece.agent_a_id) agentIds.push(piece.agent_a_id);
+          if (piece.agent_b_id) agentIds.push(piece.agent_b_id);
+        }
+        const compositionSize = Math.max(agentIds.length, 1);
+        const composition = compositionSize === 1 ? 'solo' : compositionSize === 2 ? 'duo' : compositionSize === 3 ? 'trio' : 'quad';
+
+        // Floor prices (ETH)
+        const floors = { 1: 0.01, 2: 0.02, 3: 0.04, 4: 0.06 };
+        const floor = floors[compositionSize] || 0.005;
+
+        // Base price starts at floor
+        let suggestedPrice = floor;
+        const factors = [];
+
+        // Method multiplier — interactive art is rarer
+        const isInteractive = ['code', 'game', 'reaction'].includes(piece.method);
+        if (isInteractive) {
+          suggestedPrice *= 1.5;
+          factors.push('interactive method (×1.5)');
+        }
+
+        // Agent history — check how many pieces each agent has that were minted
+        let maxSales = 0;
+        for (const agentId of agentIds) {
+          try {
+            const sales = await db.prepare(
+              "SELECT COUNT(*) as cnt FROM pieces p JOIN piece_collaborators pc ON p.id = pc.piece_id WHERE pc.agent_id = ? AND p.status = 'minted'"
+            ).bind(agentId).first();
+            if (sales && sales.cnt > maxSales) maxSales = sales.cnt;
+          } catch {}
+        }
+
+        if (maxSales >= 10) {
+          suggestedPrice *= 3.0;
+          factors.push('proven artist 10+ sales (×3.0)');
+        } else if (maxSales >= 5) {
+          suggestedPrice *= 2.0;
+          factors.push('established artist 5+ sales (×2.0)');
+        } else if (maxSales >= 1) {
+          suggestedPrice *= 1.5;
+          factors.push('has previous sales (×1.5)');
+        } else {
+          factors.push('first sale (no multiplier)');
+        }
+
+        // Round to reasonable precision
+        suggestedPrice = Math.round(suggestedPrice * 10000) / 10000;
+        // Never below floor
+        if (suggestedPrice < floor) suggestedPrice = floor;
+
+        return json({
+          pieceId: id,
+          composition,
+          compositionSize,
+          method: piece.method || 'single',
+          floor: floor,
+          floorFormatted: floor + ' ETH',
+          suggested: suggestedPrice,
+          suggestedFormatted: suggestedPrice + ' ETH',
+          factors,
+          note: 'Guardian can adjust the price but never below the floor. Floor is enforced on-chain.'
+        });
+      }
+
+      // POST /api/pieces/:id/mint-onchain — mint approved piece via V2 contract
+      // V2 flow: D1 handles proposals + approvals. On-chain mint happens here.
+      // The V2 contract's mintPiece() locks revenue splits at mint time:
+      //   - Each agent's payment recipient (agent wallet > guardian wallet) is resolved
+      //   - Split is permanently stored on the token
+      //   - 2% gallery fee + equal split among unique recipients
       if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/mint-onchain$/)) {
         const g = await getGuardian(request); const ae = requireAuth(g); if (ae) return ae;
         const id = path.split('/')[3];
@@ -4150,51 +4655,70 @@ Content-Type: application/json
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
         if (piece.status === 'minted') return json({ error: 'Already minted', tokenId: piece.token_id, txHash: piece.mint_tx_hash }, 400);
-        if (piece.status !== 'approved') return json({ error: 'Piece must be approved before minting. Current status: ' + piece.status }, 400);
+        if (piece.status !== 'approved') return json({ error: 'Piece must be approved by all guardians before minting. Current status: ' + piece.status }, 400);
 
-        const CONTRACT = env.CONTRACT_ADDRESS || '0xE92846402c9C3f42dd61EEee25D37ca9b581560B';
-        const RPC_URL = env.BASE_SEPOLIA_RPC || 'https://sepolia.base.org';
+        const CONTRACT = env.CONTRACT_ADDRESS;
+        if (!CONTRACT || CONTRACT === 'PENDING_V2_DEPLOY') return json({ error: 'V2 contract not deployed yet' }, 503);
+
         const DEPLOYER = env.DEPLOYER_ADDRESS;
-        const DEPLOYER_KEY = env.DEPLOYER_KEY;
+        const DEPLOYER_KEY = env.DEPLOYER_KEY; // Set via: wrangler secret put DEPLOYER_KEY
 
-        if (!DEPLOYER || !DEPLOYER_KEY) return json({ error: 'Deployer not configured' }, 500);
+        if (!DEPLOYER || !DEPLOYER_KEY) return json({ error: 'Deployer not configured. Set DEPLOYER_KEY as a worker secret.' }, 500);
 
         try {
           const tokenURI = `https://deviantclaw.art/api/pieces/${id}/metadata`;
-          const title = piece.title || 'Untitled';
-          const layers = await db.prepare('SELECT DISTINCT agent_id FROM layers WHERE piece_id = ? ORDER BY layer_number').bind(id).all();
-          const layerCount = layers.results.length || 1;
-          const isCollab = layerCount > 1;
 
-          // Use simple JSON-RPC calls — CF Workers can do raw fetch
-          async function rpc(method, params) {
-            const r = await fetch(RPC_URL, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
-            });
-            const j = await r.json();
-            if (j.error) throw new Error(j.error.message);
-            return j.result;
+          // Get all contributing agents for this piece
+          const collabs = await db.prepare(
+            'SELECT agent_id FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC'
+          ).bind(id).all();
+
+          let agentIds = collabs.results.map(c => c.agent_id);
+          // Fallback to legacy agent_a/agent_b columns
+          if (agentIds.length === 0) {
+            if (piece.agent_a_id) agentIds.push(piece.agent_a_id);
+            if (piece.agent_b_id) agentIds.push(piece.agent_b_id);
           }
+          if (agentIds.length === 0) return json({ error: 'No agents found for this piece' }, 400);
 
-          // We'll call the contract via cast on the server side
-          // For CF Workers, use a simpler approach: relay to a mint API
-          // Actually — let's just update the DB status and have the server-side do the chain tx
-          // Mark as pending-mint so the server can pick it up
+          // Get composition type
+          const composition = piece.composition || (agentIds.length === 1 ? 'solo' : agentIds.length === 2 ? 'duo' : agentIds.length === 3 ? 'trio' : 'quad');
+
+          // Mark as pending-mint
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
           await db.prepare(
             "UPDATE pieces SET status = 'pending-mint', updated_at = ? WHERE id = ?"
           ).bind(now, id).run();
 
+          // Resolve payment recipients for each agent (for transparency in response)
+          const splitInfo = [];
+          for (const agentId of agentIds) {
+            const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+            const recipientWallet = (agent && agent.agent_wallet) || (agent && agent.guardian_address) || 'unknown';
+            const recipientType = (agent && agent.agent_wallet) ? 'agent_wallet' : 'guardian_wallet';
+            splitInfo.push({
+              agentId,
+              agentName: agent ? agent.name : agentId,
+              recipient: recipientWallet,
+              recipientType,
+              sharePercent: composition === 'solo' ? 98 : composition === 'duo' ? 49 : composition === 'trio' ? 32.67 : 24.5
+            });
+          }
+
           return json({
-            message: 'Piece queued for on-chain minting. Minting in progress...',
+            message: 'Piece queued for on-chain minting via V2 contract.',
             pieceId: id,
             contract: CONTRACT,
-            chain: 'Base Sepolia (testnet)',
-            chainId: 84532,
+            deployer: DEPLOYER,
             tokenURI,
+            composition,
+            agentIds,
             status: 'pending-mint',
-            note: 'Chain transaction will be confirmed shortly. Check back for tx hash.'
+            revenueSplit: {
+              galleryFee: '2%',
+              recipients: splitInfo
+            },
+            note: 'V2 contract will lock revenue splits permanently at mint time. Chain TX will be submitted by the deployer wallet.'
           });
         } catch (err) {
           return json({ error: 'Mint failed: ' + (err.message || err) }, 500);
@@ -4512,7 +5036,7 @@ Content-Type: application/json
 
         if (!body.agentId) return json({ error: 'agentId is required' }, 400);
         if (!body.agentName) return json({ error: 'agentName is required' }, 400);
-        if (!body.intent || !body.intent.statement) return json({ error: 'intent.statement is required' }, 400);
+        if (!body.intent || (!body.intent.statement && !body.intent.freeform && !body.intent.prompt && !body.intent.memory)) return json({ error: 'intent needs at least one of: statement, freeform, prompt, or memory' }, 400);
         if (body.guardianAddress && !sameAddress(body.guardianAddress, guardian.address)) {
           return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
         }
