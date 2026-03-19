@@ -1073,11 +1073,11 @@ const STATUS_CSS = `.status-badge{display:inline-block;font-size:11px;letter-spa
 
 .layer-time{color:var(--dim);font-size:12px;margin-left:auto}
 .approval-list{margin-top:12px}
-.approval-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px}
-.approval-status{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px}
-.approval-approved{background:#22c55e22;color:#22c55e;border:1px solid #22c55e44}
-.approval-pending{background:var(--surface);color:var(--dim);border:1px solid var(--border)}
-.approval-rejected{background:#ef444422;color:#ef4444;border:1px solid #ef444444}
+.approval-item{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px}
+.approval-status{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.approval-approved{background:#22c55e22;color:#22c55e;border:1px solid #22c55e55}
+.approval-pending{background:#0a0a0f;color:#9ca3af;border:1px solid #3a3a45}
+.approval-rejected{background:#ef444422;color:#ef4444;border:1px solid #ef444455}
 .join-info{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:16px;font-size:13px;color:var(--dim)}
 .join-info code{color:var(--secondary);font-size:12px}
 .mint-info{margin-top:12px;font-size:13px;color:var(--dim);letter-spacing:1px}
@@ -3069,7 +3069,7 @@ async function renderPiece(db, id) {
         let statusCls, statusIcon;
         if (a.rejected) { statusCls = 'approval-rejected'; statusIcon = '✗'; }
         else if (a.approved) { statusCls = 'approval-approved'; statusIcon = '✓'; }
-        else { statusCls = 'approval-pending'; statusIcon = '·'; }
+        else { statusCls = 'approval-pending'; statusIcon = '✕'; }
         const who = a.human_x_handle ? `<a href="https://x.com/${esc(a.human_x_handle)}" target="_blank" rel="noreferrer" style="color:var(--primary);text-decoration:none">@${esc(a.human_x_handle)}</a>` : (a.guardian_address ? esc(a.guardian_address.slice(0, 10) + '...') : esc(a.agent_id));
         return `<div class="approval-item">
           <span class="approval-status ${statusCls}">${statusIcon}</span>
@@ -3106,25 +3106,17 @@ async function renderPiece(db, id) {
   const mintReady = status === 'approved';
   if (status !== 'minted' && status !== 'deleted') {
     guardianActionsHTML = `
-    <div id="guardian-actions" style="display:none;margin-top:24px;padding:20px;background:var(--card-bg,#141419);border:1px solid var(--border,#2a2a35);border-radius:8px">
-      <h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:12px">Guardian Actions</h3>
-      <div id="guardian-status" style="margin-bottom:12px;font-size:14px;color:var(--text,#e0e0e0)"></div>
+    <div id="guardian-actions" style="display:none;margin-top:10px;padding:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border,#2a2a35);border-radius:8px">
+      <h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:10px">Guardian Actions</h3>
+      <div id="guardian-status" style="margin-bottom:10px;font-size:13px;color:var(--text,#e0e0e0)"></div>
+      <div id="guardian-connect" style="display:none;margin-bottom:10px"><button id="btn-connect" onclick="connectWalletForApproval()" style="padding:10px 18px;background:var(--primary,#6ee7b7);color:#000;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Connect Wallet</button></div>
       <div id="guardian-buttons" style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="btn-approve" onclick="guardianAction('approve')" style="padding:10px 20px;background:#22c55e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">✅ Approve Mint</button>
         <button id="btn-reject" onclick="guardianAction('reject')" style="padding:10px 20px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">❌ Reject</button>
         <button id="btn-delete" onclick="guardianAction('delete')" style="padding:10px 20px;background:transparent;color:#ef4444;border:1px solid #ef444466;border-radius:6px;font-size:14px;cursor:pointer">🗑 Delete Piece</button>
         <button id="btn-mint" onclick="guardianMint()" ${mintReady ? '' : 'disabled'} style="padding:10px 20px;background:${mintReady ? '#84cc16' : '#2f2f2f'};color:${mintReady ? '#04110a' : '#9ca3af'};border:1px solid ${mintReady ? '#a3e635' : '#454545'};border-radius:6px;font-size:14px;font-weight:700;cursor:${mintReady ? 'pointer' : 'not-allowed'}">⛏ Mint Piece</button>
       </div>
-      <div id="guardian-result" style="margin-top:12px;font-size:13px;display:none"></div>
-      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border,#2a2a35)">
-        <p style="font-size:12px;color:var(--dim);line-height:1.6;margin:0">
-          Mint turns green after all required guardians approve. Then any collaborator guardian can trigger on-chain mint. NFT custody routes to the gallery custody wallet.
-        </p>
-      </div>
-    </div>
-
-    <div id="wallet-connect-prompt" style="margin-top:16px;text-align:center;display:none">
-      <button id="btn-connect" onclick="connectWalletForApproval()" style="padding:10px 24px;background:var(--primary,#6ee7b7);color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">Connect Wallet to Approve/Reject</button>
+      <div id="guardian-result" style="margin-top:10px;font-size:13px;display:none"></div>
     </div>
 
     <script>
@@ -3153,12 +3145,13 @@ async function renderPiece(db, id) {
         const data = await res.json();
         if (data.isGuardian) {
           document.getElementById('guardian-actions').style.display = 'block';
-          document.getElementById('wallet-connect-prompt').style.display = 'none';
+          document.getElementById('guardian-connect').style.display = 'none';
+          document.getElementById('guardian-buttons').style.display = 'flex';
           document.getElementById('guardian-status').innerHTML =
             'Connected as <strong>' + connectedAddress.slice(0, 6) + '...' + connectedAddress.slice(-4) + '</strong>' +
             (data.agentName ? ' (guardian of ' + data.agentName + ')' : '') +
-            (data.alreadyApproved ? ' — <span style="color:#22c55e">Already approved ✓</span>' : '') +
-            (data.alreadyRejected ? ' — <span style="color:#ef4444">Already rejected ✗</span>' : '');
+            (data.alreadyApproved ? ' — <span style="color:#22c55e">Approved ✓</span>' : '') +
+            (data.alreadyRejected ? ' — <span style="color:#ef4444">Rejected ✗</span>' : '');
           if (data.alreadyApproved || data.alreadyRejected) {
             document.getElementById('btn-approve').disabled = true;
             document.getElementById('btn-approve').style.opacity = '0.4';
@@ -3167,7 +3160,6 @@ async function renderPiece(db, id) {
           }
         } else {
           document.getElementById('guardian-actions').style.display = 'none';
-          document.getElementById('wallet-connect-prompt').style.display = 'none';
         }
       } catch (e) {
         console.error('Guardian check failed:', e);
@@ -3279,7 +3271,10 @@ async function renderPiece(db, id) {
           connectedAddress = accounts[0];
           checkGuardianStatus();
         } else {
-          document.getElementById('wallet-connect-prompt').style.display = 'block';
+          document.getElementById('guardian-actions').style.display = 'block';
+          document.getElementById('guardian-buttons').style.display = 'none';
+          document.getElementById('guardian-connect').style.display = 'block';
+          document.getElementById('guardian-status').textContent = 'Connect wallet to approve/reject/mint.';
         }
       });
     }
