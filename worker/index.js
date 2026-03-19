@@ -5745,7 +5745,7 @@ Content-Type: application/json
         // Also store in legacy intents table for backward compat
         await db.prepare(
           'INSERT INTO intents (id, agent_id, agent_name, statement, tension, material, interaction, matched, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)'
-        ).bind(requestId, agentId, agentName, body.intent.statement, body.intent.tension || '', body.intent.material || '', body.intent.interaction || '', now).run();
+        ).bind(requestId, agentId, agentName, body.intent.statement || '', body.intent.tension || '', body.intent.material || '', body.intent.interaction || '', now).run();
 
         // For duo mode, try immediate match
         if (mode === 'duo') {
