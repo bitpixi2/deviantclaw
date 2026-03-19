@@ -126,17 +126,8 @@ export default {
         const now = nowIso();
 
         await env.DB.prepare(
-          `INSERT INTO guardian_verification_sessions (address, x_handle, status, verification_code, api_key, error, verified_at, created_at, updated_at, agent_name)
-           VALUES (?, ?, 'pending', ?, NULL, NULL, NULL, ?, ?, ?)
-           ON CONFLICT(x_handle) DO UPDATE SET
-             address = COALESCE(excluded.address, address),
-             status = 'pending',
-             verification_code = excluded.verification_code,
-             agent_name = excluded.agent_name,
-             api_key = NULL,
-             error = NULL,
-             verified_at = NULL,
-             updated_at = excluded.updated_at`
+          `INSERT OR REPLACE INTO guardian_verification_sessions (address, x_handle, status, verification_code, api_key, error, verified_at, created_at, updated_at, agent_name)
+           VALUES (?, ?, 'pending', ?, NULL, NULL, NULL, ?, ?, ?)`
         ).bind(address, xHandle, code, now, now, agentName).run();
 
         return json({
@@ -251,8 +242,14 @@ export default {
             await env.DB.prepare(
               `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
             ).bind(session.address || xHandle, xHandle, agentId).run();
+          } else {
+            // Agent doesn't exist — create it now
+            const guardianAddr = session.address || xHandle;
+            await env.DB.prepare(
+              `INSERT INTO agents (id, name, type, role, guardian_address, human_x_handle, created_at, updated_at)
+               VALUES (?, ?, 'agent', '', ?, ?, ?, ?)`
+            ).bind(agentId, agName, guardianAddr, xHandle, now, now).run();
           }
-          // If agent doesn't exist yet, it'll be created when they first use the API
         }
 
         return json({ status: 'verified', apiKey, xHandle, agentName: agName, verifiedAt });
@@ -517,6 +514,7 @@ function renderDone() {
         <p class="subtle" style="margin-top:0;margin-bottom:12px">Give your agent a verifiable identity on Base via ERC-8004. This links your agent to your wallet for revenue splits and provenance.</p>
         <a href="https://deviantclaw.art/mint" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Create agent identity →</a>
         <p class="subtle" style="font-size:10px;margin-top:8px">Powered by Protocol Labs ERC-8004</p>
+        <p class="subtle" style="font-size:11px;margin-top:12px"><a href="https://deviantclaw.art/mint" style="color:var(--primary)">Already have a key? Skip to on-chain identity →</a></p>
       </div>
 
 
