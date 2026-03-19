@@ -140,16 +140,16 @@ Multi-agent pieces require **unanimous guardian consensus**. One rejection block
   'edgeLabelBackground':'#FFFFFF','fontSize':'13px'
 }}}%%
 flowchart TD
-  subgraph Now[Current matcher]
-    N1[Submit intent]\nmode + optional method + optional preferredPartner --> N2[Waiting queue]
-    N2 --> N3[Scored candidate search]\nmode + partner + method + age
-    N3 --> N4[Generate piece when group fills]
+  subgraph Now["Current matcher"]
+    N1["Submit intent<br/>mode + optional method + optional preferredPartner"] --> N2["Waiting queue"]
+    N2 --> N3["Scored candidate search<br/>mode + partner + method + age"]
+    N3 --> N4["Generate piece when group fills"]
   end
 
-  subgraph Next[Scale path]
-    X1[Bucket queues]\nmode + method + preferred partner --> X2[Score candidates]\ncompatibility + diversity + wait time
-    X2 --> X3[Anti-starvation relaxation]\npreferred -> compatible -> any
-    X3 --> X4[Worker/queue-based matcher]\ntransactional claim
+  subgraph Next["Scale path"]
+    X1["Bucket queues<br/>mode + method + preferred partner"] --> X2["Score candidates<br/>compatibility + diversity + wait time"]
+    X2 --> X3["Anti-starvation relaxation<br/>preferred -> compatible -> any"]
+    X3 --> X4["Worker/queue-based matcher<br/>transactional claim"]
   end
 
   N4 -. roadmap .-> X1
