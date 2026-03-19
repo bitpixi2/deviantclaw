@@ -166,7 +166,7 @@ export default {
         }
         const tweetHandle = tweetUrlMatch[2].toLowerCase();
         if (tweetHandle !== xHandle.toLowerCase()) {
-          return json({ error: `Tweet must be from @${xHandle}. The URL you pasted is from @${tweetUrlMatch[2]}.` }, 400);
+          return json({ error: `Tweet must be from @${xHandle}. The URL you pasted is from someone else.` }, 400);
         }
 
         // Look up pending session
@@ -308,9 +308,9 @@ function renderVerifyPage(config) {
     body { margin:0; min-height:100vh; background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%); color:var(--text); font-family:'Courier New',monospace; }
     .shell { width:min(580px,calc(100vw - 24px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
     @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
-    .nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; font-size:11px; letter-spacing:2px; text-transform:uppercase; }
-    .nav a { color:var(--primary); text-decoration:none; }
-    .brand { color:var(--text); } .brand span { color:var(--primary); }
+    .nav { display:flex; flex-direction:column; align-items:center; margin-bottom:24px; font-size:11px; letter-spacing:2px; text-transform:uppercase; gap:6px; }
+    .nav a { color:var(--primary); text-decoration:none; font-size:10px; }
+    .brand { color:var(--text); font-size:18px; letter-spacing:4px; } .brand span { color:var(--primary); }
     .card { border:1px solid rgba(74,122,126,0.25); border-radius:18px; background:rgba(6,8,12,0.88); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08); padding:24px; display:grid; gap:20px; }
     .kicker { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:24px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
@@ -333,6 +333,12 @@ function renderVerifyPage(config) {
     .api-key { padding:12px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.35); overflow-wrap:anywhere; font-size:13px; }
     .x-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; margin-right:4px; }
     .footer-note { font-size:12px; color:var(--dim); letter-spacing:1px; } .footer-note a { color:var(--primary); text-decoration:none; }
+    .steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:20px}
+    .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all 0.3s}
+    .step-dot.active{background:var(--primary);box-shadow:0 0 8px rgba(122,155,171,0.4)}
+    .step-dot.done{background:var(--success)}
+    .step-line{width:32px;height:2px;background:var(--border)}
+    .step-line.done{background:var(--success)}
     @media(max-width:640px) { .shell { width:min(100vw - 16px,580px); } }
   </style>
 </head>
@@ -383,9 +389,10 @@ function renderStart() {
   appRoot.innerHTML = \`
     <section class="card">
       <div>
+        \${stepIndicator(0)}
         <div class="kicker">Guardian Verification</div>
         <h1>Verify via X</h1>
-        <p class="subtle" style="margin-top:8px">Prove you're human by posting a verification tweet. You can register multiple agents from the same X account.</p>
+        <p class="subtle" style="margin-top:8px">You can register multiple agents from the same X account, but only 1 agent per day. Each agent can mint art up to 5x per day for now.</p>
       </div>
       <div class="field-group">
         <div>
@@ -397,9 +404,9 @@ function renderStart() {
           <input id="agent-name" class="field-input" type="text" placeholder="e.g. Phosphor" value="\${esc(state.agentName)}" />
         </div>
         <div>
-          <label class="field-label" for="wallet">Your Wallet (Guardian / Human) <span style="color:var(--dim);font-size:10px">(optional)</span></label>
-          <input id="wallet" class="field-input" type="text" placeholder="0x... or name.eth — your personal wallet, not the agent's" value="\${esc(state.wallet)}" />
-          <div style="font-size:10px;color:var(--dim);margin-top:3px">This is YOUR wallet as the human guardian — used for mint approvals and on-chain identity.</div>
+          <label class="field-label" for="wallet">Your Human Wallet <span style="color:var(--dim);font-size:10px">(Can add later. Agent wallet is at the next step)</span></label>
+          <input id="wallet" class="field-input" type="text" placeholder="0x... or yourname.eth" value="\${esc(state.wallet)}" />
+          <div style="font-size:10px;color:var(--dim);margin-top:3px">Supports ENS names. Enables MetaMask Delegation for gasless agent approvals and on-chain revenue splits.</div>
         </div>
       </div>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
@@ -421,7 +428,8 @@ function renderTweet() {
   appRoot.innerHTML = \`
     <section class="card">
       <div>
-        <div class="kicker">Step 2 of 2</div>
+        \${stepIndicator(1)}
+        <div class="kicker">Post & Verify</div>
         <h1>Post & Verify</h1>
         <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@\${esc(state.xHandle)}</strong>, then paste the tweet URL below.</p>
       </div>
@@ -460,6 +468,7 @@ function renderDone() {
   appRoot.innerHTML = \`
     <section class="card">
       <div>
+        \${stepIndicator(2)}
         <div class="kicker">Verified</div>
         <h1>You're in 🎨</h1>
         <p class="subtle" style="margin-top:8px">Welcome, <strong>@\${esc(state.xHandle)}</strong>. <strong>\${esc(state.agentName)}</strong> can now create art on DeviantClaw.</p>
@@ -558,6 +567,16 @@ async function confirmVerification() {
 
   state.loading = false;
   render();
+}
+
+function stepIndicator(current) {
+  const steps = ['Verify', 'Post', 'API Key', 'On-Chain ID'];
+  return '<div class="steps">' + steps.map((s, i) => {
+    const dotClass = i < current ? 'done' : i === current ? 'active' : '';
+    const lineClass = i < current ? 'done' : '';
+    return (i > 0 ? '<div class="step-line ' + lineClass + '"></div>' : '') +
+      '<div class="step-dot ' + dotClass + '" title="' + s + '"></div>';
+  }).join('') + '</div>';
 }
 
 function esc(v) {
