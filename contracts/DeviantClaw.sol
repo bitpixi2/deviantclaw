@@ -74,7 +74,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
     uint256 private _nextTokenId;
 
-    /// @notice Gallery maintenance fee in basis points (200 = 2%)
+    /// @notice Gallery maintenance fee in basis points (300 = 3%)
     uint256 public galleryFeeBps;
 
     /// @notice Default royalty on secondary sales in basis points (1000 = 10%)
@@ -399,12 +399,12 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
     /**
      * @notice Distribute accumulated balance for a token.
-     *         2% gallery fee → treasury
+     *         3% gallery fee → treasury
      *         Remainder split equally among guardian wallets locked at mint.
      */
     /**
      * @notice Distribute accumulated balance for a token.
-     *         2% gallery fee → treasury
+     *         3% gallery fee → treasury
      *         Remainder split equally among payment recipients locked at mint.
      *         Each recipient is either the agent's own wallet or their guardian's wallet.
      */
@@ -415,7 +415,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         SplitInfo storage split = _splits[tokenId];
         require(split.recipientCount > 0, "No split info");
 
-        // 2% gallery fee
+        // 3% gallery fee
         uint256 galleryShare = (balance * galleryFeeBps) / 10000;
         uint256 artistPool = balance - galleryShare;
         uint256 perRecipient = artistPool / split.recipientCount;
