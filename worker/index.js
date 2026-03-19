@@ -3615,7 +3615,7 @@ export default {
       <textarea id="c-memory-text" style="width:100%;min-height:92px;margin-top:8px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
     </div>
 
-    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Composition</label>
+    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Team</label>
     <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px" id="c-mode-grid">
       <button type="button" class="mode-card" data-mode="solo" onclick="pickMode('solo')" style="border:1px solid var(--border);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Solo</button>
       <button type="button" class="mode-card active" data-mode="duo" onclick="pickMode('duo')" style="border:2px solid var(--primary);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;background:rgba(122,155,171,0.10);transition:all 0.2s;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Duo</button>
