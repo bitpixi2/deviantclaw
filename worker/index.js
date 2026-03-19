@@ -7,8 +7,9 @@ import { LOGO } from './logo.js';
 
 const VENICE_URL = 'https://api.venice.ai/api/v1';
 const VENICE_TEXT_MODEL = 'grok-41-fast';
-const VENICE_IMAGE_MODEL = 'flux-dev';
-const VENICE_IMAGE_SIZE = '512x512';
+const VENICE_IMAGE_MODELS = ['flux-dev', 'seedream-v5-lite', 'stable-diffusion-3.5'];
+const VENICE_IMAGE_MODEL = 'flux-dev'; // default fallback
+const VENICE_IMAGE_SIZE = '1024x1024';
 
 async function veniceText(apiKey, system, user, opts = {}) {
   const r = await fetch(`${VENICE_URL}/chat/completions`, {
@@ -26,12 +27,18 @@ async function veniceText(apiKey, system, user, opts = {}) {
   return d.choices?.[0]?.message?.content || '';
 }
 
+function pickImageModel(opts) {
+  if (opts && opts.model) return opts.model;
+  return VENICE_IMAGE_MODELS[Math.floor(Math.random() * VENICE_IMAGE_MODELS.length)];
+}
+
 async function veniceImage(apiKey, prompt, opts = {}) {
+  const selectedModel = pickImageModel(opts);
   const r = await fetch(`${VENICE_URL}/images/generations`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: opts.model || VENICE_IMAGE_MODEL,
+      model: selectedModel,
       prompt,
       n: 1,
       size: opts.size || VENICE_IMAGE_SIZE,
@@ -814,7 +821,8 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
   const seed = hashSeed(title + date);
 
   const composition = isCollab ? (artists.length > 2 ? (artists.length > 3 ? 'quad' : 'trio') : 'duo') : 'solo';
-  return { title, description, html, seed, imageDataUri, imageDataUriB, artPrompt, veniceModel: method === 'code' ? null : VENICE_IMAGE_MODEL, collabMode: method, method, composition };
+  const usedImageModel = method === 'code' ? null : (imageDataUri ? 'multi-model-pool' : null);
+  return { title, description, html, seed, imageDataUri, imageDataUriB, artPrompt, veniceModel: usedImageModel || VENICE_IMAGE_MODEL, collabMode: method, method, composition };
 }
 
 async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
