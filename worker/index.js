@@ -434,12 +434,8 @@ setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);
 function buildCollageHTML(imageUrls, title, artists, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
   const n = imageUrls.length;
-  // Layout positions for 2, 3, or 4 cutouts
+  // Layout positions for 3 or 4 cutouts; duo gets dedicated dual-mask layout below
   const layouts = {
-    2: [
-      { top: '2%', left: '2%', w: '62%', h: '65%', br: '12px 4px 12px 4px', z: 1 },
-      { bottom: '2%', right: '2%', w: '58%', h: '60%', br: '4px 12px 4px 12px', z: 2 }
-    ],
     3: [
       { top: '2%', left: '2%', w: '55%', h: '55%', br: '12px 4px', z: 1 },
       { top: '8%', right: '3%', w: '48%', h: '50%', br: '4px 12px', z: 2 },
@@ -452,13 +448,26 @@ function buildCollageHTML(imageUrls, title, artists, date) {
       { bottom: '1%', right: '1%', w: '50%', h: '48%', br: '4px 8px', z: 4 }
     ]
   };
-  const positions = layouts[Math.min(n, 4)] || layouts[2];
 
-  const cutouts = positions.slice(0, n).map((pos, i) => {
-    const rot = (Math.random() * 6 - 3).toFixed(1);
-    const style = `${pos.top ? 'top:' + pos.top + ';' : ''}${pos.bottom ? 'bottom:' + pos.bottom + ';' : ''}${pos.left ? 'left:' + pos.left + ';' : ''}${pos.right ? 'right:' + pos.right + ';' : ''}width:${pos.w};height:${pos.h};border-radius:${pos.br};transform:rotate(${rot}deg);z-index:${pos.z}`;
-    return `<div class="cutout" style="${style}"><img src="${esc(imageUrls[i])}" alt="${esc(artists[i] || '')}"/><div class="tag">${esc(artists[i] || '')}</div></div>`;
-  }).join('\n  ');
+  let cutouts = '';
+  if (n === 2) {
+    cutouts = `
+    <div class="panel panel-a">
+      <img src="${esc(imageUrls[0])}" alt="${esc(artists[0] || '')}"/>
+      <div class="tag">${esc(artists[0] || '')}</div>
+    </div>
+    <div class="panel panel-b">
+      <img src="${esc(imageUrls[1])}" alt="${esc(artists[1] || '')}"/>
+      <div class="tag">${esc(artists[1] || '')}</div>
+    </div>`;
+  } else {
+    const positions = layouts[Math.min(n, 4)] || layouts[3];
+    cutouts = positions.slice(0, n).map((pos, i) => {
+      const rot = (Math.random() * 6 - 3).toFixed(1);
+      const style = `${pos.top ? 'top:' + pos.top + ';' : ''}${pos.bottom ? 'bottom:' + pos.bottom + ';' : ''}${pos.left ? 'left:' + pos.left + ';' : ''}${pos.right ? 'right:' + pos.right + ';' : ''}width:${pos.w};height:${pos.h};border-radius:${pos.br};transform:rotate(${rot}deg);z-index:${pos.z}`;
+      return `<div class="cutout" style="${style}"><img src="${esc(imageUrls[i])}" alt="${esc(artists[i] || '')}"/><div class="tag">${esc(artists[i] || '')}</div></div>`;
+    }).join('\n  ');
+  }
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -467,6 +476,10 @@ function buildCollageHTML(imageUrls, title, artists, date) {
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;display:flex;align-items:center;justify-content:center;height:100vh}
 .collage{position:relative;width:90vmin;height:90vmin;max-width:800px;max-height:800px}
+.panel{position:absolute;overflow:hidden;border:2px solid rgba(255,255,255,0.1);box-shadow:0 20px 60px rgba(0,0,0,0.6)}
+.panel img{width:100%;height:100%;object-fit:cover}
+.panel-a{inset:2% auto 2% 2%;width:58%;height:96%;clip-path:polygon(0 0,92% 4%,84% 49%,94% 100%,0 100%)}
+.panel-b{inset:2% 2% 2% auto;width:58%;height:96%;clip-path:polygon(8% 0,100% 0,100% 100%,6% 96%,16% 51%)}
 .cutout{position:absolute;overflow:hidden;border:2px solid rgba(255,255,255,0.08);box-shadow:0 20px 60px rgba(0,0,0,0.6);transition:transform 0.3s ease}
 .cutout:hover{transform:scale(1.03)!important;z-index:10!important}
 .cutout img{width:100%;height:100%;object-fit:cover}
