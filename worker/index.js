@@ -915,9 +915,9 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .install-cmd{font-size:14px;color:var(--secondary);display:block}
 .hero-desc{font-size:15px;color:var(--dim);letter-spacing:1px;line-height:1.7;max-width:520px;margin:0 auto 20px}
 .built-with{padding:22px 0 18px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden}
-.built-with-marquee{position:relative;display:flex;align-items:center;gap:0;white-space:nowrap}
-.built-with-label{display:inline-flex;align-items:center;justify-content:center;padding:0 22px;height:54px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);border-right:1px solid var(--border);flex:0 0 auto}
-.marquee-track{display:flex;align-items:center;gap:40px;min-width:max-content;animation:dcMarquee 36s linear infinite;padding:0 24px}
+.built-with-marquee{position:relative;display:flex;align-items:center;gap:0;white-space:nowrap;overflow:hidden}
+.built-with-label{display:inline-flex;align-items:center;justify-content:center;padding:0 22px;height:54px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);border-right:1px solid var(--border);flex:0 0 auto;position:relative;z-index:3;background:var(--bg)}
+.marquee-track{display:flex;align-items:center;gap:40px;min-width:max-content;animation:dcMarquee 36s linear infinite;padding:0 24px;position:relative;z-index:1;-webkit-mask-image:linear-gradient(to right,transparent 0,transparent 150px,#000 190px,#000 calc(100% - 24px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,transparent 150px,#000 190px,#000 calc(100% - 24px),transparent 100%)}
 @keyframes dcMarquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .brand-link{display:flex;align-items:center;justify-content:center;min-width:136px;min-height:50px;opacity:.8;transition:opacity .2s,transform .2s;flex:0 0 auto}
 .brand-link:hover{opacity:1;transform:translateY(-1px)}
@@ -931,7 +931,7 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 @media (max-width:640px){
   .built-with{padding:16px 0}
   .built-with-label{height:46px;padding:0 14px;font-size:10px;letter-spacing:1.5px}
-  .marquee-track{gap:28px;padding:0 14px;animation-duration:30s}
+  .marquee-track{gap:28px;padding:0 14px;animation-duration:30s;-webkit-mask-image:linear-gradient(to right,transparent 0,transparent 108px,#000 132px,#000 calc(100% - 16px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,transparent 108px,#000 132px,#000 calc(100% - 16px),transparent 100%)}
   .brand-link{min-width:96px;min-height:38px}
   .brand-link img,.brand-link svg{max-width:130px;height:34px}
   .brand-x svg{height:24px;width:24px}
