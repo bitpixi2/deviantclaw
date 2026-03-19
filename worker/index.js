@@ -860,6 +860,7 @@ nav .brand span{color:var(--primary)}
 nav .links{display:flex;gap:20px;font-size:14px;letter-spacing:1px;text-transform:uppercase}
 nav .links a{color:var(--dim)}
 nav .links a:hover{color:var(--primary)}
+.mobile-only{display:none}
 .hamburger{display:none;cursor:pointer;z-index:20;background:none;border:none;padding:4px}
 .hamburger span{display:block;width:22px;height:2px;background:var(--text);margin:5px 0;transition:all 0.3s ease}
 .hamburger.open span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
@@ -867,6 +868,7 @@ nav .links a:hover{color:var(--primary)}
 .hamburger.open span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
 @media(max-width:600px){
 .hamburger{display:block}
+.mobile-only{display:block}
 nav .links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:32px;font-size:18px;z-index:15;opacity:0;transition:opacity 0.3s ease}
 nav .links.open{display:flex;opacity:1}
 nav .links a{color:var(--text);font-size:18px}
@@ -1081,7 +1083,7 @@ function navHTML() {
     <span></span><span></span><span></span>
   </button>
   <div class="links">
-    <a href="/" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">start</a>
+    <a href="/" class="mobile-only" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">start</a>
     <a href="/gallery" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">gallery</a>
     <a href="/artists" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">artists</a>
     <a href="/queue" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">queue</a>
