@@ -398,6 +398,10 @@ const state = {
   apiKey: '',
   error: '',
   loading: false,
+  cardDescription: '',
+  cardImage: '',
+  cardServices: [],
+  cardRegistrations: [],
 };
 
 render();
@@ -488,6 +492,7 @@ function renderTweet() {
 
 function renderDone() {
   const defaultAgentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  ensureCardDefaults(defaultAgentId);
 
   appRoot.innerHTML = \`
     <section class="card">
@@ -519,13 +524,30 @@ function renderDone() {
           </div>
           <div>
             <label class="field-label" for="id-desc">Description (optional)</label>
-            <input id="id-desc" class="field-input" placeholder="Describe your agent" />
+            <input id="id-desc" class="field-input" value="\${esc(state.cardDescription || '')}" placeholder="Describe your agent" />
           </div>
           <div>
             <label class="field-label" for="id-image">Image URL (optional)</label>
-            <input id="id-image" class="field-input" placeholder="https://unavatar.io/x/yourhandle" />
+            <input id="id-image" class="field-input" value="\${esc(state.cardImage || '')}" placeholder="https://unavatar.io/x/yourhandle" />
           </div>
         </div>
+
+        <div>
+          <label class="field-label" style="margin-bottom:8px">Services</label>
+          <div id="svc-rows" style="display:grid;gap:6px"></div>
+          <div class="btn-row" style="margin-top:8px"><button class="secondary" id="add-svc-btn">+ add service</button></div>
+        </div>
+
+        <div>
+          <label class="field-label" style="margin-bottom:8px">Registrations</label>
+          <div id="reg-rows" style="display:grid;gap:6px"></div>
+          <div class="btn-row" style="margin-top:8px"><button class="secondary" id="add-reg-btn">+ add registration</button></div>
+        </div>
+
+        <details style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.2)">
+          <summary style="cursor:pointer;font-size:12px;color:var(--dim)">Preview JSON that will be minted</summary>
+          <pre id="card-preview" style="margin-top:8px;white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--text);line-height:1.5"></pre>
+        </details>
 
         <div class="btn-row">
           <button id="mint-inline-btn">Connect Wallet & Mint ERC-8004</button>
@@ -567,6 +589,13 @@ function renderDone() {
     setTimeout(() => { b.textContent = 'Copy key'; }, 1500);
   });
 
+  document.getElementById('id-agent').addEventListener('input', () => {
+    ensureCardDefaults(String(document.getElementById('id-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'));
+    updateCardPreview();
+  });
+  document.getElementById('id-desc').addEventListener('input', e => { state.cardDescription = e.target.value; updateCardPreview(); });
+  document.getElementById('id-image').addEventListener('input', e => { state.cardImage = e.target.value; updateCardPreview(); });
+
   document.getElementById('mint-inline-btn').addEventListener('click', mintInline);
   document.getElementById('link-inline-btn').addEventListener('click', () => {
     const t = document.getElementById('id-token');
@@ -574,6 +603,95 @@ function renderDone() {
   });
   document.getElementById('link-token-btn').addEventListener('click', linkExistingInline);
   document.getElementById('art-submit-btn').addEventListener('click', submitArtInline);
+  document.getElementById('add-svc-btn').addEventListener('click', () => {
+    state.cardServices.push({ name: '', endpoint: '' });
+    renderCardRows();
+    updateCardPreview();
+  });
+  document.getElementById('add-reg-btn').addEventListener('click', () => {
+    state.cardRegistrations.push({ name: '', endpoint: '' });
+    renderCardRows();
+    updateCardPreview();
+  });
+
+  renderCardRows();
+  updateCardPreview();
+}
+
+function ensureCardDefaults(agentId) {
+  const safeAgent = agentId || (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  if (!state.cardDescription) state.cardDescription = '';
+  if (!state.cardImage) state.cardImage = 'https://unavatar.io/x/' + encodeURIComponent(state.xHandle || '');
+  if (!Array.isArray(state.cardServices) || state.cardServices.length === 0) {
+    state.cardServices = [{ name: 'web', endpoint: 'https://deviantclaw.art/agent/' + safeAgent }];
+  }
+  if (!Array.isArray(state.cardRegistrations) || state.cardRegistrations.length === 0) {
+    state.cardRegistrations = [{ name: 'x', endpoint: 'https://x.com/' + (state.xHandle || '') }];
+  }
+}
+
+function renderCardRows() {
+  const svc = document.getElementById('svc-rows');
+  const reg = document.getElementById('reg-rows');
+  if (!svc || !reg) return;
+
+  svc.innerHTML = state.cardServices.map((s, i) =>
+    '<div style="display:grid;grid-template-columns:1fr 2fr auto;gap:6px">' +
+      '<input class="field-input" data-kind="svc-name" data-idx="' + i + '" value="' + esc(s.name || '') + '" placeholder="name" />' +
+      '<input class="field-input" data-kind="svc-end" data-idx="' + i + '" value="' + esc(s.endpoint || '') + '" placeholder="https://..." />' +
+      '<button class="secondary" data-kind="svc-del" data-idx="' + i + '">×</button>' +
+    '</div>'
+  ).join('');
+
+  reg.innerHTML = state.cardRegistrations.map((r, i) =>
+    '<div style="display:grid;grid-template-columns:1fr 2fr auto;gap:6px">' +
+      '<input class="field-input" data-kind="reg-name" data-idx="' + i + '" value="' + esc(r.name || '') + '" placeholder="name" />' +
+      '<input class="field-input" data-kind="reg-end" data-idx="' + i + '" value="' + esc(r.endpoint || '') + '" placeholder="https://..." />' +
+      '<button class="secondary" data-kind="reg-del" data-idx="' + i + '">×</button>' +
+    '</div>'
+  ).join('');
+
+  appRoot.querySelectorAll('[data-kind]').forEach(el => {
+    el.addEventListener('input', e => {
+      const idx = parseInt(e.target.getAttribute('data-idx'), 10);
+      const kind = e.target.getAttribute('data-kind');
+      if (kind === 'svc-name') state.cardServices[idx].name = e.target.value;
+      else if (kind === 'svc-end') state.cardServices[idx].endpoint = e.target.value;
+      else if (kind === 'reg-name') state.cardRegistrations[idx].name = e.target.value;
+      else if (kind === 'reg-end') state.cardRegistrations[idx].endpoint = e.target.value;
+      updateCardPreview();
+    });
+    el.addEventListener('click', e => {
+      const kind = e.target.getAttribute('data-kind');
+      const idx = parseInt(e.target.getAttribute('data-idx'), 10);
+      if (kind === 'svc-del') state.cardServices.splice(idx, 1);
+      if (kind === 'reg-del') state.cardRegistrations.splice(idx, 1);
+      if (kind === 'svc-del' || kind === 'reg-del') {
+        if (state.cardServices.length === 0) state.cardServices = [{ name: 'web', endpoint: '' }];
+        if (state.cardRegistrations.length === 0) state.cardRegistrations = [{ name: 'x', endpoint: '' }];
+        renderCardRows();
+        updateCardPreview();
+      }
+    });
+  });
+}
+
+function buildAgentCard(agentId) {
+  const safeAgent = agentId || (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  return {
+    name: state.agentName || safeAgent,
+    description: state.cardDescription || ('Agent identity for ' + (state.agentName || safeAgent)),
+    image: state.cardImage || ('https://unavatar.io/x/' + encodeURIComponent(state.xHandle || '')),
+    services: (state.cardServices || []).filter(s => (s.name || '').trim() || (s.endpoint || '').trim()),
+    registrations: (state.cardRegistrations || []).filter(r => (r.name || '').trim() || (r.endpoint || '').trim())
+  };
+}
+
+function updateCardPreview() {
+  const pre = document.getElementById('card-preview');
+  if (!pre) return;
+  const agentId = String(document.getElementById('id-agent')?.value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  pre.textContent = JSON.stringify(buildAgentCard(agentId), null, 2);
 }
 
 async function linkExistingInline() {
@@ -615,13 +733,6 @@ async function mintInline() {
 
   const REGISTRY = '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
   const BASE_CHAIN_ID = '0x2105';
-  const ABI = [{
-    "inputs":[{"internalType":"string","name":"agentURI","type":"string"}],
-    "name":"register",
-    "outputs":[{"internalType":"uint256","name":"agentId","type":"uint256"}],
-    "stateMutability":"nonpayable",
-    "type":"function"
-  }];
 
   statusEl.innerHTML = '<span class="status-pill pill-pending">Connecting wallet…</span>';
   try {
@@ -633,13 +744,9 @@ async function mintInline() {
       await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_ID }] });
     }
 
-    const payload = {
-      name: state.agentName || agentId,
-      description: desc || \`Agent identity for \${state.agentName || agentId}\`,
-      image: image || \`https://unavatar.io/x/\${encodeURIComponent(state.xHandle || '')}\`,
-      services: [{ name: 'web', endpoint: \`https://deviantclaw.art/agent/\${agentId}\` }],
-      registrations: [{ name: 'x', endpoint: \`https://x.com/\${state.xHandle || ''}\` }]
-    };
+    state.cardDescription = desc;
+    state.cardImage = image || state.cardImage;
+    const payload = buildAgentCard(agentId);
 
     const agentURI = 'data:application/json;base64,' + btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
 
