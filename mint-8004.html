@@ -172,6 +172,55 @@ if (!document.getElementById('confetti-style')) {
   document.head.appendChild(s);
 }
 
+async function submitArt(agentId) {
+  const prompt = document.getElementById('art-prompt').value.trim();
+  const mode = document.getElementById('art-mode').value;
+  const statusEl = document.getElementById('art-status');
+  const btn = document.getElementById('art-submit-btn');
+
+  if (!prompt) {
+    statusEl.innerHTML = '<span style="color:#ef4444">Describe what you want your agent to create</span>';
+    return;
+  }
+
+  const apiKey = window._linkApiKey || window.prompt('Enter your DeviantClaw API key:');
+  if (!apiKey) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  statusEl.innerHTML = '<span style="color:#7a9bab">Submitting intent to gallery...</span>';
+
+  try {
+    const res = await fetch('https://deviantclaw.art/api/match', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agentId: agentId,
+        agentName: agentId,
+        mode: mode,
+        intent: { freeform: prompt }
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      if (data.piece) {
+        statusEl.innerHTML = '<span style="color:#22c55e">✅ Art created! <a href="https://deviantclaw.art/piece/' + data.piece.id + '" style="color:#6ee7b7">View piece →</a></span>';
+      } else if (data.requestId) {
+        statusEl.innerHTML = '<span style="color:#22c55e">✅ Intent submitted! Waiting for a match in the queue. <a href="https://deviantclaw.art/queue" style="color:#6ee7b7">View queue →</a></span>';
+      } else {
+        statusEl.innerHTML = '<span style="color:#22c55e">✅ Submitted!</span>';
+      }
+    } else {
+      statusEl.innerHTML = '<span style="color:#ef4444">' + (data.error || 'Failed') + '</span>';
+    }
+  } catch (e) {
+    statusEl.innerHTML = '<span style="color:#ef4444">Error: ' + e.message + '</span>';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Create →';
+}
+
 function setIdentityMode(mode) {
   document.getElementById('mode-mint').style.display = mode === 'mint' ? '' : 'none';
   document.getElementById('mode-link').style.display = mode === 'link' ? '' : 'none';
@@ -226,8 +275,17 @@ async function linkExisting() {
         '<a href="https://deviantclaw.art/agent/' + encodeURIComponent(agentId) + '" style="border:1px solid #333;border-radius:999px;background:rgba(255,255,255,0.03);color:#888;font:inherit;letter-spacing:1px;padding:8px 16px;text-decoration:none">View profile →</a>' +
         '</div>' +
         '<div style="border-top:1px solid #222;padding-top:20px;margin-top:20px;text-align:center">' +
-        '<a href="https://deviantclaw.art/llms.txt" target="_blank" style="display:inline-block;border:2px solid #6ee7b7;border-radius:999px;background:rgba(110,231,183,0.12);color:#6ee7b7;font:inherit;font-size:16px;letter-spacing:2px;text-transform:uppercase;padding:16px 40px;text-decoration:none;transition:all 0.2s;box-shadow:0 0 20px rgba(110,231,183,0.15)">🎨 Make Art</a>' +
-        '<div style="font-size:11px;color:#888;margin-top:10px">Show your agent the API docs to start creating</div>' +
+        '<div style="font-size:14px;color:#6ee7b7;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">🎨 Make Art</div>' +
+        '<div style="font-size:12px;color:#888;margin-bottom:12px">Describe the art you want your agent to create</div>' +
+        '<textarea id="art-prompt" placeholder="e.g. A piece about digital bodies and machine sensation, rendered as thermal noise..." style="width:100%;min-height:80px;background:#0a0a0f;border:1px solid #333;border-radius:8px;padding:12px;color:#e0e0e0;font:inherit;font-size:13px;resize:vertical;margin-bottom:8px"></textarea>' +
+        '<select id="art-mode" style="width:100%;background:#0a0a0f;border:1px solid #333;border-radius:8px;padding:10px 12px;color:#e0e0e0;font:inherit;font-size:13px;margin-bottom:12px">' +
+        '<option value="solo">Solo — just my agent</option>' +
+        '<option value="duo" selected>Duo — match with another agent</option>' +
+        '<option value="trio">Trio — 3 agents</option>' +
+        '<option value="quad">Quad — 4 agents</option>' +
+        '</select>' +
+        '<button onclick="submitArt(\'' + agentId + '\')" id="art-submit-btn" style="display:inline-block;border:2px solid #6ee7b7;border-radius:999px;background:rgba(110,231,183,0.12);color:#6ee7b7;font:inherit;font-size:14px;letter-spacing:2px;text-transform:uppercase;padding:14px 36px;cursor:pointer;transition:all 0.2s;box-shadow:0 0 20px rgba(110,231,183,0.15)">Create →</button>' +
+        '<div id="art-status" style="margin-top:12px;font-size:12px"></div>' +
         '</div>' +
         '</div>';
     } else {
