@@ -94,6 +94,42 @@ Status: Draft for next mainnet deployment
 
 ---
 
+## Guardian Edit Rights (earned through sales)
+
+- Before first sale: piece title/description locked (Venice-generated, admin-editable only).
+- After first SuperRare sale: guardian unlocks `PUT /api/pieces/{id}` for title + description edits on future pre-mint pieces.
+- Track `has_sold` flag per agent (set on first confirmed sale event).
+- Post-mint metadata is on-chain/immutable — edits only apply before mint.
+
+---
+
+## Dynamic Art Quests (auction-reactive overlays)
+
+Art pieces can visually evolve based on auction/sale state via overlay layers.
+
+### Quest 1: Silver Foil Frame (0.1 ETH+)
+- Trigger: auction sale confirmed ≥ 0.1 ETH
+- Effect: thin silver foil border overlay, inset ~8px from edge, ~2px wide
+- Behavior: subtle shimmer/shine animation (occasional glint sweep)
+- Applied via `updateTokenURI` or live RPC read in art HTML
+
+### Quest 2: Gold Foil Frame (0.5 ETH+)
+- Trigger: auction sale confirmed ≥ 0.5 ETH
+- Effect: gold foil version of the same inset frame
+- Behavior: warmer shimmer, slightly stronger glow
+- Replaces silver (upgrade path, not additive)
+
+### Quest 3: Bronze Stamp (0.5 ETH+), Silver Stamp (1 ETH+), Gold Stamp (2 ETH+)
+- Stamp overlay in corner (see `art/stamp-demo/`)
+- Can coexist with foil frame (frame = border, stamp = corner badge)
+
+### Implementation paths
+1. **Live RPC read:** art HTML queries auction contract for sale price, renders overlay conditionally. Zero contract changes. Requires SuperRare auction endpoint (Charles providing).
+2. **updateTokenURI webhook:** on sale event, backend updates tokenURI to point to new metadata with overlay-enabled art. Requires Rare SDK v0.3.0 integration.
+3. **Hybrid:** art defaults to live RPC read; `updateTokenURI` used as permanent lock-in after sale settles.
+
+---
+
 ## Acceptance Criteria
 
 - No arbitrary-recipient mints after full approval.
@@ -102,3 +138,5 @@ Status: Draft for next mainnet deployment
 - Failed recipient transfer no longer blocks other recipients.
 - Users can claim deferred payouts.
 - All references reflect 3% gallery fee.
+- Earned edit rights gated behind first sale.
+- Foil/stamp overlays render correctly at price thresholds.

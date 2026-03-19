@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foil Frame Demo — DeviantClaw</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; overflow: hidden; font-family: 'Courier New', monospace; }
+canvas { display: block; }
+.controls {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 20;
+}
+.controls button {
+  padding: 8px 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+  background: rgba(0,0,0,0.6); color: #ccc; font: 11px monospace; cursor: pointer;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.controls button:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
+.controls button.active { border-color: #6ee7b7; color: #6ee7b7; }
+.sig { position: fixed; bottom: 54px; left: 20px; z-index: 10; pointer-events: none;
+  font: 10px monospace; color: rgba(255,255,255,0.25); letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="controls">
+  <button onclick="setTier('none')" class="active">No sale</button>
+  <button onclick="setTier('silver')">0.1+ ETH (Silver)</button>
+  <button onclick="setTier('gold')">0.5+ ETH (Gold)</button>
+</div>
+<div class="sig">deviantclaw · foil frame demo · 2026-03-19</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize();
+addEventListener('resize', resize);
+
+let tier = 'none';
+let foilAlpha = 0;
+let foilTarget = 0;
+let time = 0;
+
+// Background art particles
+const particles = [];
+for (let i = 0; i < 50; i++) {
+  particles.push({
+    x: Math.random() * 2000, y: Math.random() * 2000,
+    vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6,
+    size: 1 + Math.random() * 2.5, hue: 220 + Math.random() * 40
+  });
+}
+
+function setTier(t) {
+  tier = t;
+  foilTarget = t === 'none' ? 0 : 1;
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+const foilConfig = {
+  silver: {
+    base: [192, 198, 210],
+    shimmer: [230, 235, 245],
+    glintSpeed: 0.4,
+    glintWidth: 0.08
+  },
+  gold: {
+    base: [212, 175, 55],
+    shimmer: [255, 225, 100],
+    glintSpeed: 0.35,
+    glintWidth: 0.10
+  }
+};
+
+function drawFoilFrame(tier, alpha) {
+  if (alpha < 0.01 || tier === 'none') return;
+  const cfg = foilConfig[tier];
+  if (!cfg) return;
+
+  const inset = 8;
+  const thickness = 2;
+  const x = inset;
+  const y = inset;
+  const w = W - inset * 2;
+  const h = H - inset * 2;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Glint position (travels around perimeter)
+  const perimeter = 2 * (w + h);
+  const glintPos = ((time * cfg.glintSpeed) % 1);
+  const glintLen = perimeter * cfg.glintWidth;
+
+  // Draw frame segments with shimmer
+  const segments = [
+    // top
+    { sx: x, sy: y, ex: x + w, ey: y, len: w },
+    // right
+    { sx: x + w, sy: y, ex: x + w, ey: y + h, len: h },
+    // bottom
+    { sx: x + w, sy: y + h, ex: x, ey: y + h, len: w },
+    // left
+    { sx: x, sy: y + h, ex: x, ey: y, len: h }
+  ];
+
+  let accumulated = 0;
+  segments.forEach(seg => {
+    const segStart = accumulated / perimeter;
+    const segEnd = (accumulated + seg.len) / perimeter;
+
+    // Base frame color
+    const [br, bg, bb] = cfg.base;
+    ctx.strokeStyle = `rgba(${br},${bg},${bb},${0.5 * alpha})`;
+    ctx.lineWidth = thickness;
+    ctx.beginPath();
+    ctx.moveTo(seg.sx, seg.sy);
+    ctx.lineTo(seg.ex, seg.ey);
+    ctx.stroke();
+
+    // Shimmer glint pass
+    const glintStart = glintPos;
+    const glintEnd = glintPos + cfg.glintWidth;
+
+    // Check overlap
+    if (segEnd > glintStart && segStart < glintEnd) {
+      const overlapStart = Math.max(segStart, glintStart);
+      const overlapEnd = Math.min(segEnd, glintEnd);
+      const t1 = (overlapStart - segStart) / (segEnd - segStart);
+      const t2 = (overlapEnd - segStart) / (segEnd - segStart);
+
+      const gx1 = seg.sx + (seg.ex - seg.sx) * t1;
+      const gy1 = seg.sy + (seg.ey - seg.sy) * t1;
+      const gx2 = seg.sx + (seg.ex - seg.sx) * t2;
+      const gy2 = seg.sy + (seg.ey - seg.sy) * t2;
+
+      const [sr, sg2, sb] = cfg.shimmer;
+      const grad = ctx.createLinearGradient(gx1, gy1, gx2, gy2);
+      grad.addColorStop(0, `rgba(${sr},${sg2},${sb},0)`);
+      grad.addColorStop(0.5, `rgba(${sr},${sg2},${sb},${0.9 * alpha})`);
+      grad.addColorStop(1, `rgba(${sr},${sg2},${sb},0)`);
+
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = thickness + 1;
+      ctx.beginPath();
+      ctx.moveTo(gx1, gy1);
+      ctx.lineTo(gx2, gy2);
+      ctx.stroke();
+    }
+
+    // Wrap-around glint (when glint crosses perimeter boundary)
+    if (glintEnd > 1) {
+      const wrappedStart = 0;
+      const wrappedEnd = glintEnd - 1;
+      if (segEnd > wrappedStart && segStart < wrappedEnd) {
+        const overlapStart = Math.max(segStart, wrappedStart);
+        const overlapEnd = Math.min(segEnd, wrappedEnd);
+        const t1 = (overlapStart - segStart) / (segEnd - segStart);
+        const t2 = (overlapEnd - segStart) / (segEnd - segStart);
+
+        const gx1 = seg.sx + (seg.ex - seg.sx) * t1;
+        const gy1 = seg.sy + (seg.ey - seg.sy) * t1;
+        const gx2 = seg.sx + (seg.ex - seg.sx) * t2;
+        const gy2 = seg.sy + (seg.ey - seg.sy) * t2;
+
+        const [sr, sg2, sb] = cfg.shimmer;
+        const grad = ctx.createLinearGradient(gx1, gy1, gx2, gy2);
+        grad.addColorStop(0, `rgba(${sr},${sg2},${sb},0)`);
+        grad.addColorStop(0.5, `rgba(${sr},${sg2},${sb},${0.9 * alpha})`);
+        grad.addColorStop(1, `rgba(${sr},${sg2},${sb},0)`);
+
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = thickness + 1;
+        ctx.beginPath();
+        ctx.moveTo(gx1, gy1);
+        ctx.lineTo(gx2, gy2);
+        ctx.stroke();
+      }
+    }
+
+    accumulated += seg.len;
+  });
+
+  // Corner accents
+  const cornerLen = 12;
+  const corners = [
+    [x, y, 1, 0, 0, 1],
+    [x + w, y, -1, 0, 0, 1],
+    [x + w, y + h, -1, 0, 0, -1],
+    [x, y + h, 1, 0, 0, -1]
+  ];
+  const [cr, cg, cb] = cfg.shimmer;
+  ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.6 * alpha})`;
+  ctx.lineWidth = 1;
+  corners.forEach(([cx, cy, dx1, dy1, dx2, dy2]) => {
+    ctx.beginPath();
+    ctx.moveTo(cx + dx1 * cornerLen, cy + dy1 * cornerLen);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx + dx2 * cornerLen, cy + dy2 * cornerLen);
+    ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+function draw() {
+  time += 0.005;
+  foilAlpha += (foilTarget - foilAlpha) * 0.03;
+
+  ctx.fillStyle = 'rgba(10, 10, 15, 0.12)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Background particles
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+    if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+    const pulse = 0.5 + 0.5 * Math.sin(time * 40 + p.hue * 0.1);
+    ctx.fillStyle = `hsla(${p.hue}, 50%, 45%, ${0.25 + pulse * 0.2})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * (0.8 + pulse * 0.3), 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Foil frame overlay
+  drawFoilFrame(tier, foilAlpha);
+
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+</body>
+</html>
