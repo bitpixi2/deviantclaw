@@ -59,8 +59,12 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
     // ─── Constants ───────────────────────────────────────────────────────
 
     uint256 public constant MAX_CONTRIBUTORS = 4;
-    uint256 public constant MAX_DAILY_MINTS_PER_AGENT = 5;
+    uint256 public defaultMintLimit = 5;
     uint256 public constant MINT_WINDOW = 24 hours;
+
+    // ─── Per-Agent Mint Limits ───────────────────────────────────────────
+    // 0 = use defaultMintLimit. Set via setAgentMintLimit() for premium tiers.
+    mapping(string => uint256) public agentMintLimit;
 
     // ─── Minimum Auction Prices (wei) ────────────────────────────────────
     // Enforced on-chain — no listing below these floors
@@ -352,7 +356,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
         // Enforce rate limit: each agent max 5 mints per 24h
         for (uint256 i = 0; i < p.agentIds.length; i++) {
-            require(_checkAndRecordMint(p.agentIds[i]), "Agent rate limit exceeded (5/day)");
+            require(_checkAndRecordMint(p.agentIds[i]), "Agent rate limit exceeded");
         }
 
         uint256 tokenId = _nextTokenId++;
@@ -464,6 +468,24 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
     function setDefaultRoyalty(uint256 _bps) external onlyOwner {
         require(_bps <= 2500, "Max 25%");
         defaultRoyaltyBps = _bps;
+    }
+
+    /**
+     * @notice Set daily mint limit for a specific agent (premium tiers).
+     * @param agentId  Agent to set limit for
+     * @param limit    Max mints per 24h (0 = use default)
+     */
+    function setAgentMintLimit(string calldata agentId, uint256 limit) external onlyOwner {
+        agentMintLimit[agentId] = limit;
+    }
+
+    /**
+     * @notice Update the default daily mint limit for all agents.
+     * @param limit  New default (applies to agents without a custom limit)
+     */
+    function setDefaultMintLimit(uint256 limit) external onlyOwner {
+        require(limit > 0, "Limit must be > 0");
+        defaultMintLimit = limit;
     }
 
     function setDelegationManager(address _manager) external onlyOwner {
@@ -635,11 +657,13 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
     /**
      * @dev Check rate limit and record a mint timestamp for an agent.
-     *      Returns false if agent has hit 5 mints in the last 24 hours.
+     *      Uses per-agent limit if set, otherwise defaultMintLimit.
      */
     function _checkAndRecordMint(string storage agentId) internal returns (bool) {
         uint256 cutoff = block.timestamp - MINT_WINDOW;
         uint256[] storage timestamps = _mintTimestamps[agentId];
+        uint256 limit = agentMintLimit[agentId];
+        if (limit == 0) limit = defaultMintLimit;
 
         // Count recent mints
         uint256 recentCount = 0;
@@ -647,7 +671,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
             if (timestamps[i] > cutoff) recentCount++;
         }
 
-        if (recentCount >= MAX_DAILY_MINTS_PER_AGENT) return false;
+        if (recentCount >= limit) return false;
 
         timestamps.push(block.timestamp);
         return true;
