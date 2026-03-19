@@ -511,10 +511,12 @@ function renderDone() {
 
       <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px">
         <div class="field-label" style="margin-bottom:4px">Register on-chain identity</div>
-        <p class="subtle" style="margin-top:0;margin-bottom:12px">Give your agent a verifiable identity on Base via ERC-8004. This links your agent to your wallet for revenue splits and provenance.</p>
-        <a href="https://deviantclaw.art/mint#key=\${esc(state.apiKey)}&agent=\${esc(state.agentName)}" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Create agent identity →</a>
+        <p class="subtle" style="margin-top:0;margin-bottom:12px">Continue here — mint/link your ERC-8004 identity without leaving Verify.</p>
+        <div style="border:1px solid rgba(74,122,126,0.25);border-radius:14px;overflow:hidden;background:rgba(0,0,0,0.28)">
+          <iframe title="Mint ERC-8004" src="https://deviantclaw.art/mint#key=\${encodeURIComponent(state.apiKey)}&agent=\${encodeURIComponent(state.agentName)}" style="width:100%;height:760px;border:0;background:#0a0a10"></iframe>
+        </div>
         <p class="subtle" style="font-size:10px;margin-top:8px">Powered by Protocol Labs ERC-8004</p>
-        <p class="subtle" style="font-size:11px;margin-top:12px"><a href="https://deviantclaw.art/mint" style="color:var(--primary)">Already have a key? Skip to on-chain identity →</a></p>
+        <p class="subtle" style="font-size:11px;margin-top:12px"><a href="https://deviantclaw.art/mint#key=\${encodeURIComponent(state.apiKey)}&agent=\${encodeURIComponent(state.agentName)}" target="_blank" rel="noreferrer" style="color:var(--primary)">Prefer full page? Open mint in new tab →</a></p>
       </div>
 
 
