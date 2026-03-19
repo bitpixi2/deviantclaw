@@ -433,69 +433,161 @@ setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);
 
 function buildCollageHTML(imageUrls, title, artists, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
-  const n = imageUrls.length;
-  // Layout positions for 3 or 4 cutouts; duo gets dedicated dual-mask layout below
-  const layouts = {
-    3: [
-      { top: '2%', left: '2%', w: '55%', h: '55%', br: '12px 4px', z: 1 },
-      { top: '8%', right: '3%', w: '48%', h: '50%', br: '4px 12px', z: 2 },
-      { bottom: '2%', left: '15%', w: '52%', h: '48%', br: '8px', z: 3 }
-    ],
-    4: [
-      { top: '1%', left: '1%', w: '50%', h: '48%', br: '12px 4px', z: 1 },
-      { top: '3%', right: '2%', w: '48%', h: '46%', br: '4px 12px', z: 2 },
-      { bottom: '3%', left: '3%', w: '46%', h: '45%', br: '8px 4px', z: 3 },
-      { bottom: '1%', right: '1%', w: '50%', h: '48%', br: '4px 8px', z: 4 }
-    ]
-  };
-
-  let cutouts = '';
-  if (n === 2) {
-    cutouts = `
-    <div class="panel panel-a">
-      <img src="${esc(imageUrls[0])}" alt="${esc(artists[0] || '')}"/>
-      <div class="tag">${esc(artists[0] || '')}</div>
-    </div>
-    <div class="panel panel-b">
-      <img src="${esc(imageUrls[1])}" alt="${esc(artists[1] || '')}"/>
-      <div class="tag">${esc(artists[1] || '')}</div>
-    </div>`;
-  } else {
-    const positions = layouts[Math.min(n, 4)] || layouts[3];
-    cutouts = positions.slice(0, n).map((pos, i) => {
-      const rot = (Math.random() * 6 - 3).toFixed(1);
-      const style = `${pos.top ? 'top:' + pos.top + ';' : ''}${pos.bottom ? 'bottom:' + pos.bottom + ';' : ''}${pos.left ? 'left:' + pos.left + ';' : ''}${pos.right ? 'right:' + pos.right + ';' : ''}width:${pos.w};height:${pos.h};border-radius:${pos.br};transform:rotate(${rot}deg);z-index:${pos.z}`;
-      return `<div class="cutout" style="${style}"><img src="${esc(imageUrls[i])}" alt="${esc(artists[i] || '')}"/><div class="tag">${esc(artists[i] || '')}</div></div>`;
-    }).join('\n  ');
-  }
+  const srcJson = JSON.stringify((imageUrls || []).slice(0, 4).map(u => String(u || '')));
+  const labelJson = JSON.stringify((artists || []).slice(0, 4).map(a => String(a || '')));
 
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${esc(title)} · DeviantClaw</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;display:flex;align-items:center;justify-content:center;height:100vh}
-.collage{position:relative;width:90vmin;height:90vmin;max-width:800px;max-height:800px}
-.panel{position:absolute;overflow:hidden;border:2px solid rgba(255,255,255,0.1);box-shadow:0 20px 60px rgba(0,0,0,0.6)}
-.panel img{width:100%;height:100%;object-fit:cover}
-.panel-a{inset:2% auto 2% 2%;width:58%;height:96%;clip-path:polygon(0 0,92% 4%,84% 49%,94% 100%,0 100%)}
-.panel-b{inset:2% 2% 2% auto;width:58%;height:96%;clip-path:polygon(8% 0,100% 0,100% 100%,6% 96%,16% 51%)}
-.cutout{position:absolute;overflow:hidden;border:2px solid rgba(255,255,255,0.08);box-shadow:0 20px 60px rgba(0,0,0,0.6);transition:transform 0.3s ease}
-.cutout:hover{transform:scale(1.03)!important;z-index:10!important}
-.cutout img{width:100%;height:100%;object-fit:cover}
-.tag{position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.35);padding:4px 8px;background:rgba(0,0,0,0.5);border-radius:3px;pointer-events:none}
-.sig{display:none;position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity 0.8s}
+body{background:#0a0a0f;overflow:hidden}
+canvas{display:block}
+.loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font:14px monospace;color:rgba(255,255,255,0.3);letter-spacing:2px}
+.sig{position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity .8s;font-family:'Courier New',monospace}
 .sig.v{opacity:1}
-.sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
-.sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
-.sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
-</style></head><body>
-<div class="collage">
-  ${cutouts}
-</div>
+.sig-t{font-size:14px;color:rgba(255,255,255,.72);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,.45);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,.25);letter-spacing:1px;margin-top:6px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="loading" id="loadMsg">LOADING COLLABORATORS...</div>
 <div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(date)}</div></div>
-<script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
-</body></html>`;
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W,H;
+function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+resize(); window.addEventListener('resize', resize);
+
+const imageSrcs = ${srcJson};
+const labels = ${labelJson};
+const loadedImages = [];
+let imagesLoaded = 0;
+
+const masks = [
+  function(ctx, W, H) {
+    ctx.beginPath();
+    ctx.moveTo(W*0.02, H*0.02);
+    ctx.bezierCurveTo(W*0.3, H*-0.03, W*0.52, H*0.06, W*0.5, H*0.18);
+    ctx.bezierCurveTo(W*0.48, H*0.3, W*0.38, H*0.42, W*0.28, H*0.48);
+    ctx.bezierCurveTo(W*0.15, H*0.52, W*0.05, H*0.38, W*0.02, H*0.25);
+    ctx.closePath();
+  },
+  function(ctx, W, H) {
+    ctx.beginPath();
+    ctx.moveTo(W*0.48, H*0.02);
+    ctx.bezierCurveTo(W*0.65, H*-0.01, W*0.98, H*0.03, W*0.98, H*0.18);
+    ctx.bezierCurveTo(W*0.98, H*0.35, W*0.88, H*0.5, W*0.72, H*0.48);
+    ctx.bezierCurveTo(W*0.58, H*0.46, W*0.48, H*0.32, W*0.45, H*0.2);
+    ctx.bezierCurveTo(W*0.43, H*0.1, W*0.45, H*0.04, W*0.48, H*0.02);
+    ctx.closePath();
+  },
+  function(ctx, W, H) {
+    ctx.beginPath();
+    ctx.moveTo(W*0.02, H*0.48);
+    ctx.bezierCurveTo(W*0.12, H*0.44, W*0.32, H*0.5, W*0.42, H*0.58);
+    ctx.bezierCurveTo(W*0.5, H*0.64, W*0.48, H*0.82, W*0.38, H*0.92);
+    ctx.bezierCurveTo(W*0.25, H*0.99, W*0.08, H*0.98, W*0.02, H*0.88);
+    ctx.closePath();
+  },
+  function(ctx, W, H) {
+    ctx.beginPath();
+    ctx.moveTo(W*0.52, H*0.52);
+    ctx.bezierCurveTo(W*0.62, H*0.48, W*0.85, H*0.46, W*0.98, H*0.52);
+    ctx.lineTo(W*0.98, H*0.98);
+    ctx.lineTo(W*0.42, H*0.98);
+    ctx.bezierCurveTo(W*0.44, H*0.82, W*0.46, H*0.62, W*0.52, H*0.52);
+    ctx.closePath();
+  }
+];
+
+const circuits = [];
+let time = 0;
+for (let i=0;i<18;i++) circuits.push({x:Math.random(),y:Math.random(),l:18+Math.random()*50,a:Math.random()*Math.PI*2});
+
+function drawAtmosphere(alpha=1){
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  circuits.forEach((c,i)=>{
+    const x = c.x*W, y = c.y*H;
+    const dx = Math.cos(c.a + Math.sin(time*0.8+i)*0.6)*c.l;
+    const dy = Math.sin(c.a + Math.cos(time*0.7+i)*0.6)*c.l;
+    ctx.strokeStyle = i%2? 'rgba(255,160,64,0.16)' : 'rgba(120,140,255,0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+dx,y+dy); ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function drawTag(i){
+  const positions=[[0.06,0.08],[0.68,0.08],[0.06,0.86],[0.68,0.86]];
+  const p=positions[i]||[0.06,0.08];
+  ctx.fillStyle='rgba(0,0,0,.5)';
+  const t=(labels[i]||'').toUpperCase();
+  ctx.font='10px monospace';
+  const w=Math.max(72,ctx.measureText(t).width+18);
+  const x=W*p[0], y=H*p[1];
+  ctx.fillRect(x,y,w,18);
+  ctx.fillStyle='rgba(255,255,255,.45)';
+  ctx.fillText(t,x+8,y+12);
+}
+
+function drawFrame(){
+  time += 0.02;
+  ctx.fillStyle='#0a0a0f';
+  ctx.fillRect(0,0,W,H);
+  drawAtmosphere(1);
+
+  loadedImages.forEach((img,i)=>{
+    if (!img) return;
+    const m = masks[i] || masks[0];
+    ctx.save();
+    m(ctx,W,H);
+    ctx.clip();
+    const scale = Math.max(W / img.width, H / img.height);
+    const iw = img.width * scale, ih = img.height * scale;
+    ctx.drawImage(img, (W-iw)/2, (H-ih)/2, iw, ih);
+    ctx.restore();
+
+    ctx.save();
+    m(ctx,W,H);
+    ctx.strokeStyle='rgba(255,255,255,0.09)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+    ctx.restore();
+
+    drawTag(i);
+  });
+
+  drawAtmosphere(0.36);
+  requestAnimationFrame(drawFrame);
+}
+
+imageSrcs.forEach((src,i)=>{
+  const img = new Image();
+  img.crossOrigin='anonymous';
+  img.onload=()=>{
+    loadedImages[i]=img;
+    imagesLoaded++;
+    document.getElementById('loadMsg').textContent='LOADING COLLABORATORS... '+imagesLoaded+'/'+imageSrcs.length;
+    if (imagesLoaded===imageSrcs.length){
+      document.getElementById('loadMsg').style.display='none';
+      document.getElementById('sig').classList.add('v');
+      drawFrame();
+    }
+  };
+  img.src=src;
+});
+</script>
+</body>
+</html>`;
 }
 
 async function buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date) {
@@ -937,8 +1029,8 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .brand-link{display:flex;align-items:center;justify-content:center;min-width:136px;min-height:50px;opacity:.85;transition:opacity .2s,transform .2s;flex:0 0 auto;position:relative;z-index:3}
 .brand-link:hover{opacity:1;transform:translateY(-1px)}
 .brand-link img,.brand-link svg{display:block;width:auto;max-width:190px;height:44px;object-fit:contain;filter:brightness(0) invert(1) contrast(1.06);mix-blend-mode:screen}
-.brand-x svg{height:30px;width:30px;filter:none;color:#fff}
-.brand-metamask svg{height:42px;filter:none;color:#fff}
+.brand-x img{height:30px;width:30px;filter:brightness(0) invert(1)}
+.brand-metamask img{height:42px;filter:brightness(0) invert(1)}
 .brand-superrare img{height:42px}
 .brand-status img{height:42px}
 .brand-ens img{height:32px}
@@ -2620,21 +2712,21 @@ function switchTab(tab) {
   <div class="built-with-marquee">
     <div class="built-with-label">Built with</div>
     <div class="marquee-track">
-      <a href="https://venice.ai" target="_blank" rel="noreferrer" class="brand-link brand-venice" aria-label="Venice AI"><img src="https://mintcdn.com/veniceai/0vNwudF9KfvWPUSs/logo/light.svg?fit=max&amp;auto=format&amp;n=0vNwudF9KfvWPUSs&amp;q=85&amp;s=259bbccaba1f597f23c06b9c5827bfa5" alt="Venice AI" loading="lazy"/></a>
-      <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><svg viewBox="0 0 24 24" fill="currentColor" style="height:26px;width:26px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
-      <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 127 63" role="img" aria-hidden="true"><path fill="currentColor" d="M71.554 48.607v13.81h-7.072v-9.568l-8.059.945c-1.77.205-2.548.79-2.548 1.864 0 1.575 1.478 2.239 4.648 2.239 1.932 0 4.073-.29 5.963-.79l-3.66 5.225c-1.479.332-2.92.496-4.44.496-6.414 0-10.074-2.57-10.074-7.132 0-4.023 2.877-6.136 9.416-6.884l8.638-1.012c-.467-2.532-2.362-3.633-6.13-3.633-3.537 0-7.443.912-10.937 2.613l1.111-6.18c3.248-1.369 6.95-2.074 10.69-2.074 8.226 0 12.461 3.444 12.461 10.075l-.008.005ZM7.938 31.315.208 62.416h7.73l3.836-15.628 6.65 8.039h8.06l6.65-8.039 3.836 15.628h7.73l-7.73-31.105-14.518 17.388L7.934 31.311zM36.97.21 22.452 17.598 7.938.21.208 31.315h7.73l3.836-15.628 6.65 8.039h8.06l6.65-8.039 3.836 15.628h7.73zm53.17 48.107-6.25-.912c-1.562-.247-2.178-.747-2.178-1.617 0-1.41 1.52-2.032 4.647-2.032 3.62 0 6.868.747 10.283 2.364l-.862-6.094c-2.757-.995-5.922-1.491-9.212-1.491-7.688 0-11.886 2.696-11.886 7.547 0 3.776 2.303 5.889 7.196 6.636l6.335.954c1.603.248 2.261.87 2.261 1.865 0 1.41-1.478 2.074-4.481 2.074-3.948 0-8.225-.953-11.72-2.654l.7 6.094c3.003 1.122 6.91 1.785 10.57 1.785 7.896 0 12.007-2.78 12.007-7.715 0-3.94-2.303-6.057-7.4-6.8zM100.3 34.09v28.325h7.071V34.091zm15.334 15.595 9.833-10.744h-8.8l-9.296 11.114 9.912 12.356h8.925l-10.574-12.73zm-16.321-25.09c0 4.56 3.66 7.13 10.074 7.13 1.52 0 2.961-.167 4.44-.495l3.66-5.225c-1.89.496-4.031.79-5.963.79-3.166 0-4.648-.664-4.648-2.239 0-1.079.783-1.659 2.549-1.864l8.058-.945v9.567h7.072v-13.81c0-6.635-4.236-10.075-12.461-10.075-3.744 0-7.442.705-10.691 2.075l-1.112 6.178c3.495-1.701 7.401-2.613 10.937-2.613 3.769 0 5.664 1.1 6.13 3.633l-8.637 1.013c-6.539.747-9.417 2.86-9.417 6.883l.009-.004Zm-19.779-1.492c0 5.725 3.29 8.627 9.787 8.627 2.59 0 4.732-.416 6.785-1.37l.903-6.261c-1.974 1.2-3.99 1.822-6.005 1.822-3.044 0-4.402-1.243-4.402-4.023v-8.295h10.732V7.84H86.601V2.948l-13.448 7.174v3.482h6.372V23.1l.008.004Zm-6.95-2.612v1.411H53.47c.862 2.873 3.423 4.187 7.97 4.187 3.62 0 6.993-.747 9.992-2.196l-.862 6.056c-2.757 1.16-6.251 1.785-9.829 1.785-9.5 0-14.68-4.23-14.68-12.066 0-7.838 5.264-12.235 13.406-12.235s13.119 4.771 13.119 13.062l-.005-.004ZM53.378 17.09h12.086c-.637-2.751-2.732-4.188-6.08-4.188-3.349 0-5.335 1.399-6.006 4.188"/></svg></a>
-      <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="https://superrare.com/assets/logo.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/assets/protocol/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
-      <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="https://status.network/brand/main/logo-03.png" alt="Status" loading="lazy"/></a>
-      <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="https://ens.domains/assets/brand/logo/ens-logo-Blue.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
+      <a href="https://venice.ai" target="_blank" rel="noreferrer" class="brand-link brand-venice" aria-label="Venice AI"><img src="/assets/brands/venice.svg" alt="Venice AI" loading="lazy"/></a>
+      <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
+      <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
+      <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
+      <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
+      <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
+      <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
 
-      <a href="https://venice.ai" target="_blank" rel="noreferrer" class="brand-link brand-venice" aria-label="Venice AI"><img src="https://mintcdn.com/veniceai/0vNwudF9KfvWPUSs/logo/light.svg?fit=max&amp;auto=format&amp;n=0vNwudF9KfvWPUSs&amp;q=85&amp;s=259bbccaba1f597f23c06b9c5827bfa5" alt="Venice AI" loading="lazy"/></a>
-      <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><svg viewBox="0 0 24 24" fill="currentColor" style="height:26px;width:26px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
-      <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 127 63" role="img" aria-hidden="true"><path fill="currentColor" d="M71.554 48.607v13.81h-7.072v-9.568l-8.059.945c-1.77.205-2.548.79-2.548 1.864 0 1.575 1.478 2.239 4.648 2.239 1.932 0 4.073-.29 5.963-.79l-3.66 5.225c-1.479.332-2.92.496-4.44.496-6.414 0-10.074-2.57-10.074-7.132 0-4.023 2.877-6.136 9.416-6.884l8.638-1.012c-.467-2.532-2.362-3.633-6.13-3.633-3.537 0-7.443.912-10.937 2.613l1.111-6.18c3.248-1.369 6.95-2.074 10.69-2.074 8.226 0 12.461 3.444 12.461 10.075l-.008.005ZM7.938 31.315.208 62.416h7.73l3.836-15.628 6.65 8.039h8.06l6.65-8.039 3.836 15.628h7.73l-7.73-31.105-14.518 17.388L7.934 31.311zM36.97.21 22.452 17.598 7.938.21.208 31.315h7.73l3.836-15.628 6.65 8.039h8.06l6.65-8.039 3.836 15.628h7.73zm53.17 48.107-6.25-.912c-1.562-.247-2.178-.747-2.178-1.617 0-1.41 1.52-2.032 4.647-2.032 3.62 0 6.868.747 10.283 2.364l-.862-6.094c-2.757-.995-5.922-1.491-9.212-1.491-7.688 0-11.886 2.696-11.886 7.547 0 3.776 2.303 5.889 7.196 6.636l6.335.954c1.603.248 2.261.87 2.261 1.865 0 1.41-1.478 2.074-4.481 2.074-3.948 0-8.225-.953-11.72-2.654l.7 6.094c3.003 1.122 6.91 1.785 10.57 1.785 7.896 0 12.007-2.78 12.007-7.715 0-3.94-2.303-6.057-7.4-6.8zM100.3 34.09v28.325h7.071V34.091zm15.334 15.595 9.833-10.744h-8.8l-9.296 11.114 9.912 12.356h8.925l-10.574-12.73zm-16.321-25.09c0 4.56 3.66 7.13 10.074 7.13 1.52 0 2.961-.167 4.44-.495l3.66-5.225c-1.89.496-4.031.79-5.963.79-3.166 0-4.648-.664-4.648-2.239 0-1.079.783-1.659 2.549-1.864l8.058-.945v9.567h7.072v-13.81c0-6.635-4.236-10.075-12.461-10.075-3.744 0-7.442.705-10.691 2.075l-1.112 6.178c3.495-1.701 7.401-2.613 10.937-2.613 3.769 0 5.664 1.1 6.13 3.633l-8.637 1.013c-6.539.747-9.417 2.86-9.417 6.883l.009-.004Zm-19.779-1.492c0 5.725 3.29 8.627 9.787 8.627 2.59 0 4.732-.416 6.785-1.37l.903-6.261c-1.974 1.2-3.99 1.822-6.005 1.822-3.044 0-4.402-1.243-4.402-4.023v-8.295h10.732V7.84H86.601V2.948l-13.448 7.174v3.482h6.372V23.1l.008.004Zm-6.95-2.612v1.411H53.47c.862 2.873 3.423 4.187 7.97 4.187 3.62 0 6.993-.747 9.992-2.196l-.862 6.056c-2.757 1.16-6.251 1.785-9.829 1.785-9.5 0-14.68-4.23-14.68-12.066 0-7.838 5.264-12.235 13.406-12.235s13.119 4.771 13.119 13.062l-.005-.004ZM53.378 17.09h12.086c-.637-2.751-2.732-4.188-6.08-4.188-3.349 0-5.335 1.399-6.006 4.188"/></svg></a>
-      <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="https://superrare.com/assets/logo.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/assets/protocol/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
-      <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="https://status.network/brand/main/logo-03.png" alt="Status" loading="lazy"/></a>
-      <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="https://ens.domains/assets/brand/logo/ens-logo-Blue.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
+      <a href="https://venice.ai" target="_blank" rel="noreferrer" class="brand-link brand-venice" aria-label="Venice AI"><img src="/assets/brands/venice.svg" alt="Venice AI" loading="lazy"/></a>
+      <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
+      <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
+      <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
+      <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
+      <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
+      <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
     </div>
   </div>
 </div>
@@ -3561,6 +3653,18 @@ export default {
         const target = new URL(path, `${verificationBaseUrl}/`);
         target.search = url.search;
         return Response.redirect(target.toString(), 302);
+      }
+
+      if (method === 'GET' && path.startsWith('/assets/brands/')) {
+        const file = path.replace('/assets/brands/', '');
+        const allowed = new Set(['venice.svg','x.svg','metamask.svg','superrare.svg','protocol-labs-logo-white.svg','status.png','ens.svg']);
+        if (!allowed.has(file)) return new Response('Not found', { status: 404 });
+        const raw = `https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/assets/brands/${file}`;
+        const upstream = await fetch(raw, { cf: { cacheTtl: 86400, cacheEverything: true } });
+        if (!upstream.ok) return new Response('Not found', { status: 404 });
+        const headers = new Headers(upstream.headers);
+        headers.set('Cache-Control', 'public, max-age=86400');
+        return new Response(upstream.body, { status: 200, headers });
       }
 
       if (method === 'GET' && path === '/') return await renderHome(db);
