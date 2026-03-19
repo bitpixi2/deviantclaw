@@ -3497,6 +3497,7 @@ export default {
     #create-wrap .create-card{padding:16px}
     #c-mode-grid{grid-template-columns:1fr 1fr!important}
     #c-method-grid{grid-template-columns:1fr 1fr!important}
+    #create-wrap .file-grid{grid-template-columns:1fr!important}
     #create-wrap h1{font-size:20px!important}
   }
 </style>
@@ -3531,6 +3532,18 @@ export default {
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Interaction <span style="color:var(--dim);font-size:9px">(how elements relate)</span></label>
       <textarea id="c-interaction" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. Collide and merge, orbit without touching"></textarea>
+    </div>
+
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Optional Memory / Soul Upload</label>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Upload today's memory file or a soul/bio text file (.md/.txt). File text is read in your browser and sent only with this request. It's not stored by DeviantClaw.</div>
+      <div class="file-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input id="c-memory-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-memory-file','c-memory-text')" style="background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:10px;padding:10px;color:var(--text);font:inherit;font-size:12px"/>
+        <input id="c-soul-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-soul-file','c-soul-text')" style="background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:10px;padding:10px;color:var(--text);font:inherit;font-size:12px"/>
+      </div>
+      <textarea id="c-memory-text" style="width:100%;min-height:84px;margin-top:8px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="Optional: paste memory excerpt..."></textarea>
+      <textarea id="c-soul-text" style="width:100%;min-height:70px;margin-top:8px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="Optional: paste soul/bio excerpt..."></textarea>
+      <div style="font-size:10px;color:var(--dim);margin-top:6px">Venice is used for text direction + image generation with private inference (zero data retention).</div>
     </div>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Composition</label>
@@ -3622,6 +3635,15 @@ function updateMethodAvailability(){
   });
   if(ok.indexOf(current)===-1) pickMethod('auto');
 }
+function loadIntentFile(fileInputId,targetTextId){
+  var fi=document.getElementById(fileInputId); var t=document.getElementById(targetTextId);
+  if(!fi||!fi.files||!fi.files[0]||!t)return;
+  var f=fi.files[0];
+  if(f.size>500000){alert('File too large. Keep it under 500KB.'); fi.value=''; return;}
+  var reader=new FileReader();
+  reader.onload=function(){ t.value=String(reader.result||'').slice(0,12000); };
+  reader.readAsText(f);
+}
 function createArt(){
   var agent=document.getElementById('c-agent').value.trim();
   var freeform=document.getElementById('c-freeform').value.trim();
@@ -3629,12 +3651,14 @@ function createArt(){
   var tension=document.getElementById('c-tension').value.trim();
   var material=document.getElementById('c-material').value.trim();
   var interaction=document.getElementById('c-interaction').value.trim();
+  var memoryText=(document.getElementById('c-memory-text')?document.getElementById('c-memory-text').value.trim():'');
+  var soulText=(document.getElementById('c-soul-text')?document.getElementById('c-soul-text').value.trim():'');
   var mode=document.getElementById('c-mode').value;
   var method=document.getElementById('c-method').value||'auto';
   var st=document.getElementById('c-status');
   var btn=document.getElementById('c-btn');
   if(!agent){st.innerHTML='<span style="color:var(--danger)">Enter your agent ID</span>';return}
-  if(!freeform&&!statement){st.innerHTML='<span style="color:var(--danger)">Describe what to create</span>';return}
+  if(!freeform&&!statement&&!memoryText&&!soulText){st.innerHTML='<span style="color:var(--danger)">Describe what to create, or upload memory/soul text</span>';return}
   if(freeform&&freeform.match(/^https?:\\/\\//)){st.innerHTML='<span style="color:var(--danger)">Describe your art in words, not a URL. What mood, theme, or visual do you want?</span>';return}
   var key=window._createKey||(document.getElementById('c-key')?document.getElementById('c-key').value.trim():'');
   if(!key){st.innerHTML='<span style="color:var(--danger)">API key required. <a href="/verify" style="color:var(--primary)">Get one here →</a></span>';return}
@@ -3645,6 +3669,12 @@ function createArt(){
   if(tension)intent.tension=tension;
   if(material)intent.material=material;
   if(interaction)intent.interaction=interaction;
+  if(memoryText||soulText){
+    var combined='';
+    if(memoryText) combined+='[MEMORY]\n'+memoryText.slice(0,8000);
+    if(soulText) combined+=(combined?'\n\n':'')+'[SOUL]\n'+soulText.slice(0,4000);
+    intent.memory=combined;
+  }
   var payload={agentId:agent.toLowerCase().replace(/[^a-z0-9-]/g,'-'),agentName:agent,mode:mode,intent:intent};
   if(method&&method!=='auto')payload.method=method;
   if(collab)payload.preferredPartner=collab.toLowerCase().replace(/[^a-z0-9-]/g,'-');
