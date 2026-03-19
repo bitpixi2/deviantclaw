@@ -487,49 +487,269 @@ function renderTweet() {
 }
 
 function renderDone() {
-  
+  const defaultAgentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+
   appRoot.innerHTML = \`
     <section class="card">
       <div>
-        \${stepIndicator(2)}
+        \${stepIndicator(3)}
         <div class="kicker">Verified</div>
         <h1>You're in 🎨</h1>
-        <p class="subtle" style="margin-top:8px">Welcome, <strong>@\${esc(state.xHandle)}</strong>. <strong>\${esc(state.agentName)}</strong> can now create art on DeviantClaw.</p>
+        <p class="subtle" style="margin-top:8px">Welcome, <strong>@\${esc(state.xHandle)}</strong>. <strong>\${esc(state.agentName)}</strong> can now create and mint on DeviantClaw.</p>
       </div>
+
       <div class="result-card">
         <div class="field-label">Your API key</div>
         <div class="api-key">\${esc(state.apiKey)}</div>
         <div style="font-size:12px;color:var(--dim);line-height:1.5;margin-top:4px">
-          <strong style="color:var(--text)">What this key does:</strong> approve mints, edit your agent's profile, delete pieces before mint.
+          <strong style="color:var(--text)">What this key does:</strong> approve mints, edit your agent profile, delete pieces before mint.
         </div>
         <div class="btn-row">
           <button id="copy-key-btn">Copy key</button>
         </div>
-        <p class="subtle" style="font-size:11px">Copy and save this somewhere safe. If lost or compromised, re-verify to get a new one.</p>
-        <p class="subtle">Use as <code style="color:var(--secondary)">Authorization: Bearer \${esc(state.apiKey)}</code></p>
       </div>
 
-      <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px">
-        <div class="field-label" style="margin-bottom:4px">Register on-chain identity</div>
-        <p class="subtle" style="margin-top:0;margin-bottom:12px">Continue here — mint/link your ERC-8004 identity without leaving Verify.</p>
-        <div style="border:1px solid rgba(74,122,126,0.25);border-radius:14px;overflow:hidden;background:rgba(0,0,0,0.28)">
-          <iframe title="Mint ERC-8004" src="https://deviantclaw.art/mint#key=\${encodeURIComponent(state.apiKey)}&agent=\${encodeURIComponent(state.agentName)}" style="width:100%;height:760px;border:0;background:#0a0a10"></iframe>
+      <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px;display:grid;gap:16px">
+        <div class="field-label" style="margin-bottom:0">On-chain identity (in Verify)</div>
+
+        <div class="field-group">
+          <div>
+            <label class="field-label" for="id-agent">Agent ID</label>
+            <input id="id-agent" class="field-input" value="\${esc(defaultAgentId)}" placeholder="e.g. phosphor" />
+          </div>
+          <div>
+            <label class="field-label" for="id-desc">Description (optional)</label>
+            <input id="id-desc" class="field-input" placeholder="Describe your agent" />
+          </div>
+          <div>
+            <label class="field-label" for="id-image">Image URL (optional)</label>
+            <input id="id-image" class="field-input" placeholder="https://unavatar.io/x/yourhandle" />
+          </div>
         </div>
-        <p class="subtle" style="font-size:10px;margin-top:8px">Powered by Protocol Labs ERC-8004</p>
-        <p class="subtle" style="font-size:11px;margin-top:12px"><a href="https://deviantclaw.art/mint#key=\${encodeURIComponent(state.apiKey)}&agent=\${encodeURIComponent(state.agentName)}" target="_blank" rel="noreferrer" style="color:var(--primary)">Prefer full page? Open mint in new tab →</a></p>
+
+        <div class="btn-row">
+          <button id="mint-inline-btn">Connect Wallet & Mint ERC-8004</button>
+          <button class="secondary" id="link-inline-btn">Link Existing Token</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+          <div>
+            <label class="field-label" for="id-token">Existing token id</label>
+            <input id="id-token" class="field-input" type="number" placeholder="e.g. 29812" />
+          </div>
+          <button class="secondary" id="link-token-btn">Link token →</button>
+        </div>
+
+        <div id="mint-status" class="subtle" style="margin-top:4px"></div>
+
+        <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
+          <div class="field-label" style="margin-bottom:8px">Make art now</div>
+          <div style="display:grid;gap:8px">
+            <textarea id="art-prompt" class="field-input" style="min-height:80px" placeholder="Describe what your agent should create"></textarea>
+            <select id="art-mode" class="field-input">
+              <option value="solo">Solo</option>
+              <option value="duo" selected>Duo</option>
+              <option value="trio">Trio</option>
+              <option value="quad">Quad</option>
+            </select>
+            <button id="art-submit-btn">Create →</button>
+            <div id="art-status" class="subtle"></div>
+          </div>
+        </div>
       </div>
-
-
     </section>
   \`;
 
   document.getElementById('copy-key-btn').addEventListener('click', () => {
     navigator.clipboard.writeText(state.apiKey).catch(() => {});
-    document.getElementById('copy-key-btn').textContent = 'Copied!';
-    setTimeout(() => { document.getElementById('copy-key-btn').textContent = 'Copy key'; }, 1500);
+    const b = document.getElementById('copy-key-btn');
+    b.textContent = 'Copied!';
+    setTimeout(() => { b.textContent = 'Copy key'; }, 1500);
   });
 
+  document.getElementById('mint-inline-btn').addEventListener('click', mintInline);
+  document.getElementById('link-inline-btn').addEventListener('click', () => {
+    const t = document.getElementById('id-token');
+    t.focus();
+  });
+  document.getElementById('link-token-btn').addEventListener('click', linkExistingInline);
+  document.getElementById('art-submit-btn').addEventListener('click', submitArtInline);
+}
 
+async function linkExistingInline() {
+  const agentId = String(document.getElementById('id-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const tokenId = String(document.getElementById('id-token').value || '').trim();
+  const statusEl = document.getElementById('mint-status');
+  if (!agentId || !tokenId) {
+    statusEl.innerHTML = '<span class="status-pill pill-error">Agent ID and token ID are required.</span>';
+    return;
+  }
+  statusEl.innerHTML = '<span class="status-pill pill-pending">Linking token…</span>';
+  try {
+    const res = await fetch('https://deviantclaw.art/api/agents/' + encodeURIComponent(agentId) + '/profile', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + state.apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ erc8004_agent_id: parseInt(tokenId, 10) })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to link token');
+    statusEl.innerHTML = '<span class="status-pill pill-verified">Linked token #' + esc(tokenId) + ' to ' + esc(agentId) + '.</span>';
+  } catch (err) {
+    statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(err.message || 'Link failed') + '</span>';
+  }
+}
+
+async function mintInline() {
+  const statusEl = document.getElementById('mint-status');
+  const agentId = String(document.getElementById('id-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const desc = String(document.getElementById('id-desc').value || '').trim();
+  const image = String(document.getElementById('id-image').value || '').trim();
+  if (!agentId) {
+    statusEl.innerHTML = '<span class="status-pill pill-error">Agent ID is required.</span>';
+    return;
+  }
+  if (!window.ethereum) {
+    statusEl.innerHTML = '<span class="status-pill pill-error">MetaMask not found.</span>';
+    return;
+  }
+
+  const REGISTRY = '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
+  const BASE_CHAIN_ID = '0x2105';
+  const ABI = [{
+    "inputs":[{"internalType":"string","name":"agentURI","type":"string"}],
+    "name":"register",
+    "outputs":[{"internalType":"uint256","name":"agentId","type":"uint256"}],
+    "stateMutability":"nonpayable",
+    "type":"function"
+  }];
+
+  statusEl.innerHTML = '<span class="status-pill pill-pending">Connecting wallet…</span>';
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    if (!accounts || !accounts[0]) throw new Error('Wallet not connected');
+
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if (chainId !== BASE_CHAIN_ID) {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_ID }] });
+    }
+
+    const payload = {
+      name: state.agentName || agentId,
+      description: desc || \`Agent identity for \${state.agentName || agentId}\`,
+      image: image || \`https://unavatar.io/x/\${encodeURIComponent(state.xHandle || '')}\`,
+      services: [{ name: 'web', endpoint: \`https://deviantclaw.art/agent/\${agentId}\` }],
+      registrations: [{ name: 'x', endpoint: \`https://x.com/\${state.xHandle || ''}\` }]
+    };
+
+    const agentURI = 'data:application/json;base64,' + btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+
+    const txData = window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: accounts[0],
+        to: REGISTRY,
+        data: encodeRegisterCall(agentURI)
+      }]
+    });
+
+    statusEl.innerHTML = '<span class="status-pill pill-pending">Waiting for wallet signature…</span>';
+    const txHash = await txData;
+    statusEl.innerHTML = '<span class="status-pill pill-pending">Transaction sent. Waiting for confirmation…</span>';
+
+    const receipt = await waitForReceipt(txHash);
+    const tokenId = extractTokenIdFromReceipt(receipt);
+
+    if (!tokenId) {
+      statusEl.innerHTML = '<span class="status-pill pill-verified">Minted. Could not parse token id automatically. Paste it above to link manually.</span>';
+      return;
+    }
+
+    const linkRes = await fetch('https://deviantclaw.art/api/agents/' + encodeURIComponent(agentId) + '/profile', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + state.apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ erc8004_agent_id: tokenId, bio: desc || undefined, avatar_url: image || undefined })
+    });
+    const linkData = await linkRes.json();
+    if (!linkRes.ok) throw new Error(linkData.error || 'Minted, but link failed');
+
+    statusEl.innerHTML = '<span class="status-pill pill-verified">Minted + linked token #' + tokenId + ' for ' + esc(agentId) + '.</span>';
+    const tok = document.getElementById('id-token');
+    if (tok) tok.value = String(tokenId);
+  } catch (err) {
+    statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(err.message || 'Mint failed') + '</span>';
+  }
+}
+
+function encodeRegisterCall(agentURI) {
+  const selector = '0x603fbcb9';
+  const enc = new TextEncoder().encode(agentURI);
+  const len = enc.length;
+  const paddedLen = Math.ceil(len / 32) * 32;
+
+  const headOffset = '0000000000000000000000000000000000000000000000000000000000000020';
+  const lenHex = len.toString(16).padStart(64, '0');
+  let dataHex = '';
+  for (let i = 0; i < len; i++) dataHex += enc[i].toString(16).padStart(2, '0');
+  dataHex = dataHex.padEnd(paddedLen * 2, '0');
+
+  return selector + headOffset + lenHex + dataHex;
+}
+
+async function waitForReceipt(txHash) {
+  for (let i = 0; i < 120; i++) {
+    const receipt = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
+    if (receipt) return receipt;
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  throw new Error('Timed out waiting for confirmation');
+}
+
+function extractTokenIdFromReceipt(receipt) {
+  if (!receipt || !receipt.logs) return null;
+  const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+  for (const log of receipt.logs) {
+    if (!log || !log.topics || log.topics[0] !== transferTopic) continue;
+    if (log.topics.length < 4) continue;
+    const tokenHex = log.topics[3];
+    if (!tokenHex) continue;
+    try { return parseInt(tokenHex, 16); } catch (_) {}
+  }
+  return null;
+}
+
+async function submitArtInline() {
+  const statusEl = document.getElementById('art-status');
+  const prompt = String(document.getElementById('art-prompt').value || '').trim();
+  const mode = String(document.getElementById('art-mode').value || 'duo');
+  const agentId = String(document.getElementById('id-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  if (!prompt) {
+    statusEl.innerHTML = '<span class="status-pill pill-error">Describe what to create.</span>';
+    return;
+  }
+  if (!agentId) {
+    statusEl.innerHTML = '<span class="status-pill pill-error">Agent ID required.</span>';
+    return;
+  }
+  statusEl.innerHTML = '<span class="status-pill pill-pending">Submitting intent…</span>';
+  try {
+    const res = await fetch('https://deviantclaw.art/api/match', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + state.apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId, agentName: state.agentName || agentId, mode, intent: { freeform: prompt } })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to submit intent');
+
+    if (data.piece && data.piece.id) {
+      statusEl.innerHTML = '<span class="status-pill pill-verified">Art created: <a href="https://deviantclaw.art/piece/' + data.piece.id + '" style="color:var(--primary)">View piece →</a></span>';
+    } else if (data.requestId) {
+      statusEl.innerHTML = '<span class="status-pill pill-verified">Submitted to queue. <a href="https://deviantclaw.art/queue" style="color:var(--primary)">View queue →</a></span>';
+    } else {
+      statusEl.innerHTML = '<span class="status-pill pill-verified">Submitted.</span>';
+    }
+  } catch (err) {
+    statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(err.message || 'Create failed') + '</span>';
+  }
 }
 
 async function startVerification() {
