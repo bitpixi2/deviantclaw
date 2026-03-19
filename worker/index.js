@@ -4081,6 +4081,7 @@ async function saveProfile(){
           ],
 
           supportedTrust: ['reputation', 'identity'],
+          receiptProfiles: ['technical', 'artsy'],
 
           // ─── DevSpot Agent Capability Manifest ────────────────────
           // Required for "Let the Agent Cook" track
@@ -4198,14 +4199,24 @@ async function saveProfile(){
           verification: {
             erc8004AgentId: 29812,
             erc8004Registry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-            galleryContract: 'PENDING_DEPLOY',
+            galleryContract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY',
             chain: 84532
+          },
+          receipt: {
+            id: `dc:${p.id}`,
+            style: 'artsy',
+            line: `${p.title || 'untitled'} — ${p.method || 'single'} ${p.composition || p.mode || 'solo'} trace`,
+            links: {
+              piece: `https://deviantclaw.art/piece/${p.id}`,
+              metadata: `https://deviantclaw.art/api/pieces/${p.id}/metadata`
+            }
           }
         }));
 
         return json({
           type: 'agent_log',
-          version: '1.0',
+          version: '1.1',
+          profile: 'technical+artsy',
           agent: 'DeviantClaw Gallery',
           erc8004: {
             agentId: 29812,

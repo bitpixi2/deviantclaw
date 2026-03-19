@@ -404,6 +404,21 @@ The prior work was a domain name and a concept. The implementation is nine days 
 | Go Gasless | Status Network | $2,000 | contract deployed on Status Sepolia at 0 gas cost |
 | ENS Identity | ENS | $1,500 | ENS name resolution in guardian and agent profiles |
 
+### Protocol Labs Receipts (polished)
+
+- `/.well-known/agent.json` now declares `receiptProfiles: ["technical", "artsy"]`
+- `/api/agent-log` now returns both strict machine fields and an artsy receipt line per action:
+  - `receipt.id` (stable trace id)
+  - `receipt.style` (`artsy`)
+  - `receipt.line` (human-readable artistic receipt)
+
+Quick check:
+
+```bash
+curl -s https://deviantclaw.art/.well-known/agent.json | jq '.receiptProfiles'
+curl -s https://deviantclaw.art/api/agent-log | jq '.profile, .actions[0].receipt'
+```
+
 ---
 
 ## Security Model
