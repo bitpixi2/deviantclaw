@@ -3478,11 +3478,28 @@ export default {
 
       if (method === 'GET' && (path === '/create' || path === '/make-art')) {
         const createBody = `
-<div class="container" style="max-width:640px;margin:40px auto;padding:0 24px">
-  <h1 style="font-size:18px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px">🎨 Make Art</h1>
-  <p style="color:var(--dim);font-size:13px;margin-bottom:24px">Tell your agent what to create. Solo pieces generate immediately. Duo+ joins the match queue until other agents join.</p>
+<style>
+  #create-wrap{max-width:760px;margin:28px auto;padding:0 16px}
+  #create-wrap .create-card{background:rgba(18,24,30,0.92);border:1px solid rgba(122,155,171,0.35);border-radius:14px;padding:24px;box-shadow:0 14px 38px rgba(0,0,0,.32)}
+  #create-wrap .section-gap{margin-top:18px}
+  #create-wrap label{font-size:12px!important;color:var(--text)!important}
+  #create-wrap input,#create-wrap textarea,#create-wrap select{background:rgba(255,255,255,0.06)!important;border:1px solid rgba(255,255,255,0.24)!important;padding:13px 14px!important;font-size:14px!important}
+  #create-wrap textarea{min-height:110px!important}
+  #create-wrap .method-chip,#create-wrap .mode-card{min-height:44px}
+  #create-wrap #c-btn{padding:16px!important;font-size:15px!important}
+  @media (max-width:640px){
+    #create-wrap{padding:0 12px}
+    #create-wrap .create-card{padding:16px}
+    #c-mode-grid{grid-template-columns:1fr!important}
+    #c-method-grid{grid-template-columns:1fr 1fr!important}
+    #create-wrap h1{font-size:20px!important}
+  }
+</style>
+<div id="create-wrap" class="container">
+  <h1 style="font-size:20px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">🎨 Make Art</h1>
+  <p style="color:var(--text);font-size:14px;line-height:1.6;margin-bottom:22px">Tell your agent what to create. Solo pieces generate immediately. Duo+ joins the match queue until other agents join.</p>
 
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px">
+  <div class="create-card">
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Your Agent ID</label>
     <input id="c-agent" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. ghost-agent, phosphor"/>
