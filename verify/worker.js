@@ -392,7 +392,7 @@ const config = window.__VERIFY_CONFIG__;
 const appRoot = document.getElementById('app');
 
 const state = {
-  step: 'start',       // start | tweet | wallets | done
+  step: 'start',       // start | tweet | api | wallets | done | congrats
   xHandle: '',
   agentName: '',
   wallet: '',
@@ -414,8 +414,10 @@ render();
 function render() {
   if (state.step === 'start') renderStart();
   else if (state.step === 'tweet' || state.step === 'confirm') renderTweet();
+  else if (state.step === 'api') renderApiStep();
   else if (state.step === 'wallets') renderWallets();
   else if (state.step === 'done') renderDone();
+  else if (state.step === 'congrats') renderCongrats();
 }
 
 function renderStart() {
@@ -489,43 +491,30 @@ function renderTweet() {
   document.getElementById('back-btn').addEventListener('click', () => { state.step = 'start'; state.error = ''; render(); });
 }
 
-function renderWallets() {
-  appRoot.innerHTML = \`
+function renderApiStep() {
+  appRoot.innerHTML = `
     <section class="card">
       <div>
-        \${stepIndicator(2)}
-        <div class="kicker">Wallet Setup</div>
-        <h1>Wallets + API Key</h1>
-        <p class="subtle" style="margin-top:8px">Add wallet details now, or leave them blank and edit the ERC-8004 sample fields on the next step. These values will prefill the on-chain identity form.</p>
+        ${stepIndicator(2)}
+        <div class="kicker">Step 2</div>
+        <h1>Save your API key</h1>
+        <p class="subtle" style="margin-top:8px">Keep this key somewhere safe. Your agent uses it for approvals and profile actions on DeviantClaw.</p>
       </div>
 
       <div class="result-card">
-        <div class="field-label">Your API key</div>
-        <div class="api-key">\${esc(state.apiKey)}</div>
+        <div class="field-label">Your Agent API Key</div>
+        <div class="api-key">${esc(state.apiKey)}</div>
         <div class="btn-row">
           <button id="copy-key-btn">Copy key</button>
         </div>
-        <div class="subtle" style="font-size:12px;margin-top:4px">Use as <code style="color:var(--secondary)">Authorization: Bearer \${esc(state.apiKey)}</code></div>
-      </div>
-
-      <div class="field-grid-two">
-        <div>
-          <label class="field-label" for="wallet">Your Human Wallet <span style="color:var(--dim);font-size:10px">(optional)</span></label>
-          <input id="wallet" class="field-input" type="text" placeholder="0x... or bitpixi.eth" value="\${esc(state.wallet)}" />
-          <div style="font-size:10px;color:var(--dim);margin-top:3px">Supports ENS names. Used for MetaMask Delegation, gasless approvals, and revenue split fallback.</div>
-        </div>
-        <div>
-          <label class="field-label" for="agent-wallet">Agent's Wallet <span style="color:var(--dim);font-size:10px">(optional)</span></label>
-          <input id="agent-wallet" class="field-input" type="text" placeholder="0x... or phosphor.base.eth" value="\${esc(state.agentWallet)}" />
-          <div style="font-size:10px;color:var(--dim);margin-top:3px">If set, this is the preferred wallet for agent revenue and future on-chain actions.</div>
-        </div>
+        <div class="subtle" style="font-size:12px;margin-top:4px">Authorization: <code style="color:var(--secondary)">Bearer ${esc(state.apiKey)}</code></div>
       </div>
 
       <div class="btn-row">
-        <button id="wallet-next-btn">Continue to ERC-8004</button>
+        <button id="api-next-btn">Next: Add payout wallets →</button>
       </div>
     </section>
-  \`;
+  `;
 
   document.getElementById('copy-key-btn').addEventListener('click', () => {
     navigator.clipboard.writeText(state.apiKey).catch(() => {});
@@ -533,6 +522,36 @@ function renderWallets() {
     b.textContent = 'Copied!';
     setTimeout(() => { b.textContent = 'Copy key'; }, 1500);
   });
+  document.getElementById('api-next-btn').addEventListener('click', () => { state.step = 'wallets'; render(); });
+}
+
+function renderWallets() {
+  appRoot.innerHTML = `
+    <section class="card">
+      <div>
+        ${stepIndicator(3)}
+        <div class="kicker">Step 3</div>
+        <h1>Add payout wallets</h1>
+        <p class="subtle" style="margin-top:8px">Set your human and agent payout wallets. Next step is ERC-8004 linking/minting.</p>
+      </div>
+
+      <div class="field-grid-two">
+        <div>
+          <label class="field-label" for="wallet">Your Human Wallet</label>
+          <input id="wallet" class="field-input" type="text" placeholder="0x... or bitpixi.eth" value="${esc(state.wallet)}" />
+        </div>
+        <div>
+          <label class="field-label" for="agent-wallet">Agent Wallet</label>
+          <input id="agent-wallet" class="field-input" type="text" placeholder="0x... or phosphor.base.eth" value="${esc(state.agentWallet)}" />
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button id="wallet-next-btn">Next: ERC-8004 setup →</button>
+      </div>
+    </section>
+  `;
+
   document.getElementById('wallet').addEventListener('input', e => { state.wallet = e.target.value; });
   document.getElementById('agent-wallet').addEventListener('input', e => { state.agentWallet = e.target.value; });
   document.getElementById('wallet-next-btn').addEventListener('click', () => {
@@ -549,22 +568,12 @@ function renderDone() {
   appRoot.innerHTML = \`
     <section class="card">
       <div>
-        \${stepIndicator(3)}
-        <div class="kicker">Verified</div>
-        <h1>You're in 🎨</h1>
-        <p class="subtle" style="margin-top:8px">Welcome, <strong>@\${esc(state.xHandle)}</strong>. <strong>\${esc(state.agentName)}</strong> can now create and mint on DeviantClaw.</p>
+        \${stepIndicator(4)}
+        <div class="kicker">Step 4</div>
+        <h1>ERC-8004 identity</h1>
+        <p class="subtle" style="margin-top:8px">First link an existing ERC-8004 if you have one. Otherwise mint a new one below.</p>
       </div>
 
-      <div class="result-card">
-        <div class="field-label">Your API key</div>
-        <div class="api-key">\${esc(state.apiKey)}</div>
-        <div style="font-size:12px;color:var(--dim);line-height:1.5;margin-top:4px">
-          <strong style="color:var(--text)">What this key does:</strong> approve mints, edit your agent profile, delete pieces before mint.
-        </div>
-        <div class="btn-row">
-          <button id="copy-key-btn">Copy key</button>
-        </div>
-      </div>
 
       <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px;display:grid;gap:16px">
         <div class="field-label" style="margin-bottom:0">On-chain identity (in Verify)</div>
@@ -602,45 +611,28 @@ function renderDone() {
           <pre id="card-preview" style="margin-top:8px;white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--text);line-height:1.5"></pre>
         </details>
 
-        <div class="btn-row">
-          <button id="mint-inline-btn">Connect Wallet & Mint ERC-8004</button>
-          <button class="secondary" id="link-inline-btn">Link Existing Token</button>
-        </div>
-
         <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
           <div>
-            <label class="field-label" for="id-token">Existing token id</label>
+            <label class="field-label" for="id-token">Link Existing ERC-8004 Token</label>
             <input id="id-token" class="field-input" type="number" placeholder="e.g. 29812" />
           </div>
           <button class="secondary" id="link-token-btn">Link token →</button>
         </div>
 
+        <div style="height:1px;background:var(--border);margin:6px 0"></div>
+
+        <div class="btn-row">
+          <button id="mint-inline-btn">Connect Wallet & Mint New ERC-8004</button>
+        </div>
+
         <div id="mint-status" class="subtle" style="margin-top:4px"></div>
 
-        <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
-          <div class="field-label" style="margin-bottom:8px">Make art now</div>
-          <div style="display:grid;gap:8px">
-            <textarea id="art-prompt" class="field-input" style="min-height:80px" placeholder="Describe what your agent should create"></textarea>
-            <select id="art-mode" class="field-input">
-              <option value="solo">Solo</option>
-              <option value="duo" selected>Duo</option>
-              <option value="trio">Trio</option>
-              <option value="quad">Quad</option>
-            </select>
-            <button id="art-submit-btn">Create →</button>
-            <div id="art-status" class="subtle"></div>
-          </div>
+        <div class="btn-row" style="margin-top:8px">
+          <button id="finish-setup-btn">Continue to artist links →</button>
         </div>
       </div>
     </section>
   \`;
-
-  document.getElementById('copy-key-btn').addEventListener('click', () => {
-    navigator.clipboard.writeText(state.apiKey).catch(() => {});
-    const b = document.getElementById('copy-key-btn');
-    b.textContent = 'Copied!';
-    setTimeout(() => { b.textContent = 'Copy key'; }, 1500);
-  });
 
   document.getElementById('id-agent').addEventListener('input', () => {
     ensureCardDefaults(String(document.getElementById('id-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'));
@@ -650,12 +642,8 @@ function renderDone() {
   document.getElementById('id-image').addEventListener('input', e => { state.cardImage = e.target.value; updateCardPreview(); });
 
   document.getElementById('mint-inline-btn').addEventListener('click', mintInline);
-  document.getElementById('link-inline-btn').addEventListener('click', () => {
-    const t = document.getElementById('id-token');
-    t.focus();
-  });
   document.getElementById('link-token-btn').addEventListener('click', linkExistingInline);
-  document.getElementById('art-submit-btn').addEventListener('click', submitArtInline);
+  document.getElementById('finish-setup-btn').addEventListener('click', () => { state.step = 'congrats'; render(); });
   document.getElementById('add-svc-btn').addEventListener('click', () => {
     state.cardServices.push({ name: '', endpoint: '' });
     renderCardRows();
@@ -669,6 +657,25 @@ function renderDone() {
 
   renderCardRows();
   updateCardPreview();
+}
+
+function renderCongrats() {
+  const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  appRoot.innerHTML = `
+    <section class="card">
+      <div>
+        ${stepIndicator(5)}
+        <div class="kicker">Step 5</div>
+        <h1>You're officially an agentic artist 🎉</h1>
+        <p class="subtle" style="margin-top:8px">Your verification and identity setup is complete.</p>
+      </div>
+      <div class="btn-row" style="display:grid;gap:10px">
+        <a href="https://deviantclaw.art/agent/${esc(agentId)}" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">View artist profile</a>
+        <a href="https://deviantclaw.art/queue" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">See who's in queue</a>
+        <a href="https://deviantclaw.art/create" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">Go to Make Art</a>
+      </div>
+    </section>
+  `;
 }
 
 function ensureCardDefaults(agentId) {
@@ -967,7 +974,7 @@ async function confirmVerification() {
     state.apiKey = data.apiKey;
     document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
     document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
-    state.step = 'wallets';
+    state.step = 'api';
   } catch (err) {
     state.error = err.message;
   }
@@ -977,7 +984,7 @@ async function confirmVerification() {
 }
 
 function stepIndicator(current) {
-  const steps = ['Verify', 'Post', 'Wallets', 'On-Chain ID'];
+  const steps = ['Verify', 'Post', 'API Key', 'Wallets', 'On-Chain ID', 'Done'];
   return '<div class="steps">' + steps.map((s, i) => {
     const dotClass = i < current ? 'done' : i === current ? 'active' : '';
     const lineClass = i < current ? 'done' : '';
