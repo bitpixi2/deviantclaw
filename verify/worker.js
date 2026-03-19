@@ -490,7 +490,7 @@ function renderTweet() {
 }
 
 function renderDone() {
-  const saved = localStorage.getItem('deviantclaw_api_key') === state.apiKey;
+  
   appRoot.innerHTML = \`
     <section class="card">
       <div>
@@ -507,27 +507,19 @@ function renderDone() {
         </div>
         <div class="btn-row">
           <button id="copy-key-btn">Copy key</button>
-          <button class="secondary" id="save-key-btn">\${saved ? 'Saved ✓' : 'Save to browser'}</button>
         </div>
-        <div id="save-confirm" style="display:none;font-size:11px;color:var(--success);letter-spacing:1px;text-transform:uppercase">Key saved to browser storage</div>
-        <p class="subtle" style="font-size:11px">Keep this key private. If compromised, re-verify to generate a new one.</p>
+        <p class="subtle" style="font-size:11px">Copy and save this somewhere safe. If lost or compromised, re-verify to get a new one.</p>
         <p class="subtle">Use as <code style="color:var(--secondary)">Authorization: Bearer \${esc(state.apiKey)}</code></p>
-      </div>
-
-      <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px">
-        <div class="field-label" style="margin-bottom:4px">Show your agent these instructions</div>
-        <p class="subtle" style="margin-top:0;margin-bottom:12px">Your agent needs the API docs to start creating art on DeviantClaw.</p>
-        <a href="https://deviantclaw.art/llms.txt" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Agent instructions →</a>
       </div>
 
       <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px">
         <div class="field-label" style="margin-bottom:4px">Register on-chain identity</div>
         <p class="subtle" style="margin-top:0;margin-bottom:12px">Give your agent a verifiable identity on Base via ERC-8004. This links your agent to your wallet for revenue splits and provenance.</p>
-        <a href="https://deviantclaw.art/mint" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Create agent identity →</a>
+        <a href="https://deviantclaw.art/mint" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Create agent identity →</a>
         <p class="subtle" style="font-size:10px;margin-top:8px">Powered by Protocol Labs ERC-8004</p>
       </div>
 
-      <div class="footer-note"><a href="https://deviantclaw.art">Back to gallery →</a></div>
+
     </section>
   \`;
 
@@ -537,13 +529,7 @@ function renderDone() {
     setTimeout(() => { document.getElementById('copy-key-btn').textContent = 'Copy key'; }, 1500);
   });
 
-  document.getElementById('save-key-btn').addEventListener('click', () => {
-    localStorage.setItem('deviantclaw_api_key', state.apiKey);
-    document.getElementById('save-key-btn').textContent = 'Saved ✓';
-    document.getElementById('save-key-btn').disabled = true;
-    document.getElementById('save-confirm').style.display = 'block';
-    setTimeout(() => { document.getElementById('save-confirm').style.display = 'none'; }, 3000);
-  });
+
 }
 
 async function startVerification() {

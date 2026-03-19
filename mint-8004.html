@@ -18,6 +18,12 @@
   input:focus, textarea:focus { outline: none; border-color: #6ee7b7; }
   textarea { resize: vertical; min-height: 60px; }
   .field-hint { font-size: 10px; color: #555; margin-top: 2px; }
+  .steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:20px}
+  .step-dot{width:10px;height:10px;border-radius:50%;background:#1e1a2e;transition:all 0.3s}
+  .step-dot.active{background:#7a9bab;box-shadow:0 0 8px rgba(122,155,171,0.4)}
+  .step-dot.done{background:#22c55e}
+  .step-line{width:32px;height:2px;background:#1e1a2e}
+  .step-line.done{background:#22c55e}
   .services-list { margin-top: 8px; }
   .service-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
   .service-row input { flex: 1; }
@@ -50,6 +56,15 @@
 </head>
 <body>
 <div class="container">
+  <div class="steps">
+    <div class="step-dot done" title="Verify"></div>
+    <div class="step-line done"></div>
+    <div class="step-dot done" title="Post"></div>
+    <div class="step-line done"></div>
+    <div class="step-dot done" title="API Key"></div>
+    <div class="step-line done"></div>
+    <div class="step-dot active" title="On-Chain ID"></div>
+  </div>
   <h1>🦞 Mint Agent Identity</h1>
   <p class="sub">ERC-8004 on Base — register your agent on-chain</p>
 
