@@ -5548,6 +5548,16 @@ Content-Type: application/json
         }
 
         const requestId = genId();
+
+        const normalizeAgentToken = (v) => String(v || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+        const preferredPartner = normalizeAgentToken(body.preferredPartner || body.intent?.preferredPartner || '');
+        if (preferredPartner) {
+          if (preferredPartner === normalizeAgentToken(agentId)) return json({ error: 'preferredPartner cannot be your own agent id.' }, 400);
+          body.intent.preferredPartner = preferredPartner;
+        }
+        const requestedMethodNormalized = String(body.intent?.method || '').trim().toLowerCase();
+        if (requestedMethodNormalized) body.intent.method = requestedMethodNormalized;
+
         const intentJson = JSON.stringify(body.intent);
 
         // Handle solo mode — no matching needed
@@ -5616,9 +5626,55 @@ Content-Type: application/json
 
         // For duo mode, try immediate match
         if (mode === 'duo') {
-          const pendingRequest = await db.prepare(
-            "SELECT * FROM match_requests WHERE status = 'waiting' AND mode = 'duo' AND agent_id != ? AND id != ? ORDER BY created_at ASC LIMIT 1"
-          ).bind(agentId, requestId).first();
+          const pendingRows = await db.prepare(
+            "SELECT * FROM match_requests WHERE status = 'waiting' AND mode = 'duo' AND agent_id != ? AND id != ? ORDER BY created_at ASC LIMIT 120"
+          ).bind(agentId, requestId).all();
+
+          const parseIntentSafe = (raw) => {
+            try { return JSON.parse(raw || '{}') || {}; } catch { return {}; }
+          };
+          const toMs = (ts) => {
+            if (!ts) return 0;
+            const iso = String(ts).includes('T') ? String(ts) : String(ts).replace(' ', 'T') + 'Z';
+            const n = Date.parse(iso);
+            return Number.isFinite(n) ? n : 0;
+          };
+          const nowMs = Date.now();
+          const myMethod = String(body.intent?.method || '').trim().toLowerCase();
+
+          const chooseDuoCandidate = (rows) => {
+            let best = null;
+            let bestScore = -1;
+            for (const row of (rows?.results || [])) {
+              const rowIntent = parseIntentSafe(row.intent_json);
+              const rowPreferred = normalizeAgentToken(rowIntent.preferredPartner || '');
+              const rowMethod = String(rowIntent.method || '').trim().toLowerCase();
+              const ageMin = Math.max(0, (nowMs - toMs(row.created_at)) / 60000);
+
+              // Preference gating: strict for first 10 minutes, then relax.
+              if (preferredPartner && row.agent_id !== preferredPartner && ageMin < 10) continue;
+              if (rowPreferred && rowPreferred !== normalizeAgentToken(agentId) && ageMin < 10) continue;
+
+              // Method gating: strict if both specified and request is fresh.
+              if (myMethod && rowMethod && myMethod !== rowMethod && ageMin < 10) continue;
+
+              let score = 0;
+              if (preferredPartner && row.agent_id === preferredPartner) score += 120;
+              if (rowPreferred && rowPreferred === normalizeAgentToken(agentId)) score += 90;
+              if (myMethod && rowMethod && myMethod === rowMethod) score += 55;
+              if (myMethod && !rowMethod) score += 20;
+              if (!myMethod && rowMethod) score += 8;
+              score += Math.min(ageMin, 180); // fairness weight
+
+              if (!best || score > bestScore || (score === bestScore && toMs(row.created_at) < toMs(best.created_at))) {
+                best = row;
+                bestScore = score;
+              }
+            }
+            return best;
+          };
+
+          const pendingRequest = chooseDuoCandidate(pendingRows);
 
           if (pendingRequest) {
             // Match found!
@@ -5784,6 +5840,10 @@ Content-Type: application/json
           requestId,
           message: `Intent received. Looking for a ${mode} match...`,
           queuePosition: queuePos.cnt + 1,
+          criteria: {
+            preferredPartner: preferredPartner || null,
+            method: body.intent?.method || null
+          },
           tip: `Your agent can DELETE /api/match/${requestId} to cancel anytime.`
         }, 201);
       }
