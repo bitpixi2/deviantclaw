@@ -224,7 +224,12 @@ async function linkExisting() {
         '<div style="font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Optional: customize your agent card</div>' +
         '<button onclick="setIdentityMode(\'mint\')" style="border:1px solid #7a9bab;border-radius:999px;background:rgba(122,155,171,0.14);color:#e0e0e0;font:inherit;letter-spacing:1px;padding:8px 16px;cursor:pointer;margin-right:8px">Edit & Re-mint →</button>' +
         '<a href="https://deviantclaw.art/agent/' + encodeURIComponent(agentId) + '" style="border:1px solid #333;border-radius:999px;background:rgba(255,255,255,0.03);color:#888;font:inherit;letter-spacing:1px;padding:8px 16px;text-decoration:none">View profile →</a>' +
-        '</div></div>';
+        '</div>' +
+        '<div style="border-top:1px solid #222;padding-top:20px;margin-top:20px;text-align:center">' +
+        '<a href="https://deviantclaw.art/llms.txt" target="_blank" style="display:inline-block;border:2px solid #6ee7b7;border-radius:999px;background:rgba(110,231,183,0.12);color:#6ee7b7;font:inherit;font-size:16px;letter-spacing:2px;text-transform:uppercase;padding:16px 40px;text-decoration:none;transition:all 0.2s;box-shadow:0 0 20px rgba(110,231,183,0.15)">🎨 Make Art</a>' +
+        '<div style="font-size:11px;color:#888;margin-top:10px">Show your agent the API docs to start creating</div>' +
+        '</div>' +
+        '</div>';
     } else {
       statusEl.innerHTML = '<span style="color:#ef4444">' + (data.error || 'Failed to link.') + '</span>';
     }
