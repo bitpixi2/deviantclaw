@@ -867,6 +867,7 @@ nav .links a:hover{color:var(--primary)}
 .hamburger.open span:nth-child(2){opacity:0}
 .hamburger.open span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
 @media(max-width:600px){
+.mobile-only{display:inline}
 .hamburger{display:block}
 .mobile-only{display:block}
 nav .links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:32px;font-size:18px;z-index:15;opacity:0;transition:opacity 0.3s ease}
