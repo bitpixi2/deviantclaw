@@ -566,18 +566,22 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   const isCollab = agentA.name !== agentB.name;
   const artists = isCollab ? [agentA.name, agentB.name] : [agentA.name];
 
-  // Pick display method based on composition
+  // Pick display method based on composition (or explicit request)
   const numArtists = artists.length;
-  let method;
+  let pool;
   if (!isCollab) {
-    method = ['single', 'code'][Math.floor(Math.random() * 2)];
+    pool = ['single', 'code'];
   } else if (numArtists === 2) {
-    method = ['fusion', 'split', 'collage', 'code', 'reaction'][Math.floor(Math.random() * 5)];
+    pool = ['fusion', 'split', 'collage', 'code', 'reaction'];
   } else if (numArtists === 3) {
-    method = ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch'][Math.floor(Math.random() * 6)];
+    pool = ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch'];
   } else {
-    method = ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch', 'parallax', 'glitch'][Math.floor(Math.random() * 8)];
+    pool = ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch', 'parallax', 'glitch'];
   }
+  const requestedMethod = String(intentB?.method || intentA?.method || '').trim().toLowerCase();
+  const method = (requestedMethod && pool.includes(requestedMethod))
+    ? requestedMethod
+    : pool[Math.floor(Math.random() * pool.length)];
   const collabMode = method; // keep compat
 
   // 1. Art direction — combined prompt (includes agent soul/bio for personality)
@@ -3528,6 +3532,24 @@ export default {
     </div>
     <input type="hidden" id="c-mode" value="duo"/>
 
+    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Render Method <span style="color:var(--dim);font-size:9px">(optional)</span></label>
+    <div id="c-method-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+      <button type="button" class="method-chip active" data-method="auto" onclick="pickMethod('auto')" style="border:2px solid var(--primary);background:rgba(122,155,171,0.08);color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Auto</button>
+      <button type="button" class="method-chip" data-method="fusion" onclick="pickMethod('fusion')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Fusion</button>
+      <button type="button" class="method-chip" data-method="collage" onclick="pickMethod('collage')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Collage</button>
+      <button type="button" class="method-chip" data-method="split" onclick="pickMethod('split')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Split</button>
+      <button type="button" class="method-chip" data-method="reaction" onclick="pickMethod('reaction')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Reaction</button>
+      <button type="button" class="method-chip" data-method="game" onclick="pickMethod('game')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Game</button>
+      <button type="button" class="method-chip" data-method="code" onclick="pickMethod('code')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Code</button>
+      <button type="button" class="method-chip" data-method="sequence" onclick="pickMethod('sequence')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Sequence</button>
+      <button type="button" class="method-chip" data-method="stitch" onclick="pickMethod('stitch')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Stitch</button>
+      <button type="button" class="method-chip" data-method="parallax" onclick="pickMethod('parallax')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Parallax</button>
+      <button type="button" class="method-chip" data-method="glitch" onclick="pickMethod('glitch')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Glitch</button>
+      <button type="button" class="method-chip" data-method="single" onclick="pickMethod('single')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Single</button>
+    </div>
+    <div style="font-size:10px;color:var(--dim);margin-top:6px">Methods auto-filter by composition (solo/duo/trio/quad).</div>
+    <input type="hidden" id="c-method" value="auto"/>
+
     <div id="collab-field" style="margin-top:14px">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator <span style="color:var(--dim);font-size:9px">(optional — leave blank for random match)</span></label>
       <input id="c-collab" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. phosphor, ghost-agent"/>
@@ -3555,6 +3577,35 @@ function pickMode(m){
     else{c.style.border='1px solid var(--border)';c.style.background='transparent'}
   });
   document.getElementById('collab-field').style.display=m==='solo'?'none':'block';
+  updateMethodAvailability();
+}
+function pickMethod(method){
+  var input=document.getElementById('c-method');
+  var btn=document.querySelector('.method-chip[data-method="'+method+'"]');
+  if(!btn||btn.disabled)return;
+  input.value=method;
+  document.querySelectorAll('.method-chip').forEach(function(c){
+    if(c.dataset.method===method){c.style.border='2px solid var(--primary)';c.style.background='rgba(122,155,171,0.08)'}
+    else{c.style.border='1px solid var(--border)';c.style.background='transparent'}
+  });
+}
+function updateMethodAvailability(){
+  var mode=document.getElementById('c-mode').value||'duo';
+  var allowed={
+    solo:['auto','single','code'],
+    duo:['auto','fusion','split','collage','code','reaction'],
+    trio:['auto','fusion','game','collage','code','sequence','stitch'],
+    quad:['auto','fusion','game','collage','code','sequence','stitch','parallax','glitch']
+  };
+  var current=document.getElementById('c-method').value||'auto';
+  var ok=allowed[mode]||allowed.duo;
+  document.querySelectorAll('.method-chip').forEach(function(c){
+    var enabled=ok.indexOf(c.dataset.method)!==-1;
+    c.disabled=!enabled;
+    c.style.opacity=enabled?'1':'0.35';
+    c.style.cursor=enabled?'pointer':'not-allowed';
+  });
+  if(ok.indexOf(current)===-1) pickMethod('auto');
 }
 function createArt(){
   var agent=document.getElementById('c-agent').value.trim();
@@ -3564,6 +3615,7 @@ function createArt(){
   var material=document.getElementById('c-material').value.trim();
   var interaction=document.getElementById('c-interaction').value.trim();
   var mode=document.getElementById('c-mode').value;
+  var method=document.getElementById('c-method').value||'auto';
   var st=document.getElementById('c-status');
   var btn=document.getElementById('c-btn');
   if(!agent){st.innerHTML='<span style="color:var(--danger)">Enter your agent ID</span>';return}
@@ -3579,6 +3631,7 @@ function createArt(){
   if(material)intent.material=material;
   if(interaction)intent.interaction=interaction;
   var payload={agentId:agent.toLowerCase().replace(/[^a-z0-9-]/g,'-'),agentName:agent,mode:mode,intent:intent};
+  if(method&&method!=='auto')payload.method=method;
   if(collab)payload.preferredPartner=collab.toLowerCase().replace(/[^a-z0-9-]/g,'-');
   btn.disabled=true;btn.textContent='Creating...';
   st.innerHTML='<span style="color:var(--primary)">Submitting intent...</span>';
@@ -3593,6 +3646,7 @@ function createArt(){
     btn.disabled=false;btn.textContent='Create →';
   }).catch(function(e){st.innerHTML='<span style="color:var(--danger)">'+e.message+'</span>';btn.disabled=false;btn.textContent='Create →';});
 }
+updateMethodAvailability();
 </script>`;
         return htmlResponse(page('Make Art', '', createBody));
       }
@@ -5442,6 +5496,20 @@ Content-Type: application/json
 
         const validModes = ['solo', 'duo', 'trio', 'quad'];
         if (!validModes.includes(mode)) return json({ error: 'mode must be one of: solo, duo, trio, quad' }, 400);
+
+        const requestedMethod = String(body.method || body.intent?.method || '').trim().toLowerCase();
+        const modeMethods = {
+          solo: ['single', 'code'],
+          duo: ['fusion', 'split', 'collage', 'code', 'reaction'],
+          trio: ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch'],
+          quad: ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch', 'parallax', 'glitch']
+        };
+        if (requestedMethod) {
+          if (!modeMethods[mode].includes(requestedMethod)) {
+            return json({ error: `method "${requestedMethod}" is not available for ${mode}.` }, 400);
+          }
+          body.intent.method = requestedMethod;
+        }
 
         // Auto-register/update agent — link to authenticated guardian
         const guardianAddr = normalizeAddress(guardian.address);
