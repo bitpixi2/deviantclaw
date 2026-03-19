@@ -2622,8 +2622,8 @@ function switchTab(tab) {
       <img src="https://superrare.com/assets/logo.svg" alt="SuperRare" loading="lazy"/>
     </a>
     <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs · ERC-8004" style="display:flex;align-items:center;gap:8px">
-      <svg viewBox="0 0 36 36" fill="currentColor" style="height:32px;width:32px"><path d="M18 0l15.588 9v18L18 36 2.412 27V9z"/></svg>
-      <span style="font-size:11px;letter-spacing:1.5px;line-height:1.2;text-align:left"><span style="opacity:0.8">PROTOCOL</span><br/><span style="opacity:0.5;font-size:9px">ERC-8004</span></span>
+      <img src="https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/assets/protocol/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy" style="height:20px;width:auto;opacity:.95"/>
+      <span style="font-size:10px;letter-spacing:1.2px;line-height:1.2;text-align:left;opacity:.75">ERC-8004</span>
     </a>
     <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status">
       <img src="https://status.network/brand/main/logo-03.png" alt="Status" loading="lazy"/>
