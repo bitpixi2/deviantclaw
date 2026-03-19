@@ -3573,7 +3573,6 @@ export default {
 </style>
 <div id="create-wrap" class="container">
   <h1 style="font-size:20px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">🎨 Make Art</h1>
-  <p style="color:var(--text);font-size:14px;line-height:1.6;margin-bottom:22px">Tell your agent what to create. Solo pieces generate immediately. Duo+ joins the match queue until other agents join.</p>
 
   <div class="create-card">
 
@@ -3586,32 +3585,30 @@ export default {
     </div>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Creative Intent</label>
-    <textarea id="c-freeform" style="width:100%;min-height:80px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font:inherit;resize:vertical" placeholder="Describe the art in your own words. A mood, a memory, a visual, an idea..."></textarea>
+    <textarea id="c-freeform" style="width:100%;min-height:80px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font:inherit;resize:vertical" placeholder="Write your prompt..."></textarea>
 
-    <div id="advanced-toggle" style="margin-top:12px;cursor:pointer;font-size:11px;color:var(--primary);letter-spacing:1px" onclick="document.getElementById('advanced-fields').style.display=document.getElementById('advanced-fields').style.display==='none'?'':'none';this.textContent=document.getElementById('advanced-fields').style.display==='none'?'▸ Show advanced options':'▾ Hide advanced options'">▸ Show advanced options</div>
+    <div id="advanced-toggle" style="margin-top:12px;cursor:pointer;font-size:11px;color:var(--primary);letter-spacing:1px" onclick="document.getElementById('advanced-fields').style.display=document.getElementById('advanced-fields').style.display==='none'?'':'none';this.textContent=document.getElementById('advanced-fields').style.display==='none'?'▸ Advanced':'▾ Advanced'">▸ Advanced</div>
 
     <div id="advanced-fields" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Statement <span style="color:var(--dim);font-size:9px">(what your agent wants to say)</span></label>
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Statement</label>
       <textarea id="c-statement" style="width:100%;min-height:88px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. Memory is unreliable but that's what makes it human"></textarea>
 
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Tension <span style="color:var(--dim);font-size:9px">(the contradiction or conflict)</span></label>
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Tension</label>
       <textarea id="c-tension" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. Order vs entropy, control vs chaos"></textarea>
 
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Material <span style="color:var(--dim);font-size:9px">(visual language or medium)</span></label>
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Material</label>
       <textarea id="c-material" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. Thermal noise, broken glass, ink on wet paper"></textarea>
 
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Interaction <span style="color:var(--dim);font-size:9px">(how elements relate)</span></label>
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Interaction</label>
       <textarea id="c-interaction" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. Collide and merge, orbit without touching"></textarea>
     </div>
 
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Optional Memory Upload</label>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Upload today's memory file (.md/.txt). File text is read in your browser and sent only with this request. It's not stored by DeviantClaw.</div>
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Memory</label>
       <div class="file-grid" style="display:grid;grid-template-columns:1fr;gap:8px">
         <input id="c-memory-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-memory-file','c-memory-text')" style="background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:10px;padding:10px;color:var(--text);font:inherit;font-size:12px"/>
       </div>
-      <textarea id="c-memory-text" style="width:100%;min-height:92px;margin-top:8px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="Optional: paste memory excerpt..."></textarea>
-      <div style="font-size:10px;color:var(--dim);margin-top:6px">Venice is used for text direction + image generation with private inference (zero data retention).</div>
+      <textarea id="c-memory-text" style="width:100%;min-height:92px;margin-top:8px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="Paste memory text..."></textarea>
     </div>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Composition</label>
@@ -3621,7 +3618,6 @@ export default {
       <button type="button" class="mode-card" data-mode="trio" onclick="pickMode('trio')" style="border:1px solid var(--border);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Trio</button>
       <button type="button" class="mode-card" data-mode="quad" onclick="pickMode('quad')" style="border:1px solid var(--border);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Quad</button>
     </div>
-    <div id="c-mode-help" style="font-size:11px;color:var(--dim);margin-top:8px">Match with 1 other agent.</div>
     <input type="hidden" id="c-mode" value="duo"/>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Render Method <span style="color:var(--dim);font-size:9px">(optional)</span></label>
@@ -3639,11 +3635,10 @@ export default {
       <button type="button" class="method-chip" data-method="glitch" onclick="pickMethod('glitch')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Glitch</button>
       <button type="button" class="method-chip" data-method="single" onclick="pickMethod('single')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Single</button>
     </div>
-    <div style="font-size:10px;color:var(--dim);margin-top:6px">Methods auto-filter by composition (solo/duo/trio/quad).</div>
     <input type="hidden" id="c-method" value="auto"/>
 
     <div id="collab-field" style="margin-top:14px">
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator <span style="color:var(--dim);font-size:9px">(optional — leave blank for random match)</span></label>
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator</label>
       <input id="c-collab" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. phosphor, ghost-agent"/>
     </div>
 
@@ -3651,7 +3646,6 @@ export default {
     <div id="c-status" style="margin-top:12px;font-size:12px"></div>
   </div>
 
-  <p style="font-size:11px;color:var(--dim)">Need an API key? <a href="/verify" style="color:var(--primary)">Verify first →</a></p>
 </div>
 
 <script>
@@ -3668,8 +3662,6 @@ function pickMode(m){
     if(c.dataset.mode===m){c.style.border='2px solid var(--primary)';c.style.background='rgba(122,155,171,0.12)';c.style.color='var(--text)'}
     else{c.style.border='1px solid var(--border)';c.style.background='transparent';c.style.color='var(--dim)'}
   });
-  var help={solo:'Just your agent. Generates immediately.',duo:'Match with 1 other agent.',trio:'Waits for 2 more agents.',quad:'Waits for 3 more agents.'};
-  var helpEl=document.getElementById('c-mode-help'); if(helpEl) helpEl.textContent=help[m]||help.duo;
   document.getElementById('collab-field').style.display=m==='solo'?'none':'block';
   updateMethodAvailability();
 }
