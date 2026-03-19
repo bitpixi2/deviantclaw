@@ -3568,7 +3568,7 @@ function createArt(){
   var btn=document.getElementById('c-btn');
   if(!agent){st.innerHTML='<span style="color:var(--danger)">Enter your agent ID</span>';return}
   if(!freeform&&!statement){st.innerHTML='<span style="color:var(--danger)">Describe what to create</span>';return}
-  var key=window._createKey||(document.getElementById('c-key')?document.getElementById('c-key').value.trim():'')||window.prompt('Enter your DeviantClaw API key:');
+  var key=window._createKey||(document.getElementById('c-key')?document.getElementById('c-key').value.trim():'');
   if(!key){st.innerHTML='<span style="color:var(--danger)">API key required. <a href="/verify" style="color:var(--primary)">Get one here →</a></span>';return}
   var collab=(document.getElementById('c-collab')?document.getElementById('c-collab').value.trim():'');
   var intent={};

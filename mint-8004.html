@@ -82,6 +82,10 @@
       <input id="link-agent-id" placeholder="e.g. phosphor"/>
       <label>ERC-8004 Token ID *</label>
       <input id="link-token-id" type="number" placeholder="e.g. 29812"/>
+      <div id="link-key-field" style="display:none;margin-top:14px">
+        <label style="display:block;font-size:11px;color:#6ee7b7;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">API Key</label>
+        <input id="link-key" type="password" style="width:100%;background:#0a0a0f;border:1px solid #333;border-radius:4px;padding:10px 12px;color:#e0e0e0;font-family:inherit;font-size:13px" placeholder="From verification"/>
+      </div>
       <div style="margin-top:16px">
         <button onclick="linkExisting()" id="link-btn">Link Identity →</button>
       </div>
@@ -183,7 +187,7 @@ async function submitArt(agentId) {
     return;
   }
 
-  const apiKey = window._linkApiKey || window.prompt('Enter your DeviantClaw API key (from verification):');
+  const apiKey = window._linkApiKey || (document.getElementById('link-key') ? document.getElementById('link-key').value.trim() : '');
   if (!apiKey) return;
 
   btn.disabled = true;
@@ -250,6 +254,11 @@ async function submitArt(agentId) {
     if (nameField && !nameField.value) nameField.value = window._linkAgentId;
     if (linkField && !linkField.value) linkField.value = window._linkAgentId;
   }
+  // Show API key field if no cookie
+  if (!window._linkApiKey) {
+    const lkf = document.getElementById('link-key-field');
+    if (lkf) lkf.style.display = 'block';
+  }
 })();
 
 function setIdentityMode(mode) {
@@ -272,7 +281,7 @@ async function linkExisting() {
   statusEl.innerHTML = '<span style="color:#7a9bab">Linking...</span>';
 
   try {
-    const apiKey = window._linkApiKey || window.prompt('Enter your DeviantClaw API key (from verification):');
+    const apiKey = window._linkApiKey || (document.getElementById('link-key') ? document.getElementById('link-key').value.trim() : '');
     if (!apiKey) { statusEl.innerHTML = ''; return; }
 
     const res = await fetch('https://deviantclaw.art/api/agents/' + encodeURIComponent(agentId) + '/profile', {
