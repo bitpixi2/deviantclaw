@@ -5236,7 +5236,7 @@ Content-Type: application/json
         }
 
         const body = await request.json();
-        const allowed = ['avatar_url', 'banner_url', 'bio', 'theme_color', 'theme_bg', 'links', 'mood', 'soul_excerpt'];
+        const allowed = ['avatar_url', 'banner_url', 'bio', 'theme_color', 'theme_bg', 'links', 'mood', 'soul_excerpt', 'erc8004_agent_id'];
         const updates = [];
         const values = [];
         for (const key of allowed) {
