@@ -2611,7 +2611,7 @@ function switchTab(tab) {
       <img src="https://mintcdn.com/veniceai/0vNwudF9KfvWPUSs/logo/light.svg?fit=max&amp;auto=format&amp;n=0vNwudF9KfvWPUSs&amp;q=85&amp;s=259bbccaba1f597f23c06b9c5827bfa5" alt="Venice AI" loading="lazy"/>
     </a>
     <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X">
-      <svg viewBox="0 0 24 24" fill="currentColor" style="height:20px;width:20px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      <svg viewBox="0 0 24 24" fill="currentColor" style="height:26px;width:26px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
     </a>
     <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 127 63" role="img" aria-hidden="true">
@@ -2623,13 +2623,12 @@ function switchTab(tab) {
     </a>
     <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs · ERC-8004" style="display:flex;align-items:center;gap:8px">
       <img src="https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/assets/protocol/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy" style="height:20px;width:auto;opacity:.95"/>
-      <span style="font-size:10px;letter-spacing:1.2px;line-height:1.2;text-align:left;opacity:.75">ERC-8004</span>
     </a>
     <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status">
       <img src="https://status.network/brand/main/logo-03.png" alt="Status" loading="lazy"/>
     </a>
     <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS">
-      <img src="https://ens.domains/assets/brand/logo/ens-logo-Blue.svg" alt="ENS" loading="lazy"/>
+      <img src="https://ens.domains/assets/brand/logo/ens-logo-Blue.svg" alt="ENS" loading="lazy" style="height:36px"/>
     </a>
   </div>
 </div>`;
