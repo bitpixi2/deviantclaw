@@ -3643,6 +3643,7 @@ export default {
 
     <div id="collab-field" style="margin-top:14px">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator</label>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.45">Optional. Leave blank for random matching.</div>
       <input id="c-collab" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder=""/>
     </div>
 
