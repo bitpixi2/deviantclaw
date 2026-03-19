@@ -3549,15 +3549,19 @@ export default {
       if (method === 'GET' && (path === '/create' || path === '/make-art')) {
         const createBody = `
 <style>
-  #create-wrap{max-width:760px;margin:28px auto;padding:0 16px}
-  #create-wrap .create-card{background:rgba(18,24,30,0.92);border:1px solid rgba(122,155,171,0.35);border-radius:14px;padding:24px;box-shadow:0 14px 38px rgba(0,0,0,.32)}
+  #create-wrap{max-width:780px;margin:22px auto;padding:0 16px}
+  #create-wrap .create-card{border:1px solid rgba(74,122,126,0.25);border-radius:18px;background:rgba(6,8,12,0.88);backdrop-filter:blur(16px);box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08);padding:24px}
   #create-wrap .section-gap{margin-top:18px}
   #create-wrap label{font-size:12px!important;color:var(--text)!important}
-  #create-wrap input,#create-wrap textarea,#create-wrap select{background:rgba(255,255,255,0.06)!important;border:1px solid rgba(255,255,255,0.24)!important;padding:13px 14px!important;font-size:14px!important}
+  #create-wrap input,#create-wrap textarea,#create-wrap select{background:rgba(0,0,0,0.4)!important;border:1px solid var(--border)!important;border-radius:12px!important;padding:12px 14px!important;font-size:14px!important;color:var(--text)!important}
+  #create-wrap input:focus,#create-wrap textarea:focus,#create-wrap select:focus{outline:none;border-color:var(--primary)!important;box-shadow:0 0 0 3px rgba(122,155,171,0.14)}
   #create-wrap textarea{min-height:110px!important}
   #create-wrap .method-chip,#create-wrap .mode-card{min-height:44px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
   #create-wrap .method-chip[disabled]{filter:grayscale(0.35)}
-  #create-wrap #c-btn{padding:16px!important;font-size:15px!important}
+  #create-wrap #c-btn{padding:16px!important;font-size:15px!important;border:1px solid var(--primary)!important;background:rgba(122,155,171,0.14)!important;color:var(--text)!important}
+  #create-wrap #c-btn:hover{transform:translateY(-1px);background:rgba(122,155,171,0.22)!important}
+  #create-wrap #advanced-fields{background:rgba(255,255,255,0.01);border-radius:12px;padding:12px!important}
+  #create-wrap #advanced-toggle{display:inline-block;padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03)}
   @media (max-width:640px){
     #create-wrap{padding:0 12px}
     #create-wrap .create-card{padding:16px}
