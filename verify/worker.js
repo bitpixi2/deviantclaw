@@ -661,7 +661,7 @@ function renderDone() {
 
 function renderCongrats() {
   const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  appRoot.innerHTML = `
+  appRoot.innerHTML = \`
     <section class="card">
       <div>
         \${stepIndicator(5)}
@@ -675,7 +675,7 @@ function renderCongrats() {
         <a href="https://deviantclaw.art/create" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">Go to Make Art</a>
       </div>
     </section>
-  `;
+  \`;
 }
 
 function ensureCardDefaults(agentId) {
