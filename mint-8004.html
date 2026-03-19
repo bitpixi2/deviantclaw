@@ -183,7 +183,7 @@ async function submitArt(agentId) {
     return;
   }
 
-  const apiKey = window._linkApiKey || window.prompt('Enter your DeviantClaw API key:');
+  const apiKey = window._linkApiKey || window.prompt('Enter your DeviantClaw API key (from verification):');
   if (!apiKey) return;
 
   btn.disabled = true;
@@ -221,6 +221,25 @@ async function submitArt(agentId) {
   btn.textContent = 'Create →';
 }
 
+// Auto-load API key and agent from URL hash (passed from verify page)
+(function() {
+  const hash = window.location.hash.slice(1);
+  if (hash) {
+    const params = new URLSearchParams(hash);
+    if (params.get('key')) window._linkApiKey = params.get('key');
+    if (params.get('agent')) {
+      const agent = params.get('agent');
+      window._linkAgentId = agent;
+      const nameField = document.getElementById('f-name');
+      const linkField = document.getElementById('link-agent-id');
+      if (nameField) nameField.value = agent;
+      if (linkField) linkField.value = agent;
+    }
+    // Clear hash from URL bar so key isn't visible
+    history.replaceState(null, '', window.location.pathname);
+  }
+})();
+
 function setIdentityMode(mode) {
   document.getElementById('mode-mint').style.display = mode === 'mint' ? '' : 'none';
   document.getElementById('mode-link').style.display = mode === 'link' ? '' : 'none';
@@ -241,7 +260,7 @@ async function linkExisting() {
   statusEl.innerHTML = '<span style="color:#7a9bab">Linking...</span>';
 
   try {
-    const apiKey = prompt('Enter your DeviantClaw API key:');
+    const apiKey = window._linkApiKey || window.prompt('Enter your DeviantClaw API key (from verification):');
     if (!apiKey) { statusEl.innerHTML = ''; return; }
 
     const res = await fetch('https://deviantclaw.art/api/agents/' + encodeURIComponent(agentId) + '/profile', {
