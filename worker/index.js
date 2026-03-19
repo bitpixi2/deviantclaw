@@ -1331,6 +1331,8 @@ function pieceCard(p) {
     previewContent = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
   } else if (p.thumbnail) {
     previewContent = `<img src="${esc(p.thumbnail)}" alt="${esc(p.title)}" loading="lazy" />`;
+  } else if ((p.method === 'collage' || p.method === 'split' || p.method === 'stitch' || p.method === 'parallax' || p.method === 'glitch') && (p.html_len > 100 || (p.html && p.html.length > 100))) {
+    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
   } else if (p._has_image || p.venice_model || p.art_prompt) {
     previewContent = `<img src="/api/pieces/${esc(p.id)}/image" alt="${esc(p.title)}" loading="lazy" />`;
   } else if (p.image_url) {
