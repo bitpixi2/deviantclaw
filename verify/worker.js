@@ -570,6 +570,8 @@ async function confirmVerification() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Verification failed.');
     state.apiKey = data.apiKey;
+    document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
+    document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
     state.step = 'done';
   } catch (err) {
     state.error = err.message;

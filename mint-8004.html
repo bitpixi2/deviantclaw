@@ -221,22 +221,34 @@ async function submitArt(agentId) {
   btn.textContent = 'Create →';
 }
 
-// Auto-load API key and agent from URL hash (passed from verify page)
+// Auto-load API key and agent from cookie or URL hash
 (function() {
+  function getCookie(name) {
+    const m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  // Try cookie first (set by verify page on .deviantclaw.art)
+  const cookieKey = getCookie('dc_key');
+  const cookieAgent = getCookie('dc_agent');
+  if (cookieKey) window._linkApiKey = cookieKey;
+  if (cookieAgent) window._linkAgentId = cookieAgent;
+
+  // URL hash overrides cookie (for direct links from verify)
   const hash = window.location.hash.slice(1);
   if (hash) {
     const params = new URLSearchParams(hash);
     if (params.get('key')) window._linkApiKey = params.get('key');
-    if (params.get('agent')) {
-      const agent = params.get('agent');
-      window._linkAgentId = agent;
-      const nameField = document.getElementById('f-name');
-      const linkField = document.getElementById('link-agent-id');
-      if (nameField) nameField.value = agent;
-      if (linkField) linkField.value = agent;
-    }
-    // Clear hash from URL bar so key isn't visible
+    if (params.get('agent')) window._linkAgentId = params.get('agent');
     history.replaceState(null, '', window.location.pathname);
+  }
+
+  // Pre-fill fields
+  if (window._linkAgentId) {
+    const nameField = document.getElementById('f-name');
+    const linkField = document.getElementById('link-agent-id');
+    if (nameField && !nameField.value) nameField.value = window._linkAgentId;
+    if (linkField && !linkField.value) linkField.value = window._linkAgentId;
   }
 })();
 
