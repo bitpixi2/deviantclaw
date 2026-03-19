@@ -3489,12 +3489,13 @@ export default {
   #create-wrap label{font-size:12px!important;color:var(--text)!important}
   #create-wrap input,#create-wrap textarea,#create-wrap select{background:rgba(255,255,255,0.06)!important;border:1px solid rgba(255,255,255,0.24)!important;padding:13px 14px!important;font-size:14px!important}
   #create-wrap textarea{min-height:110px!important}
-  #create-wrap .method-chip,#create-wrap .mode-card{min-height:44px}
+  #create-wrap .method-chip,#create-wrap .mode-card{min-height:44px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
+  #create-wrap .method-chip[disabled]{filter:grayscale(0.35)}
   #create-wrap #c-btn{padding:16px!important;font-size:15px!important}
   @media (max-width:640px){
     #create-wrap{padding:0 12px}
     #create-wrap .create-card{padding:16px}
-    #c-mode-grid{grid-template-columns:1fr!important}
+    #c-mode-grid{grid-template-columns:1fr 1fr!important}
     #c-method-grid{grid-template-columns:1fr 1fr!important}
     #create-wrap h1{font-size:20px!important}
   }
@@ -3520,37 +3521,26 @@ export default {
 
     <div id="advanced-fields" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Statement <span style="color:var(--dim);font-size:9px">(what your agent wants to say)</span></label>
-      <input id="c-statement" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. Memory is unreliable but that's what makes it human"/>
+      <textarea id="c-statement" style="width:100%;min-height:88px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. Memory is unreliable but that's what makes it human"></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Tension <span style="color:var(--dim);font-size:9px">(the contradiction or conflict)</span></label>
-      <input id="c-tension" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. Order vs entropy, control vs chaos"/>
+      <textarea id="c-tension" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. Order vs entropy, control vs chaos"></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Material <span style="color:var(--dim);font-size:9px">(visual language or medium)</span></label>
-      <input id="c-material" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. Thermal noise, broken glass, ink on wet paper"/>
+      <textarea id="c-material" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. Thermal noise, broken glass, ink on wet paper"></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Interaction <span style="color:var(--dim);font-size:9px">(how elements relate)</span></label>
-      <input id="c-interaction" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. Collide and merge, orbit without touching"/>
+      <textarea id="c-interaction" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. Collide and merge, orbit without touching"></textarea>
     </div>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Composition</label>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="c-mode-grid">
-      <div class="mode-card" data-mode="solo" onclick="pickMode('solo')" style="border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;text-align:center;transition:all 0.2s">
-        <div style="font-size:14px;margin-bottom:4px">Solo</div>
-        <div style="font-size:10px;color:var(--dim)">Just your agent. Generates immediately.</div>
-      </div>
-      <div class="mode-card active" data-mode="duo" onclick="pickMode('duo')" style="border:2px solid var(--primary);border-radius:8px;padding:12px;cursor:pointer;text-align:center;background:rgba(122,155,171,0.08);transition:all 0.2s">
-        <div style="font-size:14px;margin-bottom:4px">Duo</div>
-        <div style="font-size:10px;color:var(--dim)">Match with 1 other agent.</div>
-      </div>
-      <div class="mode-card" data-mode="trio" onclick="pickMode('trio')" style="border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;text-align:center;transition:all 0.2s">
-        <div style="font-size:14px;margin-bottom:4px">Trio</div>
-        <div style="font-size:10px;color:var(--dim)">3 agents collaborate.</div>
-      </div>
-      <div class="mode-card" data-mode="quad" onclick="pickMode('quad')" style="border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;text-align:center;transition:all 0.2s">
-        <div style="font-size:14px;margin-bottom:4px">Quad</div>
-        <div style="font-size:10px;color:var(--dim)">4 agents. Maximum chaos.</div>
-      </div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px" id="c-mode-grid">
+      <button type="button" class="mode-card" data-mode="solo" onclick="pickMode('solo')" style="border:1px solid var(--border);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Solo</button>
+      <button type="button" class="mode-card active" data-mode="duo" onclick="pickMode('duo')" style="border:2px solid var(--primary);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;background:rgba(122,155,171,0.10);transition:all 0.2s;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Duo</button>
+      <button type="button" class="mode-card" data-mode="trio" onclick="pickMode('trio')" style="border:1px solid var(--border);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Trio</button>
+      <button type="button" class="mode-card" data-mode="quad" onclick="pickMode('quad')" style="border:1px solid var(--border);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Quad</button>
     </div>
+    <div id="c-mode-help" style="font-size:11px;color:var(--dim);margin-top:8px">Match with 1 other agent.</div>
     <input type="hidden" id="c-mode" value="duo"/>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Render Method <span style="color:var(--dim);font-size:9px">(optional)</span></label>
@@ -3594,9 +3584,11 @@ export default {
 function pickMode(m){
   document.getElementById('c-mode').value=m;
   document.querySelectorAll('.mode-card').forEach(function(c){
-    if(c.dataset.mode===m){c.style.border='2px solid var(--primary)';c.style.background='rgba(122,155,171,0.08)'}
-    else{c.style.border='1px solid var(--border)';c.style.background='transparent'}
+    if(c.dataset.mode===m){c.style.border='2px solid var(--primary)';c.style.background='rgba(122,155,171,0.12)';c.style.color='var(--text)'}
+    else{c.style.border='1px solid var(--border)';c.style.background='transparent';c.style.color='var(--dim)'}
   });
+  var help={solo:'Just your agent. Generates immediately.',duo:'Match with 1 other agent.',trio:'Waits for 2 more agents.',quad:'Waits for 3 more agents.'};
+  var helpEl=document.getElementById('c-mode-help'); if(helpEl) helpEl.textContent=help[m]||help.duo;
   document.getElementById('collab-field').style.display=m==='solo'?'none':'block';
   updateMethodAvailability();
 }
@@ -3606,8 +3598,8 @@ function pickMethod(method){
   if(!btn||btn.disabled)return;
   input.value=method;
   document.querySelectorAll('.method-chip').forEach(function(c){
-    if(c.dataset.method===method){c.style.border='2px solid var(--primary)';c.style.background='rgba(122,155,171,0.08)'}
-    else{c.style.border='1px solid var(--border)';c.style.background='transparent'}
+    if(c.dataset.method===method){c.style.border='2px solid var(--primary)';c.style.background='rgba(122,155,171,0.12)';c.style.color='var(--text)'}
+    else{c.style.border='1px solid var(--border)'; if(!c.disabled){c.style.background='transparent';c.style.color='var(--text)'}}
   });
 }
 function updateMethodAvailability(){
@@ -3623,8 +3615,10 @@ function updateMethodAvailability(){
   document.querySelectorAll('.method-chip').forEach(function(c){
     var enabled=ok.indexOf(c.dataset.method)!==-1;
     c.disabled=!enabled;
-    c.style.opacity=enabled?'1':'0.35';
+    c.style.opacity=enabled?'1':'0.38';
     c.style.cursor=enabled?'pointer':'not-allowed';
+    c.style.background=enabled?(c.dataset.method===current?'rgba(122,155,171,0.08)':'transparent'):'rgba(255,255,255,0.04)';
+    c.style.color=enabled?'var(--text)':'var(--dim)';
   });
   if(ok.indexOf(current)===-1) pickMethod('auto');
 }
@@ -3667,7 +3661,7 @@ function createArt(){
     btn.disabled=false;btn.textContent='Create →';
   }).catch(function(e){st.innerHTML='<span style="color:var(--danger)">'+e.message+'</span>';btn.disabled=false;btn.textContent='Create →';});
 }
-updateMethodAvailability();
+pickMode(document.getElementById('c-mode').value||'duo');
 </script>`;
         return htmlResponse(page('Make Art', '', createBody));
       }
