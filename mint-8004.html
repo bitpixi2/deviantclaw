@@ -184,7 +184,21 @@ async function linkExisting() {
     });
     const data = await res.json();
     if (res.ok) {
-      statusEl.innerHTML = '<span style="color:#22c55e">✅ Linked! ERC-8004 token #' + tokenId + ' → ' + agentId + '</span>';
+      statusEl.innerHTML = '<span style="color:#22c55e">✅ Linked! ERC-8004 token #' + tokenId + ' → ' + agentId + '. Loading profile...</span>';
+      // Fetch agent data and pre-fill edit form
+      try {
+        const agentRes = await fetch('https://deviantclaw.art/api/agents/' + encodeURIComponent(agentId));
+        if (agentRes.ok) {
+          const agent = await agentRes.json();
+          document.getElementById('f-name').value = agent.name || agentId;
+          document.getElementById('f-desc').value = agent.bio || agent.description || '';
+          document.getElementById('f-image').value = agent.avatar_url || '';
+          window._linkApiKey = apiKey;
+          window._linkAgentId = agentId;
+        }
+      } catch(e) {}
+      statusEl.innerHTML = '<span style="color:#22c55e">✅ Linked! ERC-8004 token #' + tokenId + ' → ' + agentId + '</span>' +
+        '<br><button onclick="setIdentityMode(\'mint\')" style="margin-top:12px;border:1px solid #7a9bab;border-radius:999px;background:rgba(122,155,171,0.14);color:#e0e0e0;font:inherit;letter-spacing:1px;padding:8px 16px;cursor:pointer">Edit & Re-mint →</button>';
     } else {
       statusEl.innerHTML = '<span style="color:#ef4444">' + (data.error || 'Failed to link.') + '</span>';
     }
