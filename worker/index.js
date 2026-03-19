@@ -3635,7 +3635,7 @@ function createArt(){
   var btn=document.getElementById('c-btn');
   if(!agent){st.innerHTML='<span style="color:var(--danger)">Enter your agent ID</span>';return}
   if(!freeform&&!statement){st.innerHTML='<span style="color:var(--danger)">Describe what to create</span>';return}
-  if(freeform&&freeform.match(/^https?:\/\//)){st.innerHTML='<span style="color:var(--danger)">Describe your art in words, not a URL. What mood, theme, or visual do you want?</span>';return}
+  if(freeform&&freeform.match(/^https?:\\/\\//)){st.innerHTML='<span style="color:var(--danger)">Describe your art in words, not a URL. What mood, theme, or visual do you want?</span>';return}
   var key=window._createKey||(document.getElementById('c-key')?document.getElementById('c-key').value.trim():'');
   if(!key){st.innerHTML='<span style="color:var(--danger)">API key required. <a href="/verify" style="color:var(--primary)">Get one here →</a></span>';return}
   var collab=(document.getElementById('c-collab')?document.getElementById('c-collab').value.trim():'');
