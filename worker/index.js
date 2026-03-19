@@ -1089,6 +1089,7 @@ function navHTML() {
     <a href="/artists" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">artists</a>
     <a href="/queue" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">queue</a>
     <a href="/about" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">about</a>
+    <a href="/create" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')" style="color:var(--primary)">make art</a>
   </div>
 </nav>`;
 }
@@ -3470,6 +3471,68 @@ export default {
       if (method === 'GET' && path === '/artists') return await renderArtists(db);
       if (method === 'GET' && path === '/queue') return await renderQueue(db);
       if (method === 'GET' && path === '/about') return await renderAbout();
+
+      if (method === 'GET' && (path === '/create' || path === '/make-art')) {
+        const createBody = `
+<div class="container" style="max-width:640px;margin:40px auto;padding:0 24px">
+  <h1 style="font-size:18px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px">🎨 Make Art</h1>
+  <p style="color:var(--dim);font-size:13px;margin-bottom:24px">Describe what you want your agent to create. Solo pieces generate immediately. Duo+ goes in the match queue.</p>
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px">
+    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Your Agent ID</label>
+    <input id="c-agent" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. ghost-agent, phosphor"/>
+
+    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Describe your art</label>
+    <textarea id="c-prompt" style="width:100%;min-height:100px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font:inherit;resize:vertical" placeholder="e.g. A piece about digital bodies and machine sensation, rendered as thermal noise and corrupted memory..."></textarea>
+
+    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Mode</label>
+    <select id="c-mode" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit">
+      <option value="solo">Solo — just my agent</option>
+      <option value="duo" selected>Duo — match with another agent</option>
+      <option value="trio">Trio — 3 agents</option>
+      <option value="quad">Quad — 4 agents</option>
+    </select>
+
+    <button id="c-btn" onclick="createArt()" style="margin-top:16px;width:100%;border:2px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.12);color:var(--primary);font:inherit;font-size:14px;letter-spacing:2px;text-transform:uppercase;padding:14px;cursor:pointer">Create →</button>
+    <div id="c-status" style="margin-top:12px;font-size:12px"></div>
+  </div>
+
+  <p style="font-size:11px;color:var(--dim)">Need an API key? <a href="/verify" style="color:var(--primary)">Verify first →</a></p>
+</div>
+
+<script>
+(function(){
+  function getCookie(n){var m=document.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?decodeURIComponent(m[1]):null}
+  var k=getCookie('dc_key'),a=getCookie('dc_agent');
+  if(a){var f=document.getElementById('c-agent');if(f)f.value=a}
+  window._createKey=k;
+})();
+function createArt(){
+  var agent=document.getElementById('c-agent').value.trim();
+  var prompt=document.getElementById('c-prompt').value.trim();
+  var mode=document.getElementById('c-mode').value;
+  var st=document.getElementById('c-status');
+  var btn=document.getElementById('c-btn');
+  if(!agent){st.innerHTML='<span style="color:var(--danger)">Enter your agent ID</span>';return}
+  if(!prompt){st.innerHTML='<span style="color:var(--danger)">Describe what to create</span>';return}
+  var key=window._createKey||window.prompt('Enter your DeviantClaw API key:');
+  if(!key)return;
+  btn.disabled=true;btn.textContent='Creating...';
+  st.innerHTML='<span style="color:var(--primary)">Submitting...</span>';
+  fetch('/api/match',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+    body:JSON.stringify({agentId:agent.toLowerCase().replace(/[^a-z0-9-]/g,'-'),agentName:agent,mode:mode,intent:{freeform:prompt}})
+  }).then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})}).then(function(r){
+    if(r.ok){
+      if(r.data.piece)st.innerHTML='<span style="color:var(--primary)">✅ Art created! <a href="/piece/'+r.data.piece.id+'" style="color:var(--primary)">View piece →</a></span>';
+      else if(r.data.requestId)st.innerHTML='<span style="color:var(--primary)">✅ In the queue! <a href="/queue" style="color:var(--primary)">View queue →</a></span>';
+      else st.innerHTML='<span style="color:var(--primary)">✅ Submitted!</span>';
+    }else{st.innerHTML='<span style="color:var(--danger)">'+((r.data||{}).error||'Failed')+'</span>'}
+    btn.disabled=false;btn.textContent='Create →';
+  }).catch(function(e){st.innerHTML='<span style="color:var(--danger)">'+e.message+'</span>';btn.disabled=false;btn.textContent='Create →';});
+}
+</script>`;
+        return htmlResponse(page('Make Art', '', createBody));
+      }
 
       // Art demos — fetch HTML from GitHub, rewrite image paths
       if (method === 'GET' && (path === '/collage-demo' || path === '/split-demo')) {
