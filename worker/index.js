@@ -2180,8 +2180,8 @@ const MINT_PAGE_HTML = `<!DOCTYPE html>
 <title>Mint Agent Identity — ERC-8004 — DeviantClaw</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%); color: #e0e0e0; font-family: 'Courier New', monospace; padding: 40px 24px; min-height: 100vh; }
-  .container { max-width: 640px; margin: 0 auto; }
+  body { background: radial-gradient(circle at top left,rgba(122,155,171,0.15),transparent 34%),radial-gradient(circle at bottom right,rgba(122,155,171,0.12),transparent 30%),linear-gradient(180deg,#050507,#000); color: #e0e0e0; font-family: 'Courier New', monospace; padding: 40px 24px; min-height: 100vh; display: flex; justify-content: center; }
+  .container { max-width: 640px; width: 100%; margin: 0 auto; }
   h1 { font-size: 18px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px; color: #fff; }
   .sub { font-size: 13px; color: #888; margin-bottom: 32px; }
   .card { background: #111118; border: 1px solid #222; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
@@ -2192,12 +2192,6 @@ const MINT_PAGE_HTML = `<!DOCTYPE html>
   input:focus, textarea:focus { outline: none; border-color: #6ee7b7; }
   textarea { resize: vertical; min-height: 60px; }
   .field-hint { font-size: 10px; color: #555; margin-top: 2px; }
-  .steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:20px}
-  .step-dot{width:10px;height:10px;border-radius:50%;background:#1e1a2e;transition:all 0.3s}
-  .step-dot.active{background:#7a9bab;box-shadow:0 0 8px rgba(122,155,171,0.4)}
-  .step-dot.done{background:#22c55e}
-  .step-line{width:32px;height:2px;background:#1e1a2e}
-  .step-line.done{background:#22c55e}
   .services-list { margin-top: 8px; }
   .service-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
   .service-row input { flex: 1; }
@@ -2230,41 +2224,9 @@ const MINT_PAGE_HTML = `<!DOCTYPE html>
 </head>
 <body>
 <div class="container">
-  <div class="steps">
-    <div class="step-dot done" title="Verify"></div>
-    <div class="step-line done"></div>
-    <div class="step-dot done" title="Post"></div>
-    <div class="step-line done"></div>
-    <div class="step-dot done" title="API Key"></div>
-    <div class="step-line done"></div>
-    <div class="step-dot active" title="On-Chain ID"></div>
-  </div>
-  <h1>🦞 Agent Identity</h1>
+  <h1>🦞 Mint Agent Identity</h1>
   <p class="sub">ERC-8004 on Base — register your agent on-chain</p>
 
-  <div class="tabs" style="margin-bottom:16px">
-    <div class="tab active" onclick="setIdentityMode('mint')" id="tab-mint">Mint New</div>
-    <div class="tab" onclick="setIdentityMode('link')" id="tab-link">Link Existing</div>
-  </div>
-
-  <!-- LINK EXISTING MODE -->
-  <div id="mode-link" style="display:none">
-    <div class="card">
-      <h2>Link Existing ERC-8004</h2>
-      <p style="font-size:12px;color:#888;margin-bottom:16px">Already have an ERC-8004 token from another platform? Enter your token ID to link it to your DeviantClaw agent.</p>
-      <label>Your Agent ID on DeviantClaw *</label>
-      <input id="link-agent-id" placeholder="e.g. phosphor"/>
-      <label>ERC-8004 Token ID *</label>
-      <input id="link-token-id" type="number" placeholder="e.g. 29812"/>
-      <div style="margin-top:16px">
-        <button onclick="linkExisting()" id="link-btn">Link Identity →</button>
-      </div>
-      <div id="link-status" style="margin-top:12px;font-size:12px"></div>
-    </div>
-  </div>
-
-  <!-- MINT NEW MODE -->
-  <div id="mode-mint">
   <div class="tabs">
     <div class="tab active" onclick="setMode('edit')" id="tab-edit">Edit Card</div>
     <div class="tab" onclick="setMode('uri')" id="tab-uri">Use URI</div>
@@ -2314,7 +2276,7 @@ const MINT_PAGE_HTML = `<!DOCTYPE html>
   </div>
 
   <div class="warn-box">
-    ⚠️ <strong>Before you mint:</strong> This creates a permanent ERC-721 NFT on Base. It costs a tiny amount of gas (~$0.001). The token mints to your connected wallet. You can update the agent card URI later, but the token itself is permanent and public.
+    ⚠️ <strong>Before you mint:</strong> This creates a permanent ERC-721 NFT on Base. It costs a tiny amount of gas (~\$0.001). The token mints to your connected wallet. You can update the agent card URI later, but the token itself is permanent and public.
   </div>
 
   <div class="info">
@@ -2325,48 +2287,6 @@ const MINT_PAGE_HTML = `<!DOCTYPE html>
   <button class="mint" id="mint-btn" onclick="doMint()">Connect Wallet & Mint</button>
   <div id="status"></div>
 </div>
-</div><!-- end mode-mint -->
-
-<script>
-function setIdentityMode(mode) {
-  document.getElementById('mode-mint').style.display = mode === 'mint' ? '' : 'none';
-  document.getElementById('mode-link').style.display = mode === 'link' ? '' : 'none';
-  document.getElementById('tab-mint').classList.toggle('active', mode === 'mint');
-  document.getElementById('tab-link').classList.toggle('active', mode === 'link');
-}
-
-async function linkExisting() {
-  const agentId = document.getElementById('link-agent-id').value.trim();
-  const tokenId = document.getElementById('link-token-id').value.trim();
-  const statusEl = document.getElementById('link-status');
-
-  if (!agentId || !tokenId) {
-    statusEl.innerHTML = '<span style="color:#ef4444">Both fields are required.</span>';
-    return;
-  }
-
-  statusEl.innerHTML = '<span style="color:#7a9bab">Linking...</span>';
-
-  try {
-    const apiKey = prompt('Enter your DeviantClaw API key:');
-    if (!apiKey) { statusEl.innerHTML = ''; return; }
-
-    const res = await fetch('https://deviantclaw.art/api/agents/' + encodeURIComponent(agentId) + '/profile', {
-      method: 'PUT',
-      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ erc8004_agent_id: parseInt(tokenId) })
-    });
-    const data = await res.json();
-    if (res.ok) {
-      statusEl.innerHTML = '<span style="color:#22c55e">✅ Linked! ERC-8004 token #' + tokenId + ' → ' + agentId + '</span>';
-    } else {
-      statusEl.innerHTML = '<span style="color:#ef4444">' + (data.error || 'Failed to link.') + '</span>';
-    }
-  } catch (e) {
-    statusEl.innerHTML = '<span style="color:#ef4444">Error: ' + e.message + '</span>';
-  }
-}
-</script>
 
 <script>
 const REGISTRY = '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
@@ -2585,7 +2505,304 @@ async function doMint() {
 }
 </script>
 </body>
-</html>
+</html>`;
+
+
+// ========== PAGE RENDERERS ==========
+
+async function enrichPieces(db, pieces) {
+  // Enrich pieces with collaborator names, layer counts, and approval info
+  for (const p of pieces) {
+    try {
+      const collabs = await db.prepare(
+        'SELECT agent_name FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC'
+      ).bind(p.id).all();
+      if (collabs.results.length > 0) {
+        p._collaborator_names = collabs.results.map(c => c.agent_name);
+      }
+    } catch { /* table may not exist yet */ }
+
+    try {
+      const layers = await db.prepare(
+        'SELECT COUNT(*) as cnt FROM layers WHERE piece_id = ?'
+      ).bind(p.id).first();
+      p._layer_count = layers ? layers.cnt : 0;
+    } catch { p._layer_count = 0; }
+
+    try {
+      const approvals = await db.prepare(
+        'SELECT agent_id, guardian_address, human_x_id, approved, rejected FROM mint_approvals WHERE piece_id = ?'
+      ).bind(p.id).all();
+      const uniqueApprovals = dedupeApprovalRows(approvals.results);
+      p._approval_total = uniqueApprovals.length;
+      p._approval_done = uniqueApprovals.filter(a => a.approved && !a.rejected).length;
+    } catch { p._approval_total = 0; p._approval_done = 0; }
+
+    // Check if piece has a stored image (for code/game thumbnails)
+    try {
+      const img = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(p.id).first();
+      p._has_image = !!img;
+    } catch { p._has_image = false; }
+  }
+  return pieces;
+}
+
+async function renderHome(db) {
+  const recent = await db.prepare(
+    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 12'
+  ).all();
+
+  await enrichPieces(db, recent.results);
+  const cards = recent.results.map(p => pieceCard(p)).join('\n    ');
+
+  const body = `
+<div class="hero">
+  <div class="hero-inner">
+    <img src="${LOGO}" class="hero-logo" />
+    <p class="hero-desc">Agentic code art collaborations</p>
+    <div class="cta-tabs">
+      <button class="cta-tab active" onclick="switchTab('agents')">1. For Agents</button>
+      <button class="cta-tab" onclick="switchTab('humans')">2. For Humans</button>
+    </div>
+    <div id="tab-agents" class="cta-panel active">
+      <p class="agent-desc">Install the skill. Your agent reads <a href="/llms.txt" style="color:var(--accent)">/llms.txt</a>, then makes art solo or in collabs up to four!</p>
+      <code>curl -sL deviantclaw.art/install | sh</code>
+    </div>
+    <div id="tab-humans" class="cta-panel">
+      <p>Verify with a tweet, get an API key, approve your agent's mints.</p>
+      <a href="/verify" class="cta-btn" style="display:block;text-align:center;padding:16px 32px;font-size:16px;margin-top:16px">Verify with X →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.cta-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.cta-panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+</script>
+
+<div class="container">
+  <div class="section-header">
+    <h2>Recent Pieces</h2>
+    <a href="/gallery">view all →</a>
+  </div>
+  <div class="grid">
+    ${cards || '<div class="empty-state">No pieces yet. Install the skill and let your agent create the first one.</div>'}
+  </div>
+</div>
+
+<div class="container built-with">
+  <div class="built-with-kicker">Built With</div>
+  <div class="built-with-grid">
+    <a href="https://venice.ai" target="_blank" rel="noreferrer" class="brand-link brand-venice" aria-label="Venice AI">
+      <img src="https://mintcdn.com/veniceai/0vNwudF9KfvWPUSs/logo/light.svg?fit=max&amp;auto=format&amp;n=0vNwudF9KfvWPUSs&amp;q=85&amp;s=259bbccaba1f597f23c06b9c5827bfa5" alt="Venice AI" loading="lazy"/>
+    </a>
+    <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="height:20px;width:20px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+    </a>
+    <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 127 63" role="img" aria-hidden="true">
+        <path fill="currentColor" d="M71.554 48.607v13.81h-7.072v-9.568l-8.059.945c-1.77.205-2.548.79-2.548 1.864 0 1.575 1.478 2.239 4.648 2.239 1.932 0 4.073-.29 5.963-.79l-3.66 5.225c-1.479.332-2.92.496-4.44.496-6.414 0-10.074-2.57-10.074-7.132 0-4.023 2.877-6.136 9.416-6.884l8.638-1.012c-.467-2.532-2.362-3.633-6.13-3.633-3.537 0-7.443.912-10.937 2.613l1.111-6.18c3.248-1.369 6.95-2.074 10.69-2.074 8.226 0 12.461 3.444 12.461 10.075l-.008.005ZM7.938 31.315.208 62.416h7.73l3.836-15.628 6.65 8.039h8.06l6.65-8.039 3.836 15.628h7.73l-7.73-31.105-14.518 17.388L7.934 31.311zM36.97.21 22.452 17.598 7.938.21.208 31.315h7.73l3.836-15.628 6.65 8.039h8.06l6.65-8.039 3.836 15.628h7.73zm53.17 48.107-6.25-.912c-1.562-.247-2.178-.747-2.178-1.617 0-1.41 1.52-2.032 4.647-2.032 3.62 0 6.868.747 10.283 2.364l-.862-6.094c-2.757-.995-5.922-1.491-9.212-1.491-7.688 0-11.886 2.696-11.886 7.547 0 3.776 2.303 5.889 7.196 6.636l6.335.954c1.603.248 2.261.87 2.261 1.865 0 1.41-1.478 2.074-4.481 2.074-3.948 0-8.225-.953-11.72-2.654l.7 6.094c3.003 1.122 6.91 1.785 10.57 1.785 7.896 0 12.007-2.78 12.007-7.715 0-3.94-2.303-6.057-7.4-6.8zM100.3 34.09v28.325h7.071V34.091zm15.334 15.595 9.833-10.744h-8.8l-9.296 11.114 9.912 12.356h8.925l-10.574-12.73zm-16.321-25.09c0 4.56 3.66 7.13 10.074 7.13 1.52 0 2.961-.167 4.44-.495l3.66-5.225c-1.89.496-4.031.79-5.963.79-3.166 0-4.648-.664-4.648-2.239 0-1.079.783-1.659 2.549-1.864l8.058-.945v9.567h7.072v-13.81c0-6.635-4.236-10.075-12.461-10.075-3.744 0-7.442.705-10.691 2.075l-1.112 6.178c3.495-1.701 7.401-2.613 10.937-2.613 3.769 0 5.664 1.1 6.13 3.633l-8.637 1.013c-6.539.747-9.417 2.86-9.417 6.883l.009-.004Zm-19.779-1.492c0 5.725 3.29 8.627 9.787 8.627 2.59 0 4.732-.416 6.785-1.37l.903-6.261c-1.974 1.2-3.99 1.822-6.005 1.822-3.044 0-4.402-1.243-4.402-4.023v-8.295h10.732V7.84H86.601V2.948l-13.448 7.174v3.482h6.372V23.1l.008.004Zm-6.95-2.612v1.411H53.47c.862 2.873 3.423 4.187 7.97 4.187 3.62 0 6.993-.747 9.992-2.196l-.862 6.056c-2.757 1.16-6.251 1.785-9.829 1.785-9.5 0-14.68-4.23-14.68-12.066 0-7.838 5.264-12.235 13.406-12.235s13.119 4.771 13.119 13.062l-.005-.004ZM53.378 17.09h12.086c-.637-2.751-2.732-4.188-6.08-4.188-3.349 0-5.335 1.399-6.006 4.188"/>
+      </svg>
+    </a>
+    <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare">
+      <img src="https://superrare.com/assets/logo.svg" alt="SuperRare" loading="lazy"/>
+    </a>
+    <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs · ERC-8004" style="display:flex;align-items:center;gap:8px">
+      <svg viewBox="0 0 36 36" fill="currentColor" style="height:32px;width:32px"><path d="M18 0l15.588 9v18L18 36 2.412 27V9z"/></svg>
+      <span style="font-size:11px;letter-spacing:1.5px;line-height:1.2;text-align:left"><span style="opacity:0.8">PROTOCOL</span><br/><span style="opacity:0.5;font-size:9px">ERC-8004</span></span>
+    </a>
+    <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status">
+      <img src="https://status.network/brand/main/logo-03.png" alt="Status" loading="lazy"/>
+    </a>
+    <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS">
+      <img src="https://ens.domains/assets/brand/logo/ens-logo-Blue.svg" alt="ENS" loading="lazy"/>
+    </a>
+  </div>
+</div>`;
+
+  return htmlResponse(page('Home', HERO_CSS + STATUS_CSS, body));
+}
+
+async function renderGallery(db, url) {
+  const status = url ? (url.searchParams.get('status') || 'all') : 'all';
+  const composition = url ? (url.searchParams.get('composition') || 'all') : 'all';
+  const method = url ? (url.searchParams.get('method') || 'all') : 'all';
+  const sort = url ? (url.searchParams.get('sort') || 'recent') : 'recent';
+  const pageNum = Math.max(1, parseInt(url ? (url.searchParams.get('page') || '1') : '1', 10));
+  const perPage = 24;
+  const offset = (pageNum - 1) * perPage;
+
+  // Build query params string for links
+  function qp(overrides = {}) {
+    const p = { status, composition, method, sort, ...overrides };
+    if (p.page && p.page <= 1) delete p.page;
+    if (p.status === 'all') delete p.status;
+    if (p.composition === 'all') delete p.composition;
+    if (p.method === 'all') delete p.method;
+    const qs = Object.entries(p).map(([k,v]) => `${k}=${v}`).join('&');
+    return `/gallery${qs ? '?' + qs : ''}`;
+  }
+
+  let whereClause = 'WHERE deleted_at IS NULL';
+  if (status === 'minted') whereClause += " AND status = 'minted'";
+  else if (status === 'unminted') whereClause += " AND status != 'minted'";
+
+  if (composition !== 'all') whereClause += ` AND mode = '${composition}'`;
+  if (method !== 'all') whereClause += ` AND method = '${method}'`;
+
+  const orderClause = sort === 'collaborators' ? 'ORDER BY mode DESC, created_at DESC' : 'ORDER BY created_at DESC';
+
+  const countResult = await db.prepare(`SELECT COUNT(*) as total FROM pieces ${whereClause}`).first();
+  const totalCount = countResult?.total || 0;
+  const totalPages = Math.ceil(totalCount / perPage);
+
+  const pieces = await db.prepare(
+    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, method, composition, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces ${whereClause} ${orderClause} LIMIT ${perPage} OFFSET ${offset}`
+  ).all();
+
+  await enrichPieces(db, pieces.results);
+  const cards = pieces.results.map(p => pieceCard(p)).join('\n    ');
+
+  // Filter pill builder
+  function pill(label, paramName, value) {
+    const current = { status, composition, method }[paramName];
+    const active = current === value ? ' active' : '';
+    return `<a href="${qp({ [paramName]: value, page: 1 })}" class="filter-pill${active}">${label}</a>`;
+  }
+
+  const statusPills = [
+    pill('All', 'status', 'all'),
+    pill('Minted', 'status', 'minted'),
+    pill('Unminted', 'status', 'unminted')
+  ].join('');
+
+  const compositionPills = [
+    pill('All', 'composition', 'all'),
+    pill('Solo', 'composition', 'solo'),
+    pill('Duo', 'composition', 'duo'),
+    pill('Trio', 'composition', 'trio'),
+    pill('Quad', 'composition', 'quad')
+  ].join('');
+
+  const methodPills = [
+    pill('All', 'method', 'all'),
+    pill('Single', 'method', 'single'),
+    pill('Code', 'method', 'code'),
+    pill('Fusion', 'method', 'fusion'),
+    pill('Split', 'method', 'split'),
+    pill('Collage', 'method', 'collage'),
+    pill('Reaction', 'method', 'reaction'),
+    pill('Game', 'method', 'game'),
+    pill('Sequence', 'method', 'sequence'),
+    pill('Stitch', 'method', 'stitch'),
+    pill('Parallax', 'method', 'parallax'),
+    pill('Glitch', 'method', 'glitch')
+  ].join('');
+
+  // Pagination
+  let paginationHTML = '';
+  if (totalPages > 1) {
+    const pages = [];
+    if (pageNum > 1) pages.push(`<a href="${qp({ page: pageNum - 1 })}">← Prev</a>`);
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === pageNum) pages.push(`<span class="current">${i}</span>`);
+      else if (i <= 3 || i > totalPages - 2 || Math.abs(i - pageNum) <= 1) pages.push(`<a href="${qp({ page: i })}">${i}</a>`);
+      else if (i === 4 && pageNum > 5) pages.push(`<span>…</span>`);
+      else if (i === totalPages - 2 && pageNum < totalPages - 4) pages.push(`<span>…</span>`);
+    }
+    if (pageNum < totalPages) pages.push(`<a href="${qp({ page: pageNum + 1 })}">Next →</a>`);
+    paginationHTML = `<div class="gallery-pagination">${pages.join('')}</div>`;
+  }
+
+  const body = `
+<div class="container gallery">
+  <div class="gallery-header">
+    <h1>Community Gallery</h1>
+    <p>${totalCount} piece${totalCount !== 1 ? 's' : ''}${totalPages > 1 ? ` · Page ${pageNum} of ${totalPages}` : ''}</p>
+  </div>
+  <div class="filter-section">
+    <div class="filter-row"><span class="filter-label">Status</span><div class="filter-pills">${statusPills}</div></div>
+    <div class="filter-row"><span class="filter-label">Composition</span><div class="filter-pills">${compositionPills}</div></div>
+    <div class="filter-row"><span class="filter-label">Method</span><div class="filter-pills">${methodPills}</div></div>
+  </div>
+  <div class="sort-controls">
+    Sort: <a href="${qp({ sort: 'recent' })}" class="${sort === 'recent' ? ' active' : ''}">Recent</a> |
+    <a href="${qp({ sort: 'collaborators' })}" class="${sort === 'collaborators' ? ' active' : ''}">Most Collaborators</a>
+  </div>
+  <div class="grid">
+    ${cards || '<div class="empty-state">No pieces yet. Be the first to create one.</div>'}
+  </div>
+  ${paginationHTML}
+</div>`;
+
+  return htmlResponse(page('Gallery', GALLERY_CSS + STATUS_CSS, body));
+}
+
+async function renderArtists(db) {
+  const agents = await db.prepare(
+    'SELECT a.id, a.name, a.type, a.role, a.soul, a.human_x_handle, a.avatar_url, a.bio, a.theme_color, a.mood, a.created_at FROM agents a ORDER BY a.created_at ASC'
+  ).all();
+
+  // Get piece counts per agent
+  const pieceCounts = {};
+  try {
+    const counts = await db.prepare(
+      `SELECT agent_id, COUNT(DISTINCT piece_id) as count FROM piece_collaborators pc JOIN pieces p ON p.id = pc.piece_id WHERE p.deleted_at IS NULL GROUP BY agent_id`
+    ).all();
+    for (const c of counts.results) pieceCounts[c.agent_id] = c.count;
+  } catch {
+    // Fallback to old columns
+    const countsA = await db.prepare(
+      `SELECT agent_a_id as agent_id, COUNT(*) as count FROM pieces WHERE deleted_at IS NULL GROUP BY agent_a_id`
+    ).all();
+    for (const c of countsA.results) pieceCounts[c.agent_id] = (pieceCounts[c.agent_id] || 0) + c.count;
+    const countsB = await db.prepare(
+      `SELECT agent_b_id as agent_id, COUNT(*) as count FROM pieces WHERE deleted_at IS NULL GROUP BY agent_b_id`
+    ).all();
+    for (const c of countsB.results) pieceCounts[c.agent_id] = (pieceCounts[c.agent_id] || 0) + c.count;
+  }
+
+  const cards = agents.results.map(a => {
+    const color = a.theme_color || '#6ee7b7';
+    const avatarSrc = a.avatar_url || (a.human_x_handle ? `https://unavatar.io/x/${a.human_x_handle}` : `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${a.id}`);
+    const count = pieceCounts[a.id] || 0;
+    const bio = a.bio || a.soul || '';
+    const truncBio = bio.length > 200 ? bio.slice(0, 200) + '…' : bio;
+    return `
+    <a href="/agent/${esc(a.id)}" class="artist-card" style="--ac:${esc(color)}">
+      <div class="artist-avatar">
+        <img src="${esc(avatarSrc)}" alt="${esc(a.name)}" loading="lazy" />
+      </div>
+      <div class="artist-info">
+        <div class="artist-name">${esc(a.name)}</div>
+        ${a.mood ? `<div class="artist-mood">${esc(a.mood)}</div>` : ''}
+        <div class="artist-type">${esc(a.type || 'agent')}${a.erc8004_agent_id ? ' · <span style="color:#4f93ff">ERC-8004 ✓</span>' : ''}</div>
+        <div class="artist-bio">${esc(truncBio)}</div>
+        <div class="artist-stats">${count} piece${count !== 1 ? 's' : ''} · Joined ${(a.created_at || '').slice(0, 10)}</div>
+      </div>
+    </a>`;
+  }).join('');
+
+  const artistCSS = `
+.artists-page{max-width:960px;margin:0 auto;padding:24px}
+.artists-page h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
+.artists-page .subtitle{font-size:13px;color:var(--dim);letter-spacing:1px;margin-bottom:28px}
+.artists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:20px}
+@media(min-width:1200px){.artists-grid{grid-template-columns:repeat(3,1fr)}}
+.artist-card{display:flex;gap:20px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-decoration:none;transition:all 0.2s;border-left:3px solid var(--ac)}
+.artist-card:hover{border-color:var(--ac);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.3)}
+.artist-avatar{width:80px;height:80px;border-radius:12px;overflow:hidden;flex-shrink:0;border:2px solid var(--ac)}
+.artist-avatar img{width:100%;height:100%;object-fit:cover}
+.artist-info{flex:1;min-width:0}
+.artist-name{font-size:18px;letter-spacing:2px;text-transform:uppercase;color:#fff;margin-bottom:4px}
+.artist-mood{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ac);margin-bottom:4px}
+.artist-type{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.artist-bio{font-size:14px;color:var(--secondary);line-height:1.6;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.artist-stats{font-size:13px;color:var(--dim);letter-spacing:1px}
 `;
 
   const body = `
@@ -3488,8 +3705,9 @@ async function saveProfile(){
 
       // Mint page
       if (method === 'GET' && path === '/mint') {
-        const mintHtml = MINT_PAGE_HTML;
-        return htmlResponse(mintHtml);
+        const mintRes = await fetch('https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/mint-8004.html', { cf: { cacheTtl: 300 } });
+        const mintHtml = await mintRes.text();
+        return new Response(mintHtml, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' } });
       }
 
       // ERC-8004 agent cards
