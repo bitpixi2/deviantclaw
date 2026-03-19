@@ -178,8 +178,34 @@ export default {
           return json({ error: 'No pending verification found. Start a new one.' }, 400);
         }
 
-        // URL handle matches claimed handle. We don't have X API access to verify
-        // tweet content, but the handle-in-URL check prevents impersonation.
+        // Verify tweet via X API if Bearer Token is available
+        const tweetId = tweetUrlMatch[3];
+        if (env.X_BEARER_TOKEN) {
+          try {
+            const xRes = await fetch(`https://api.x.com/2/tweets/${tweetId}?expansions=author_id&user.fields=username&tweet.fields=text`, {
+              headers: { 'Authorization': `Bearer ${env.X_BEARER_TOKEN}` }
+            });
+            if (xRes.ok) {
+              const xData = await xRes.json();
+              const tweetText = xData.data?.text || '';
+              const tweetAuthor = xData.includes?.users?.[0]?.username?.toLowerCase() || '';
+
+              // Verify author matches claimed handle
+              if (tweetAuthor && tweetAuthor !== xHandle.toLowerCase()) {
+                return json({ error: `Tweet is from @${tweetAuthor}, not @${xHandle}.` }, 400);
+              }
+
+              // Verify tweet contains the verification code
+              if (!tweetText.includes(session.verification_code)) {
+                return json({ error: 'Tweet does not contain your verification code. Please post the exact text provided.' }, 400);
+              }
+            }
+            // If X API fails (rate limit, etc.), fall through to URL-based check
+          } catch (e) {
+            // X API unavailable — fall through silently
+          }
+        }
+
         const apiKey = crypto.randomUUID();
         const now = nowIso();
         const verifiedAt = now;
