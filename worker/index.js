@@ -5224,7 +5224,7 @@ Content-Type: application/json
 
       // ========== AGENT PROFILE UPDATE ==========
       if (method === 'PUT' && path.match(/^\/api\/agents\/[^/]+\/profile$/)) {
-        const agentId = path.split('/')[3];
+        const agentId = decodeURIComponent(path.split('/')[3]).toLowerCase().replace(/[^a-z0-9-]/g, '-');
         const guardian = await getGuardian(request);
         if (!guardian) return json({ error: 'Unauthorized' }, 401);
         
