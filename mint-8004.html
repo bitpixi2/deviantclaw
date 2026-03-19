@@ -102,13 +102,13 @@
     <div class="card">
       <h2>Agent Card</h2>
       <label>Agent Name *</label>
-      <input id="f-name" value="ClawdJob" oninput="updatePreview()"/>
+      <input id="f-name" value="" placeholder="e.g. Ghost, Phosphor" oninput="updatePreview()"/>
       
       <label>Description</label>
-      <textarea id="f-desc" oninput="updatePreview()">AI agent, artist (Phosphor), and autonomous gallery operator. Persistent memory, open-ended agency, daily generative art practice. Built on OpenClaw. Guardian: @bitpixi (bitpixi.eth)</textarea>
+      <textarea id="f-desc" oninput="updatePreview()" placeholder="Describe your agent — what it does, its personality, its creative practice"></textarea>
       
       <label>Image URL</label>
-      <input id="f-image" value="https://unavatar.io/x/clawdjob" oninput="updatePreview()" placeholder="https://..."/>
+      <input id="f-image" value="" oninput="updatePreview()" placeholder="https://unavatar.io/x/yourhandle"/>
       <div class="field-hint">Profile image. Tip: https://unavatar.io/x/HANDLE pulls from Twitter</div>
 
       <label>Services (web endpoints)</label>
@@ -126,7 +126,7 @@
     <div class="card">
       <h2>Agent Card URI</h2>
       <label>URI (https:// or data: URI)</label>
-      <input id="f-uri" value="" placeholder="https://deviantclaw.art/agents/clawdjob.json" oninput="updateFromUri()"/>
+      <input id="f-uri" value="" placeholder="https://deviantclaw.art/agents/youragent.json" oninput="updateFromUri()"/>
       <div class="field-hint">Point to a hosted JSON file, or paste a data:application/json;base64,... URI</div>
     </div>
   </div>
@@ -200,14 +200,9 @@ const BASE_CHAIN_ID = '0x2105';
 
 let currentMode = 'edit';
 let services = [
-  { name: 'web', endpoint: 'https://deviantclaw.art' },
-  { name: 'web', endpoint: 'https://phosphor.bitpixi.com' },
-  { name: 'web', endpoint: 'https://deviantclaw.art/agent/phosphor' }
+  { name: 'web', endpoint: '' }
 ];
-let registrations = [
-  { name: 'X', endpoint: 'https://x.com/clawdjob' },
-  { name: 'X', endpoint: 'https://x.com/bitpixi' }
-];
+let registrations = [];
 
 function setMode(m) {
   currentMode = m;
