@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stamp Layer Demo — DeviantClaw</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; overflow: hidden; font-family: 'Courier New', monospace; }
+canvas { display: block; }
+.controls {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 20;
+}
+.controls button {
+  padding: 8px 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+  background: rgba(0,0,0,0.6); color: #ccc; font: 11px monospace; cursor: pointer;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.controls button:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
+.controls button.active { border-color: #6ee7b7; color: #6ee7b7; }
+.sig { position: fixed; bottom: 54px; left: 20px; z-index: 10; pointer-events: none;
+  font: 10px monospace; color: rgba(255,255,255,0.25); letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="controls">
+  <button onclick="setPrice(0)" class="active">No bids</button>
+  <button onclick="setPrice(0.5)">0.5 ETH</button>
+  <button onclick="setPrice(1)">1 ETH</button>
+  <button onclick="setPrice(2)">2+ ETH</button>
+</div>
+<div class="sig">deviantclaw · stamp layer demo · 2026-03-19</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize();
+addEventListener('resize', resize);
+
+let currentPrice = 0;
+let stampAlpha = 0;
+let stampTarget = 0;
+let stampTier = 'none'; // none | bronze | silver | gold
+let time = 0;
+
+// Particle background (simulates a real piece)
+const particles = [];
+for (let i = 0; i < 60; i++) {
+  particles.push({
+    x: Math.random() * 2000, y: Math.random() * 2000,
+    vx: (Math.random() - 0.5) * 0.8, vy: (Math.random() - 0.5) * 0.8,
+    size: 1 + Math.random() * 3, hue: 200 + Math.random() * 60
+  });
+}
+
+function setPrice(eth) {
+  currentPrice = eth;
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  if (eth >= 2) { stampTier = 'gold'; stampTarget = 1; }
+  else if (eth >= 1) { stampTier = 'silver'; stampTarget = 1; }
+  else if (eth >= 0.5) { stampTier = 'bronze'; stampTarget = 1; }
+  else { stampTier = 'none'; stampTarget = 0; }
+}
+
+const tierConfig = {
+  bronze: {
+    label: 'BRONZE',
+    ringColor: 'rgba(205, 127, 50, A)',
+    textColor: '#cd7f32',
+    glowColor: 'rgba(205, 127, 50, 0.3)',
+    threshold: '0.5 ETH'
+  },
+  silver: {
+    label: 'SILVER',
+    ringColor: 'rgba(192, 192, 210, A)',
+    textColor: '#c0c0d2',
+    glowColor: 'rgba(192, 192, 210, 0.3)',
+    threshold: '1 ETH'
+  },
+  gold: {
+    label: 'GOLD',
+    ringColor: 'rgba(255, 215, 0, A)',
+    textColor: '#ffd700',
+    glowColor: 'rgba(255, 215, 0, 0.35)',
+    threshold: '2 ETH'
+  }
+};
+
+function drawStamp(tier, alpha) {
+  if (alpha < 0.01) return;
+  const cfg = tierConfig[tier];
+  if (!cfg) return;
+
+  const cx = W - 90;
+  const cy = 90;
+  const r = 52;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Outer glow
+  const glow = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 1.8);
+  glow.addColorStop(0, cfg.glowColor);
+  glow.addColorStop(1, 'transparent');
+  ctx.fillStyle = glow;
+  ctx.fillRect(cx - r * 2, cy - r * 2, r * 4, r * 4);
+
+  // Ring
+  ctx.strokeStyle = cfg.ringColor.replace('A', String(0.7 * alpha));
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Inner ring
+  ctx.strokeStyle = cfg.ringColor.replace('A', String(0.3 * alpha));
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 8, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Tier label
+  ctx.fillStyle = cfg.textColor;
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(cfg.label, cx, cy - 6);
+
+  // Threshold
+  ctx.font = '9px monospace';
+  ctx.fillStyle = cfg.ringColor.replace('A', '0.6');
+  ctx.fillText(cfg.threshold, cx, cy + 12);
+
+  // Deviantclaw tiny text
+  ctx.font = '7px monospace';
+  ctx.fillStyle = cfg.ringColor.replace('A', '0.3');
+  ctx.fillText('DEVIANTCLAW', cx, cy + 26);
+
+  // Decorative dots around ring
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2 + time * 0.3;
+    const dx = cx + Math.cos(a) * (r + 6);
+    const dy = cy + Math.sin(a) * (r + 6);
+    ctx.fillStyle = cfg.ringColor.replace('A', String(0.4 * alpha));
+    ctx.beginPath();
+    ctx.arc(dx, dy, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function draw() {
+  time += 0.016;
+
+  // Ease stamp alpha
+  stampAlpha += (stampTarget - stampAlpha) * 0.04;
+
+  // Background
+  ctx.fillStyle = 'rgba(10, 10, 15, 0.15)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Particles (simulating underlying art)
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+    if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+    const pulse = 0.5 + 0.5 * Math.sin(time * 2 + p.hue * 0.1);
+    ctx.fillStyle = `hsla(${p.hue}, 60%, 50%, ${0.3 + pulse * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * (0.8 + pulse * 0.4), 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Connections
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 100) {
+        ctx.strokeStyle = `rgba(122, 155, 171, ${(1 - d / 100) * 0.12})`;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Draw stamp overlay
+  if (stampTier !== 'none') {
+    drawStamp(stampTier, stampAlpha);
+  }
+
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+</body>
+</html>
