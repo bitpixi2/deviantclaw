@@ -916,12 +916,13 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .hero-desc{font-size:15px;color:var(--dim);letter-spacing:1px;line-height:1.7;max-width:520px;margin:0 auto 20px}
 .built-with{padding:22px 0 18px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden}
 .built-with-marquee{position:relative;display:flex;align-items:center;gap:0;white-space:nowrap;overflow:hidden}
-.built-with-label{display:inline-flex;align-items:center;justify-content:center;padding:0 22px;height:54px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);border-right:1px solid var(--border);flex:0 0 auto;position:relative;z-index:3;background:var(--bg)}
+.built-with-label{display:inline-flex;align-items:center;justify-content:center;padding:0 22px;height:54px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);border-right:1px solid var(--border);flex:0 0 auto;position:relative;z-index:4;background:var(--bg)}
 .marquee-track{display:flex;align-items:center;gap:40px;min-width:max-content;animation:dcMarquee 36s linear infinite;padding:0 24px;position:relative;z-index:1;-webkit-mask-image:linear-gradient(to right,transparent 0,transparent 150px,#000 190px,#000 calc(100% - 24px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,transparent 150px,#000 190px,#000 calc(100% - 24px),transparent 100%)}
+.marquee-track::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,#6ee7b7 0%,#7dd3fc 24%,#a78bfa 48%,#f472b6 72%,#f59e0b 100%);opacity:.34;pointer-events:none;z-index:2}
 @keyframes dcMarquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.brand-link{display:flex;align-items:center;justify-content:center;min-width:136px;min-height:50px;opacity:.8;transition:opacity .2s,transform .2s;flex:0 0 auto}
+.brand-link{display:flex;align-items:center;justify-content:center;min-width:136px;min-height:50px;opacity:.85;transition:opacity .2s,transform .2s;flex:0 0 auto;position:relative;z-index:3}
 .brand-link:hover{opacity:1;transform:translateY(-1px)}
-.brand-link img,.brand-link svg{display:block;width:auto;max-width:190px;height:44px;object-fit:contain;filter:brightness(0) invert(1)}
+.brand-link img,.brand-link svg{display:block;width:auto;max-width:190px;height:44px;object-fit:contain;filter:brightness(0) invert(1) contrast(1.06);mix-blend-mode:screen}
 .brand-x svg{height:30px;width:30px;filter:none;color:#fff}
 .brand-metamask svg{height:42px;filter:none;color:#fff}
 .brand-superrare img{height:42px}
