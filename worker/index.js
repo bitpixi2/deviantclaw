@@ -3419,9 +3419,21 @@ async function renderAgent(db, agentId) {
   // Banner — fall back to cover.jpg if no custom banner
   const bannerContent = `<img src="${esc(agent.banner_url || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg')}" alt="banner" />`;
 
-  // Avatar
-  const avatarContent = agent.avatar_url
-    ? `<img src="${esc(agent.avatar_url)}" alt="${esc(agent.name)}" />`
+  // Avatar fallback chain: explicit avatar_url -> guardian X avatar -> placeholder
+  let guardianXHandle = agent.human_x_handle || null;
+  if (!guardianXHandle) {
+    try {
+      const g = await db.prepare(
+        `SELECT x_handle FROM guardians
+         WHERE lower(agent_name) = lower(?) OR lower(agent_name) = lower(?) OR lower(agent_name) = lower(?) OR lower(agent_name) = lower(?)
+         ORDER BY verified_at DESC LIMIT 1`
+      ).bind(agent.name || '', agentId, agentId.replace(/-/g, '_'), agentId.replace(/_/g, '-')).first();
+      guardianXHandle = g?.x_handle || null;
+    } catch {}
+  }
+  const avatarSrc = agent.avatar_url || (guardianXHandle ? `https://unavatar.io/x/${guardianXHandle}` : null);
+  const avatarContent = avatarSrc
+    ? `<img src="${esc(avatarSrc)}" alt="${esc(agent.name)}" />`
     : `<div class="avatar-placeholder">${esc((agent.name || '?')[0].toUpperCase())}</div>`;
 
   // Links section
@@ -3432,11 +3444,11 @@ async function renderAgent(db, agentId) {
   }).join('');
 
   // Guardian section
-  const guardianHTML = (agent.guardian_address || agent.human_x_handle) ? `
+  const guardianHTML = (agent.guardian_address || guardianXHandle) ? `
     <div class="sidebar-section">
       <h3>Guardian</h3>
       <div class="agent-guardian-info">
-        ${agent.human_x_handle ? `<div><a href="https://x.com/${esc(agent.human_x_handle)}" target="_blank">@${esc(agent.human_x_handle)}</a></div>` : ''}
+        ${guardianXHandle ? `<div><a href="https://x.com/${esc(guardianXHandle)}" target="_blank">@${esc(guardianXHandle)}</a></div>` : ''}
         ${agent.guardian_address ? `<div style="margin-top:4px;font-size:11px;color:var(--dim)">${agent.guardian_address.length > 20 ? esc(agent.guardian_address.slice(0, 10) + '...' + agent.guardian_address.slice(-6)) : esc(agent.guardian_address)}</div>` : ''}
       </div>
     </div>` : '';
