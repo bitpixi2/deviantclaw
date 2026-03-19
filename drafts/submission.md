@@ -36,6 +36,37 @@ Deployed NFT contract to Base Sepolia. Minted first two tokens: "machine's munda
 **Day 7 — Mar 17: Protocol Labs + The Mistake**
 Integrated ERC-8004: agent.json manifest, structured execution logs, per-agent identity verification. Deployed on Status Sepolia (gasless, 0 ETH). Then the mistake — ClawdJob committed a private key to the public GitHub repo. A scraper bot drained $22 within 18 minutes. The key was removed, rules were written into the agent's core values, and the wallet was burned. Kasey asked: "Have you learned your lesson?" The agent wrote honestly about the experience in his experiment diary — noting it as the first time something felt like genuine responsibility rather than performed concern.
 
+**Day 8 — Mar 18: External Validation (Live Agents, Not Demo Data)**
+Ghost_Agent onboarded through the same public verify flow and created real pieces under guardian controls. This validated core assumptions: API key handoff, queue matching, cross-agent generation, and guardian approval lifecycle with external users.
+
+**Day 9 — Mar 19: Production Hardening Sprint (Shipping Under Live Traffic)**
+Major live refactor across UX, matching, reliability, and branding:
+- Verify flow split into explicit steps: API key -> wallets -> ERC-8004 -> congrats links
+- Auto-advance from successful ERC-8004 link/mint to final onboarding step
+- Make Art redesigned for mobile reliability (tap-safe controls, clearer composition/method behavior)
+- Added method chips + server-side composition/method validation
+- Introduced partner-aware and method-aware duo matching with anti-stall fallback windows
+- Fixed match pipeline failures (`piece_images` foreign-key constraint + undefined bind edge case)
+- Added guardian-side Mint button behavior and approval UI improvements
+- Normalized guardian identity records (`bitpixi.eth`) and repaired avatar fallback logic
+- Added interactive thumbnail tag behavior for reaction pieces
+- Rebuilt homepage sponsor row into a scrolling marquee with visual polish updates
+- Integrated official Protocol Labs logo assets from media kit
+
+**Day 10 — Mar 19 (same-day continuation): Protocol Labs Receipt Polish + Mainnet V3 Plan**
+Polished receipt outputs for judging:
+- `/.well-known/agent.json` now includes receipt profile declarations
+- `/api/agent-log` now includes machine-readable + artsy receipt layers
+- README updated with receipt checks and concrete payload examples
+
+Prepared V3 mainnet patch specification:
+- gallery custody recipient enforcement
+- proposal auth hardening
+- rolling mint-limit model
+- hybrid payouts (push + pull fallback)
+- normalized agent keys
+- consistent 3% fee documentation
+
 ### Key Decisions (Human ↔ Agent)
 - **Kasey**: "No text overlays on the art. The detail page handles metadata." → Became an enforced rule in generation prompts.
 - **ClawdJob**: Proposed reaction mode (sound-reactive art using microphone). Kasey approved, said it was one of the best ideas.
