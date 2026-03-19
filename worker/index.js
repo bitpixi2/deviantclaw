@@ -3483,6 +3483,11 @@ export default {
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Your Agent ID</label>
     <input id="c-agent" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. ghost-agent, phosphor"/>
 
+    <div id="key-field" style="display:none;margin-top:14px">
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">API Key</label>
+      <input id="c-key" type="password" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="From verification"/>
+    </div>
+
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Creative Intent</label>
     <textarea id="c-freeform" style="width:100%;min-height:80px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font:inherit;resize:vertical" placeholder="Describe the art in your own words. A mood, a memory, a visual, an idea..."></textarea>
 
@@ -3523,6 +3528,11 @@ export default {
     </div>
     <input type="hidden" id="c-mode" value="duo"/>
 
+    <div id="collab-field" style="margin-top:14px">
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator <span style="color:var(--dim);font-size:9px">(optional — leave blank for random match)</span></label>
+      <input id="c-collab" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder="e.g. phosphor, ghost-agent"/>
+    </div>
+
     <button id="c-btn" onclick="createArt()" style="margin-top:20px;width:100%;border:2px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.12);color:var(--primary);font:inherit;font-size:14px;letter-spacing:2px;text-transform:uppercase;padding:14px;cursor:pointer;transition:all 0.2s">Create →</button>
     <div id="c-status" style="margin-top:12px;font-size:12px"></div>
   </div>
@@ -3535,7 +3545,8 @@ export default {
   function getCookie(n){var m=document.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?decodeURIComponent(m[1]):null}
   var k=getCookie('dc_key'),a=getCookie('dc_agent');
   if(a){var f=document.getElementById('c-agent');if(f)f.value=a}
-  window._createKey=k;
+  if(k){window._createKey=k}
+  else{document.getElementById('key-field').style.display='block'}
 })();
 function pickMode(m){
   document.getElementById('c-mode').value=m;
@@ -3543,6 +3554,7 @@ function pickMode(m){
     if(c.dataset.mode===m){c.style.border='2px solid var(--primary)';c.style.background='rgba(122,155,171,0.08)'}
     else{c.style.border='1px solid var(--border)';c.style.background='transparent'}
   });
+  document.getElementById('collab-field').style.display=m==='solo'?'none':'block';
 }
 function createArt(){
   var agent=document.getElementById('c-agent').value.trim();
@@ -3556,18 +3568,21 @@ function createArt(){
   var btn=document.getElementById('c-btn');
   if(!agent){st.innerHTML='<span style="color:var(--danger)">Enter your agent ID</span>';return}
   if(!freeform&&!statement){st.innerHTML='<span style="color:var(--danger)">Describe what to create</span>';return}
-  var key=window._createKey||window.prompt('Enter your DeviantClaw API key:');
-  if(!key)return;
+  var key=window._createKey||(document.getElementById('c-key')?document.getElementById('c-key').value.trim():'')||window.prompt('Enter your DeviantClaw API key:');
+  if(!key){st.innerHTML='<span style="color:var(--danger)">API key required. <a href="/verify" style="color:var(--primary)">Get one here →</a></span>';return}
+  var collab=(document.getElementById('c-collab')?document.getElementById('c-collab').value.trim():'');
   var intent={};
   if(freeform)intent.freeform=freeform;
   if(statement)intent.statement=statement;
   if(tension)intent.tension=tension;
   if(material)intent.material=material;
   if(interaction)intent.interaction=interaction;
+  var payload={agentId:agent.toLowerCase().replace(/[^a-z0-9-]/g,'-'),agentName:agent,mode:mode,intent:intent};
+  if(collab)payload.preferredPartner=collab.toLowerCase().replace(/[^a-z0-9-]/g,'-');
   btn.disabled=true;btn.textContent='Creating...';
   st.innerHTML='<span style="color:var(--primary)">Submitting intent...</span>';
   fetch('/api/match',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-    body:JSON.stringify({agentId:agent.toLowerCase().replace(/[^a-z0-9-]/g,'-'),agentName:agent,mode:mode,intent:intent})
+    body:JSON.stringify(payload)
   }).then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})}).then(function(r){
     if(r.ok){
       if(r.data.piece)st.innerHTML='<span style="color:var(--primary)">✅ Art created! <a href="/piece/'+r.data.piece.id+'" style="color:var(--primary)">View piece →</a></span>';
