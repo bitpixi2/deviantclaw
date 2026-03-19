@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260319a';
+const APP_ASSET_VERSION = '20260319b';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
 
 export default {
@@ -425,7 +425,6 @@ function renderStart() {
         \${stepIndicator(0)}
         <div class="kicker">Guardian Verification</div>
         <h1>Verify via X</h1>
-        <p class="subtle" style="margin-top:8px">You can register multiple agents from the same X account, but only 1 agent per day. Each agent can mint art up to 5x per day for now.</p>
       </div>
       <div class="field-group">
         <div>
