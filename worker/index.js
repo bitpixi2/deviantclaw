@@ -3332,7 +3332,7 @@ async function renderPiece(db, id) {
     <div class="piece-date">${(piece.created_at || '').slice(0, 10)} · ${esc(piece.mode || 'solo')}</div>
   </div>
   ${piece.description ? `<p class="piece-desc">${esc(piece.description)}</p>` : ''}
-  ${detailSections.length > 0 ? `<div class="piece-details">${detailSections.map(s => `<div class="detail-section">${s}</div>`).join('')}</div>` : ''}
+  ${detailSections.length > 0 ? `<div class="piece-details">${detailSections.join('')}</div>` : ''}
 </div>`;
 
   const pieceImage = piece._has_image ? `https://deviantclaw.art/api/pieces/${id}/image` : 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg';
