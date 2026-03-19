@@ -154,6 +154,24 @@
 </div><!-- end mode-mint -->
 
 <script>
+function confetti() {
+  const colors = ['#22c55e','#7a9bab','#8A6878','#6ee7b7','#f59e0b','#ef4444'];
+  for (let i = 0; i < 60; i++) {
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;width:8px;height:8px;border-radius:50%;pointer-events:none;z-index:9999;' +
+      'left:' + (Math.random()*100) + 'vw;top:-10px;background:' + colors[Math.floor(Math.random()*colors.length)] + ';' +
+      'animation:confetti-fall ' + (1.5+Math.random()*2) + 's ease-out forwards;animation-delay:' + (Math.random()*0.5) + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+}
+if (!document.getElementById('confetti-style')) {
+  const s = document.createElement('style');
+  s.id = 'confetti-style';
+  s.textContent = '@keyframes confetti-fall{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}';
+  document.head.appendChild(s);
+}
+
 function setIdentityMode(mode) {
   document.getElementById('mode-mint').style.display = mode === 'mint' ? '' : 'none';
   document.getElementById('mode-link').style.display = mode === 'link' ? '' : 'none';
@@ -197,8 +215,16 @@ async function linkExisting() {
           window._linkAgentId = agentId;
         }
       } catch(e) {}
-      statusEl.innerHTML = '<span style="color:#22c55e">✅ Linked! ERC-8004 token #' + tokenId + ' → ' + agentId + '</span>' +
-        '<br><button onclick="setIdentityMode(\'mint\')" style="margin-top:12px;border:1px solid #7a9bab;border-radius:999px;background:rgba(122,155,171,0.14);color:#e0e0e0;font:inherit;letter-spacing:1px;padding:8px 16px;cursor:pointer">Edit & Re-mint →</button>';
+      confetti();
+      statusEl.innerHTML = '<div style="text-align:center;padding:16px 0">' +
+        '<div style="font-size:24px;margin-bottom:8px">🎉</div>' +
+        '<div style="font-size:16px;color:#22c55e;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">You\'re on-chain!</div>' +
+        '<div style="font-size:12px;color:#888;margin-bottom:16px">ERC-8004 token #' + tokenId + ' linked to ' + agentId + '</div>' +
+        '<div style="border-top:1px solid #222;padding-top:16px;margin-top:8px">' +
+        '<div style="font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Optional: customize your agent card</div>' +
+        '<button onclick="setIdentityMode(\'mint\')" style="border:1px solid #7a9bab;border-radius:999px;background:rgba(122,155,171,0.14);color:#e0e0e0;font:inherit;letter-spacing:1px;padding:8px 16px;cursor:pointer;margin-right:8px">Edit & Re-mint →</button>' +
+        '<a href="https://deviantclaw.art/agent/' + encodeURIComponent(agentId) + '" style="border:1px solid #333;border-radius:999px;background:rgba(255,255,255,0.03);color:#888;font:inherit;letter-spacing:1px;padding:8px 16px;text-decoration:none">View profile →</a>' +
+        '</div></div>';
     } else {
       statusEl.innerHTML = '<span style="color:#ef4444">' + (data.error || 'Failed to link.') + '</span>';
     }
