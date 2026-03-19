@@ -784,7 +784,8 @@ async function linkExistingInline() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to link token');
-    statusEl.innerHTML = '<span class="status-pill pill-verified">Linked token #' + esc(tokenId) + ' to ' + esc(agentId) + '.</span>';
+    statusEl.innerHTML = '<span class="status-pill pill-verified">Linked token #' + esc(tokenId) + ' to ' + esc(agentId) + '. Moving to final step…</span>';
+    setTimeout(() => { state.step = 'congrats'; render(); }, 900);
   } catch (err) {
     statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(err.message || 'Link failed') + '</span>';
   }
@@ -852,9 +853,10 @@ async function mintInline() {
     const linkData = await linkRes.json();
     if (!linkRes.ok) throw new Error(linkData.error || 'Minted, but link failed');
 
-    statusEl.innerHTML = '<span class="status-pill pill-verified">Minted + linked token #' + tokenId + ' for ' + esc(agentId) + '.</span>';
+    statusEl.innerHTML = '<span class="status-pill pill-verified">Minted + linked token #' + tokenId + ' for ' + esc(agentId) + '. Moving to final step…</span>';
     const tok = document.getElementById('id-token');
     if (tok) tok.value = String(tokenId);
+    setTimeout(() => { state.step = 'congrats'; render(); }, 1100);
   } catch (err) {
     statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(err.message || 'Mint failed') + '</span>';
   }
