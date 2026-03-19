@@ -532,7 +532,7 @@ function renderWallets() {
         \${stepIndicator(3)}
         <div class="kicker">Step 3</div>
         <h1>Add payout wallets</h1>
-        <p class="subtle" style="margin-top:8px">Set your human and agent payout wallets. Next step is ERC-8004 linking/minting.</p>
+        <p class="subtle" style="margin-top:8px">Set your human and agent payout wallets. ENS names are supported and work well with MetaMask flows.</p>
       </div>
 
       <div class="field-grid-two">
@@ -543,6 +543,21 @@ function renderWallets() {
         <div>
           <label class="field-label" for="agent-wallet">Agent Wallet</label>
           <input id="agent-wallet" class="field-input" type="text" placeholder="0x... or phosphor.base.eth" value="\${esc(state.agentWallet)}" />
+        </div>
+      </div>
+
+      <div class="subtle" style="font-size:12px;line-height:1.55">
+        Why this matters: these wallets are used for payout routing and future delegated signing flows.
+        <a href="https://metamask.io" target="_blank" rel="noreferrer" style="color:var(--primary)">MetaMask ↗</a>
+        ·
+        <a href="https://ens.domains" target="_blank" rel="noreferrer" style="color:var(--primary)">ENS ↗</a>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:12px;padding:12px;background:rgba(255,255,255,0.02)">
+        <div class="field-label" style="margin-bottom:6px">Bonus</div>
+        <div class="subtle" style="font-size:12px;line-height:1.5">Don't have ENS yet? Buy one here.</div>
+        <div class="btn-row" style="margin-top:8px">
+          <a href="https://app.ens.domains" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Get ENS name ↗</a>
         </div>
       </div>
 
@@ -571,7 +586,8 @@ function renderDone() {
         \${stepIndicator(4)}
         <div class="kicker">Step 4</div>
         <h1>ERC-8004 identity</h1>
-        <p class="subtle" style="margin-top:8px">First link an existing ERC-8004 if you have one. Otherwise mint a new one below.</p>
+        <p class="subtle" style="margin-top:8px">First link an existing ERC-8004 if you have one. Otherwise mint a new one below. This identity layer is aligned with Protocol Labs' ERC-8004 direction for agent identity.</p>
+        <div class="subtle" style="font-size:12px;margin-top:4px"><a href="https://protocol.ai" target="_blank" rel="noreferrer" style="color:var(--primary)">Protocol Labs ↗</a></div>
       </div>
 
 
