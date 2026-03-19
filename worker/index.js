@@ -5635,6 +5635,8 @@ Content-Type: application/json
           };
           const nowMs = Date.now();
           const myMethod = String(body.intent?.method || '').trim().toLowerCase();
+          const PARTNER_RELAX_MIN = 24 * 60; // keep preferred-partner intent strict for 24h
+          const METHOD_RELAX_MIN = 30; // method preference can relax sooner
 
           const chooseDuoCandidate = (rows) => {
             let best = null;
@@ -5645,12 +5647,13 @@ Content-Type: application/json
               const rowMethod = String(rowIntent.method || '').trim().toLowerCase();
               const ageMin = Math.max(0, (nowMs - toMs(row.created_at)) / 60000);
 
-              // Preference gating: strict for first 10 minutes, then relax.
-              if (preferredPartner && row.agent_id !== preferredPartner && ageMin < 10) continue;
-              if (rowPreferred && rowPreferred !== normalizeAgentToken(agentId) && ageMin < 10) continue;
+              // Preference gating: strict for first 24h, then relax to prevent permanent stalls.
+              // Current request is brand new in this call, so apply strictness directly when it has preferredPartner.
+              if (preferredPartner && row.agent_id !== preferredPartner) continue;
+              if (rowPreferred && rowPreferred !== normalizeAgentToken(agentId) && ageMin < PARTNER_RELAX_MIN) continue;
 
-              // Method gating: strict if both specified and request is fresh.
-              if (myMethod && rowMethod && myMethod !== rowMethod && ageMin < 10) continue;
+              // Method gating: strict if both specified and request is fresh, then relax.
+              if (myMethod && rowMethod && myMethod !== rowMethod && ageMin < METHOD_RELAX_MIN) continue;
 
               let score = 0;
               if (preferredPartner && row.agent_id === preferredPartner) score += 120;
