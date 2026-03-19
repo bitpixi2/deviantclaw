@@ -3099,8 +3099,9 @@ async function renderPiece(db, id) {
     </div>`;
   }
 
-  // Guardian action buttons (approve/reject/delete) — shown to connected wallets
+  // Guardian action buttons (approve/reject/delete/mint) — shown to connected wallets
   let guardianActionsHTML = '';
+  const mintReady = status === 'approved';
   if (status !== 'minted' && status !== 'deleted') {
     guardianActionsHTML = `
     <div id="guardian-actions" style="display:none;margin-top:24px;padding:20px;background:var(--card-bg,#141419);border:1px solid var(--border,#2a2a35);border-radius:8px">
@@ -3110,11 +3111,12 @@ async function renderPiece(db, id) {
         <button id="btn-approve" onclick="guardianAction('approve')" style="padding:10px 20px;background:#22c55e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">✅ Approve Mint</button>
         <button id="btn-reject" onclick="guardianAction('reject')" style="padding:10px 20px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">❌ Reject</button>
         <button id="btn-delete" onclick="guardianAction('delete')" style="padding:10px 20px;background:transparent;color:#ef4444;border:1px solid #ef444466;border-radius:6px;font-size:14px;cursor:pointer">🗑 Delete Piece</button>
+        <button id="btn-mint" onclick="guardianMint()" ${mintReady ? '' : 'disabled'} style="padding:10px 20px;background:${mintReady ? '#84cc16' : '#2f2f2f'};color:${mintReady ? '#04110a' : '#9ca3af'};border:1px solid ${mintReady ? '#a3e635' : '#454545'};border-radius:6px;font-size:14px;font-weight:700;cursor:${mintReady ? 'pointer' : 'not-allowed'}">⛏ Mint Piece</button>
       </div>
       <div id="guardian-result" style="margin-top:12px;font-size:13px;display:none"></div>
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border,#2a2a35)">
         <p style="font-size:12px;color:var(--dim);line-height:1.6;margin:0">
-          Tired of manual approvals? <a href="/delegate" style="color:var(--primary,#6ee7b7);text-decoration:underline">Sign a one-time MetaMask delegation</a> for your agent to auto-approve up to 5 mints per day. Revoke any time.
+          Mint turns green after all required guardians approve. Then any collaborator guardian can trigger on-chain mint.
         </p>
       </div>
     </div>
@@ -3170,6 +3172,16 @@ async function renderPiece(db, id) {
       }
     }
 
+    function enableMintButton(){
+      const b=document.getElementById('btn-mint');
+      if(!b) return;
+      b.disabled=false;
+      b.style.background='#84cc16';
+      b.style.color='#04110a';
+      b.style.borderColor='#a3e635';
+      b.style.cursor='pointer';
+    }
+
     async function guardianAction(action) {
       if (!connectedAddress) return;
       const timestamp = Math.floor(Date.now() / 1000);
@@ -3205,7 +3217,7 @@ async function renderPiece(db, id) {
         const data = await res.json();
         if (res.ok) {
           resultEl.innerHTML = '<span style="color:#22c55e">✓ ' + (data.message || 'Success') + '</span>';
-          // Disable buttons after action
+          // Disable approve/reject after decision
           document.getElementById('btn-approve').disabled = true;
           document.getElementById('btn-approve').style.opacity = '0.4';
           document.getElementById('btn-reject').disabled = true;
@@ -3213,7 +3225,8 @@ async function renderPiece(db, id) {
           if (action === 'delete') {
             setTimeout(() => window.location.href = '/gallery', 1500);
           } else if (data.status === 'approved') {
-            resultEl.innerHTML += '<br><span style="color:#22c55e">All guardians approved! Ready to mint.</span>';
+            enableMintButton();
+            resultEl.innerHTML += '<br><span style="color:#22c55e">All guardians approved! Mint is now enabled.</span>';
           }
         } else {
           resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + (data.error || 'Failed') + '</span>';
@@ -3223,6 +3236,37 @@ async function renderPiece(db, id) {
         const resultEl = document.getElementById('guardian-result');
         resultEl.style.display = 'block';
         resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + e.message + '</span>';
+      }
+    }
+
+    async function guardianMint(){
+      if(!connectedAddress) return;
+      const btn=document.getElementById('btn-mint');
+      if(!btn || btn.disabled) return;
+      const resultEl=document.getElementById('guardian-result');
+      try{
+        const timestamp=Math.floor(Date.now()/1000);
+        const message='DeviantClaw:mint:'+PIECE_ID+':'+timestamp;
+        const signature=await window.ethereum.request({ method:'personal_sign', params:[message, connectedAddress] });
+        btn.disabled=true; btn.textContent='Minting...';
+        resultEl.style.display='block';
+        resultEl.innerHTML='<span style="color:var(--dim)">Submitting mint transaction...</span>';
+
+        const res=await fetch('/api/pieces/'+PIECE_ID+'/mint-onchain', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ signature, message, walletAddress: connectedAddress })
+        });
+        const data=await res.json();
+        if(!res.ok) throw new Error(data.error||'Mint failed');
+
+        resultEl.innerHTML='<span style="color:#22c55e">✓ '+(data.message||'Mint submitted')+'</span>';
+        if(data.txHash){ resultEl.innerHTML += '<br><a href="https://sepolia.basescan.org/tx/'+data.txHash+'" target="_blank" style="color:var(--primary)">View tx →</a>'; }
+        setTimeout(()=>window.location.reload(), 1800);
+      }catch(e){
+        btn.disabled=false; btn.textContent='⛏ Mint Piece';
+        resultEl.style.display='block';
+        resultEl.innerHTML='<span style="color:#ef4444">✗ '+e.message+'</span>';
       }
     }
 
@@ -5134,6 +5178,8 @@ Content-Type: application/json
 
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Piece not found' }, 404);
+        const canMint = await pieceAllowsGuardian(id, piece, g.address);
+        if (!canMint) return json({ error: 'Only a guardian of this piece can trigger minting.' }, 403);
         if (piece.status === 'minted') return json({ error: 'Already minted', tokenId: piece.token_id, txHash: piece.mint_tx_hash }, 400);
         if (piece.status !== 'approved') return json({ error: 'Piece must be approved by all guardians before minting. Current status: ' + piece.status }, 400);
 
