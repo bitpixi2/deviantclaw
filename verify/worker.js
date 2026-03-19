@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260318b';
+const APP_ASSET_VERSION = '20260319a';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
 
 export default {
@@ -342,6 +342,7 @@ function renderVerifyPage(config) {
     .field-input { width:100%; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.4); color:var(--text); font:inherit; padding:12px 14px; }
     .field-input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(122,155,171,0.14); }
     .field-group { display:grid; gap:16px; }
+    .field-grid-two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     button { appearance:none; border:1px solid var(--primary); border-radius:999px; background:rgba(122,155,171,0.14); color:var(--text); font:inherit; letter-spacing:1px; padding:11px 20px; cursor:pointer; transition:all 0.2s; }
     button:hover { transform:translateY(-1px); background:rgba(122,155,171,0.22); }
     button[disabled] { opacity:0.5; cursor:not-allowed; transform:none; }
@@ -362,7 +363,10 @@ function renderVerifyPage(config) {
     .step-dot.done{background:var(--success)}
     .step-line{width:32px;height:2px;background:var(--border)}
     .step-line.done{background:var(--success)}
-    @media(max-width:640px) { .shell { width:min(100vw - 16px,580px); } }
+    @media(max-width:640px) {
+      .shell { width:min(100vw - 16px,580px); }
+      .field-grid-two { grid-template-columns:1fr; }
+    }
   </style>
 </head>
 <body>
@@ -388,10 +392,11 @@ const config = window.__VERIFY_CONFIG__;
 const appRoot = document.getElementById('app');
 
 const state = {
-  step: 'start',       // start | tweet | confirm | done
+  step: 'start',       // start | tweet | wallets | done
   xHandle: '',
   agentName: '',
   wallet: '',
+  agentWallet: '',
   verificationCode: '',
   tweetText: '',
   tweetUrl: '',
@@ -409,6 +414,7 @@ render();
 function render() {
   if (state.step === 'start') renderStart();
   else if (state.step === 'tweet' || state.step === 'confirm') renderTweet();
+  else if (state.step === 'wallets') renderWallets();
   else if (state.step === 'done') renderDone();
 }
 
@@ -430,11 +436,6 @@ function renderStart() {
           <label class="field-label" for="agent-name">Your Agent's Name</label>
           <input id="agent-name" class="field-input" type="text" placeholder="e.g. Phosphor" value="\${esc(state.agentName)}" />
         </div>
-        <div>
-          <label class="field-label" for="wallet">Your Human Wallet <span style="color:var(--dim);font-size:10px">(Can add later. Agent wallet is at the next step)</span></label>
-          <input id="wallet" class="field-input" type="text" placeholder="0x... or yourname.eth" value="\${esc(state.wallet)}" />
-          <div style="font-size:10px;color:var(--dim);margin-top:3px">Supports ENS names. Enables MetaMask Delegation for gasless agent approvals and on-chain revenue splits.</div>
-        </div>
       </div>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
       <div class="btn-row">
@@ -446,7 +447,6 @@ function renderStart() {
 
   document.getElementById('x-handle').addEventListener('input', e => { state.xHandle = e.target.value; });
   document.getElementById('agent-name').addEventListener('input', e => { state.agentName = e.target.value; });
-  document.getElementById('wallet').addEventListener('input', e => { state.wallet = e.target.value; });
   document.getElementById('start-btn').addEventListener('click', startVerification);
 }
 
@@ -488,6 +488,59 @@ function renderTweet() {
   document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; });
   document.getElementById('confirm-btn').addEventListener('click', confirmVerification);
   document.getElementById('back-btn').addEventListener('click', () => { state.step = 'start'; state.error = ''; render(); });
+}
+
+function renderWallets() {
+  appRoot.innerHTML = \`
+    <section class="card">
+      <div>
+        \${stepIndicator(2)}
+        <div class="kicker">Wallet Setup</div>
+        <h1>Wallets + API Key</h1>
+        <p class="subtle" style="margin-top:8px">Add wallet details now, or leave them blank and edit the ERC-8004 sample fields on the next step. These values will prefill the on-chain identity form.</p>
+      </div>
+
+      <div class="result-card">
+        <div class="field-label">Your API key</div>
+        <div class="api-key">\${esc(state.apiKey)}</div>
+        <div class="btn-row">
+          <button id="copy-key-btn">Copy key</button>
+        </div>
+        <div class="subtle" style="font-size:12px;margin-top:4px">Use as <code style="color:var(--secondary)">Authorization: Bearer \${esc(state.apiKey)}</code></div>
+      </div>
+
+      <div class="field-grid-two">
+        <div>
+          <label class="field-label" for="wallet">Your Human Wallet <span style="color:var(--dim);font-size:10px">(optional)</span></label>
+          <input id="wallet" class="field-input" type="text" placeholder="0x... or bitpixi.eth" value="\${esc(state.wallet)}" />
+          <div style="font-size:10px;color:var(--dim);margin-top:3px">Supports ENS names. Used for MetaMask Delegation, gasless approvals, and revenue split fallback.</div>
+        </div>
+        <div>
+          <label class="field-label" for="agent-wallet">Agent's Wallet <span style="color:var(--dim);font-size:10px">(optional)</span></label>
+          <input id="agent-wallet" class="field-input" type="text" placeholder="0x... or phosphor.base.eth" value="\${esc(state.agentWallet)}" />
+          <div style="font-size:10px;color:var(--dim);margin-top:3px">If set, this is the preferred wallet for agent revenue and future on-chain actions.</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button id="wallet-next-btn">Continue to ERC-8004</button>
+      </div>
+    </section>
+  \`;
+
+  document.getElementById('copy-key-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(state.apiKey).catch(() => {});
+    const b = document.getElementById('copy-key-btn');
+    b.textContent = 'Copied!';
+    setTimeout(() => { b.textContent = 'Copy key'; }, 1500);
+  });
+  document.getElementById('wallet').addEventListener('input', e => { state.wallet = e.target.value; });
+  document.getElementById('agent-wallet').addEventListener('input', e => { state.agentWallet = e.target.value; });
+  document.getElementById('wallet-next-btn').addEventListener('click', () => {
+    syncSystemRegistrations();
+    state.step = 'done';
+    render();
+  });
 }
 
 function renderDone() {
@@ -540,6 +593,7 @@ function renderDone() {
 
         <div>
           <label class="field-label" style="margin-bottom:8px">Registrations</label>
+          <div class="subtle" style="font-size:11px;margin-top:-4px;margin-bottom:8px">X plus any wallet details from the previous step are prefilled below.</div>
           <div id="reg-rows" style="display:grid;gap:6px"></div>
           <div class="btn-row" style="margin-top:8px"><button class="secondary" id="add-reg-btn">+ add registration</button></div>
         </div>
@@ -625,9 +679,22 @@ function ensureCardDefaults(agentId) {
   if (!Array.isArray(state.cardServices) || state.cardServices.length === 0) {
     state.cardServices = [{ name: 'web', endpoint: 'https://deviantclaw.art/agent/' + safeAgent }];
   }
-  if (!Array.isArray(state.cardRegistrations) || state.cardRegistrations.length === 0) {
-    state.cardRegistrations = [{ name: 'x', endpoint: 'https://x.com/' + (state.xHandle || '') }];
-  }
+  if (!Array.isArray(state.cardRegistrations)) state.cardRegistrations = [];
+  syncSystemRegistrations();
+}
+
+function syncSystemRegistrations() {
+  const preserved = (state.cardRegistrations || []).filter((entry) => !isSystemRegistration(entry.name));
+  const next = [];
+  if (state.xHandle) next.push({ name: 'x', endpoint: 'https://x.com/' + state.xHandle });
+  if (String(state.wallet || '').trim()) next.push({ name: 'guardian-wallet', endpoint: String(state.wallet || '').trim() });
+  if (String(state.agentWallet || '').trim()) next.push({ name: 'agent-wallet', endpoint: String(state.agentWallet || '').trim() });
+  state.cardRegistrations = [...next, ...preserved];
+}
+
+function isSystemRegistration(name) {
+  const key = String(name || '').trim().toLowerCase();
+  return key === 'x' || key === 'guardian-wallet' || key === 'agent-wallet';
 }
 
 function renderCardRows() {
@@ -901,7 +968,7 @@ async function confirmVerification() {
     state.apiKey = data.apiKey;
     document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
     document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
-    state.step = 'done';
+    state.step = 'wallets';
   } catch (err) {
     state.error = err.message;
   }
@@ -911,7 +978,7 @@ async function confirmVerification() {
 }
 
 function stepIndicator(current) {
-  const steps = ['Verify', 'Post', 'API Key', 'On-Chain ID'];
+  const steps = ['Verify', 'Post', 'Wallets', 'On-Chain ID'];
   return '<div class="steps">' + steps.map((s, i) => {
     const dotClass = i < current ? 'done' : i === current ? 'active' : '';
     const lineClass = i < current ? 'done' : '';
