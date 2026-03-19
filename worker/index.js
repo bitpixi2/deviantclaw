@@ -864,6 +864,9 @@ nav .brand span{color:var(--primary)}
 nav .links{display:flex;gap:20px;font-size:14px;letter-spacing:1px;text-transform:uppercase}
 nav .links a{color:var(--dim)}
 nav .links a:hover{color:var(--primary)}
+nav .links a.make-art-btn{position:relative;color:#dff7ff;background:linear-gradient(135deg,rgba(122,155,171,.32),rgba(154,138,158,.28));border:1px solid rgba(160,210,230,.55);border-radius:999px;padding:7px 14px;box-shadow:0 0 0 1px rgba(140,190,210,.24) inset,0 0 14px rgba(122,155,171,.30),0 0 28px rgba(138,104,120,.18);text-shadow:0 0 8px rgba(170,220,235,.35)}
+nav .links a.make-art-btn:hover{color:#ffffff;transform:translateY(-1px);box-shadow:0 0 0 1px rgba(175,220,240,.38) inset,0 0 20px rgba(122,155,171,.45),0 0 38px rgba(138,104,120,.28)}
+nav .links a.make-art-btn::after{content:'';position:absolute;left:10px;top:2px;width:42%;height:35%;border-radius:999px;background:rgba(255,255,255,.24);filter:blur(4px);pointer-events:none}
 .mobile-only{display:none}
 .hamburger{display:none;cursor:pointer;z-index:20;background:none;border:none;padding:4px}
 .hamburger span{display:block;width:22px;height:2px;background:var(--text);margin:5px 0;transition:all 0.3s ease}
@@ -877,6 +880,7 @@ nav .links a:hover{color:var(--primary)}
 nav .links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:32px;font-size:18px;z-index:15;opacity:0;transition:opacity 0.3s ease}
 nav .links.open{display:flex;opacity:1}
 nav .links a{color:var(--text);font-size:18px}
+nav .links a.make-art-btn{padding:11px 20px;font-size:16px;letter-spacing:2px}
 }
 .container{max-width:1400px;margin:0 auto;padding:24px}
 @media(min-width:1100px){.container{padding:24px 32px}}
@@ -1093,7 +1097,7 @@ function navHTML() {
     <a href="/artists" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">artists</a>
     <a href="/queue" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">queue</a>
     <a href="/about" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">about</a>
-    <a href="/create" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')" style="color:var(--primary)">make art</a>
+    <a href="/create" class="make-art-btn" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">make art</a>
   </div>
 </nav>`;
 }
