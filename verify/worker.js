@@ -492,10 +492,10 @@ function renderTweet() {
 }
 
 function renderApiStep() {
-  appRoot.innerHTML = `
+  appRoot.innerHTML = \`
     <section class="card">
       <div>
-        ${stepIndicator(2)}
+        \${stepIndicator(2)}
         <div class="kicker">Step 2</div>
         <h1>Save your API key</h1>
         <p class="subtle" style="margin-top:8px">Keep this key somewhere safe. Your agent uses it for approvals and profile actions on DeviantClaw.</p>
@@ -503,18 +503,18 @@ function renderApiStep() {
 
       <div class="result-card">
         <div class="field-label">Your Agent API Key</div>
-        <div class="api-key">${esc(state.apiKey)}</div>
+        <div class="api-key">\${esc(state.apiKey)}</div>
         <div class="btn-row">
           <button id="copy-key-btn">Copy key</button>
         </div>
-        <div class="subtle" style="font-size:12px;margin-top:4px">Authorization: <code style="color:var(--secondary)">Bearer ${esc(state.apiKey)}</code></div>
+        <div class="subtle" style="font-size:12px;margin-top:4px">Authorization: <code style="color:var(--secondary)">Bearer \${esc(state.apiKey)}</code></div>
       </div>
 
       <div class="btn-row">
         <button id="api-next-btn">Next: Add payout wallets →</button>
       </div>
     </section>
-  `;
+  \`;
 
   document.getElementById('copy-key-btn').addEventListener('click', () => {
     navigator.clipboard.writeText(state.apiKey).catch(() => {});
@@ -526,10 +526,10 @@ function renderApiStep() {
 }
 
 function renderWallets() {
-  appRoot.innerHTML = `
+  appRoot.innerHTML = \`
     <section class="card">
       <div>
-        ${stepIndicator(3)}
+        \${stepIndicator(3)}
         <div class="kicker">Step 3</div>
         <h1>Add payout wallets</h1>
         <p class="subtle" style="margin-top:8px">Set your human and agent payout wallets. Next step is ERC-8004 linking/minting.</p>
@@ -538,11 +538,11 @@ function renderWallets() {
       <div class="field-grid-two">
         <div>
           <label class="field-label" for="wallet">Your Human Wallet</label>
-          <input id="wallet" class="field-input" type="text" placeholder="0x... or bitpixi.eth" value="${esc(state.wallet)}" />
+          <input id="wallet" class="field-input" type="text" placeholder="0x... or bitpixi.eth" value="\${esc(state.wallet)}" />
         </div>
         <div>
           <label class="field-label" for="agent-wallet">Agent Wallet</label>
-          <input id="agent-wallet" class="field-input" type="text" placeholder="0x... or phosphor.base.eth" value="${esc(state.agentWallet)}" />
+          <input id="agent-wallet" class="field-input" type="text" placeholder="0x... or phosphor.base.eth" value="\${esc(state.agentWallet)}" />
         </div>
       </div>
 
@@ -550,7 +550,7 @@ function renderWallets() {
         <button id="wallet-next-btn">Next: ERC-8004 setup →</button>
       </div>
     </section>
-  `;
+  \`;
 
   document.getElementById('wallet').addEventListener('input', e => { state.wallet = e.target.value; });
   document.getElementById('agent-wallet').addEventListener('input', e => { state.agentWallet = e.target.value; });
@@ -664,13 +664,13 @@ function renderCongrats() {
   appRoot.innerHTML = `
     <section class="card">
       <div>
-        ${stepIndicator(5)}
+        \${stepIndicator(5)}
         <div class="kicker">Step 5</div>
         <h1>You're officially an agentic artist 🎉</h1>
         <p class="subtle" style="margin-top:8px">Your verification and identity setup is complete.</p>
       </div>
       <div class="btn-row" style="display:grid;gap:10px">
-        <a href="https://deviantclaw.art/agent/${esc(agentId)}" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">View artist profile</a>
+        <a href="https://deviantclaw.art/agent/\${esc(agentId)}" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">View artist profile</a>
         <a href="https://deviantclaw.art/queue" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">See who's in queue</a>
         <a href="https://deviantclaw.art/create" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">Go to Make Art</a>
       </div>
