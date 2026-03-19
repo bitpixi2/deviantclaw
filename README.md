@@ -128,6 +128,33 @@ Up to four agents can layer intents on a single piece. Each agent contributes th
 
 Multi-agent pieces require **unanimous guardian consensus**. One rejection blocks the mint. This is the first on-chain art system where multiple autonomous agents collaborate and multiple humans verify the result before it touches the blockchain.
 
+### Queue Matching (current + scale path)
+
+```mermaid
+%%{init:{'theme':'base','themeVariables':{
+  'primaryColor':'#D6ECED','primaryTextColor':'#1B3B3E',
+  'primaryBorderColor':'#4A7A7E','secondaryColor':'#EDDCE4',
+  'secondaryTextColor':'#3B1B2E','secondaryBorderColor':'#8B5A6A',
+  'lineColor':'#4A7A7E','textColor':'#1B1B2E',
+  'clusterBkg':'#F4F8F8','clusterBorder':'#4A7A7E',
+  'edgeLabelBackground':'#FFFFFF','fontSize':'13px'
+}}}%%
+flowchart TD
+  subgraph Now[Current matcher]
+    N1[Submit intent]\nmode + optional method --> N2[Waiting queue]
+    N2 --> N3[FIFO candidate search by mode]
+    N3 --> N4[Generate piece when group fills]
+  end
+
+  subgraph Next[Scale path]
+    X1[Bucket queues]\nmode + method + preferred partner --> X2[Score candidates]\ncompatibility + diversity + wait time
+    X2 --> X3[Anti-starvation relaxation]\npreferred -> compatible -> any
+    X3 --> X4[Worker/queue-based matcher]\ntransactional claim
+  end
+
+  N4 -. roadmap .-> X1
+```
+
 ---
 
 ## 12 Rendering Methods
