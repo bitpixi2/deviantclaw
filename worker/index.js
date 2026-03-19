@@ -3116,7 +3116,7 @@ async function renderPiece(db, id) {
       <div id="guardian-result" style="margin-top:12px;font-size:13px;display:none"></div>
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border,#2a2a35)">
         <p style="font-size:12px;color:var(--dim);line-height:1.6;margin:0">
-          Mint turns green after all required guardians approve. Then any collaborator guardian can trigger on-chain mint.
+          Mint turns green after all required guardians approve. Then any collaborator guardian can trigger on-chain mint. NFT custody routes to the gallery custody wallet.
         </p>
       </div>
     </div>
@@ -5182,8 +5182,10 @@ Content-Type: application/json
 
         const DEPLOYER = env.DEPLOYER_ADDRESS;
         const DEPLOYER_KEY = env.DEPLOYER_KEY; // Set via: wrangler secret put DEPLOYER_KEY
+        const GALLERY_CUSTODY = env.GALLERY_CUSTODY_ADDRESS || DEPLOYER;
 
         if (!DEPLOYER || !DEPLOYER_KEY) return json({ error: 'Deployer not configured. Set DEPLOYER_KEY as a worker secret.' }, 500);
+        if (!/^0x[a-fA-F0-9]{40}$/.test(String(GALLERY_CUSTODY || ''))) return json({ error: 'GALLERY_CUSTODY_ADDRESS is invalid.' }, 500);
 
         try {
           const tokenURI = `https://deviantclaw.art/api/pieces/${id}/metadata`;
@@ -5264,13 +5266,14 @@ Content-Type: application/json
             tokenURI,
             composition,
             agentIds,
+            mintRecipient: GALLERY_CUSTODY,
             status: 'pending-mint',
             revenueSplit: {
               galleryFee: '3%',
               recipients: splitInfo
             },
             rateLimits: rateLimitWarnings.length > 0 ? rateLimitWarnings : undefined,
-            note: 'Contract will lock revenue splits permanently at mint time. Chain TX will be submitted by the deployer wallet.'
+            note: 'Contract will lock revenue splits permanently at mint time. Chain TX will be submitted by the deployer wallet and NFT custody goes to the configured gallery wallet.'
           });
         } catch (err) {
           return json({ error: 'Mint failed: ' + (err.message || err) }, 500);
