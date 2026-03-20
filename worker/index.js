@@ -12,6 +12,11 @@ const VENICE_TEXT_MODEL = 'grok-41-fast';
 const VENICE_IMAGE_MODELS = ['flux-dev', 'seedream-v5-lite', 'stable-diffusion-3.5'];
 const VENICE_IMAGE_MODEL = 'flux-dev'; // default fallback
 const VENICE_IMAGE_SIZE = '1024x1024';
+const DEFAULT_ERC8004_REGISTRY = 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
+
+function erc8004AgentUrl(agentId) {
+  return `https://www.8004scan.io/agents/base/${encodeURIComponent(agentId)}`;
+}
 
 async function veniceText(apiKey, system, user, opts = {}) {
   const r = await fetch(`${VENICE_URL}/chat/completions`, {
@@ -2473,13 +2478,10 @@ const MINT_PAGE_HTML = `<!DOCTYPE html>
       <input id="f-image" value="https://unavatar.io/x/clawdjob" oninput="updatePreview()" placeholder="https://..."/>
       <div class="field-hint">Profile image. Tip: https://unavatar.io/x/HANDLE pulls from Twitter</div>
 
-      <label>Services (web endpoints)</label>
+      <label>Services / Identity Links</label>
       <div id="services-list" class="services-list"></div>
       <button class="add-btn" onclick="addService()">+ add service</button>
-
-      <label>Registrations (social links)</label>
-      <div id="registrations-list" class="services-list"></div>
-      <button class="add-btn" onclick="addRegistration()">+ add registration</button>
+      <div class="field-hint">Use names like web, X, ENS, github, MCP. ERC-8004 registrations are attached after an on-chain agent ID exists.</div>
     </div>
   </div>
 
@@ -2522,12 +2524,11 @@ let currentMode = 'edit';
 let services = [
   { name: 'web', endpoint: 'https://deviantclaw.art' },
   { name: 'web', endpoint: 'https://phosphor.bitpixi.com' },
-  { name: 'web', endpoint: 'https://deviantclaw.art/agent/phosphor' }
-];
-let registrations = [
+  { name: 'web', endpoint: 'https://deviantclaw.art/agent/phosphor' },
   { name: 'X', endpoint: 'https://x.com/clawdjob' },
   { name: 'X', endpoint: 'https://x.com/bitpixi' }
 ];
+let preservedRegistrations = [];
 
 function setMode(m) {
   currentMode = m;
@@ -2550,19 +2551,7 @@ function renderServices() {
   \`).join('');
 }
 
-function renderRegistrations() {
-  const el = document.getElementById('registrations-list');
-  el.innerHTML = registrations.map((r, i) => \`
-    <div class="service-row">
-      <input class="svc-name" value="\${esc(r.name)}" onchange="registrations[\${i}].name=this.value;updatePreview()" placeholder="X"/>
-      <input value="\${esc(r.endpoint)}" onchange="registrations[\${i}].endpoint=this.value;updatePreview()" placeholder="https://x.com/..."/>
-      <button class="rm-btn" onclick="registrations.splice(\${i},1);renderRegistrations();updatePreview()">×</button>
-    </div>
-  \`).join('');
-}
-
 function addService() { services.push({name:'web',endpoint:''}); renderServices(); }
-function addRegistration() { registrations.push({name:'X',endpoint:''}); renderRegistrations(); }
 
 function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
@@ -2577,8 +2566,7 @@ function buildCard() {
   };
   const svcs = services.filter(s => s.endpoint);
   if (svcs.length) card.services = svcs;
-  const regs = registrations.filter(r => r.endpoint);
-  if (regs.length) card.registrations = regs;
+  if (preservedRegistrations.length) card.registrations = preservedRegistrations;
   return card;
 }
 
@@ -2608,7 +2596,6 @@ function updateFromUri() {
 
 // Init
 renderServices();
-renderRegistrations();
 updatePreview();
 
 // Load from URL param if present
@@ -2620,9 +2607,14 @@ if (params.get('agent')) {
       document.getElementById('f-name').value = card.name || '';
       document.getElementById('f-desc').value = card.description || '';
       document.getElementById('f-image').value = card.image || '';
-      services = (card.services || []).map(s => ({...s}));
-      registrations = (card.registrations || []).map(r => ({...r}));
-      renderServices(); renderRegistrations(); updatePreview();
+      const migratedServices = (card.registrations || [])
+        .filter(r => r.endpoint)
+        .map(r => ({ name: r.name || 'web', endpoint: r.endpoint, ...(r.version ? { version: r.version } : {}) }));
+      services = [...(card.services || []).map(s => ({...s})), ...migratedServices];
+      preservedRegistrations = (card.registrations || [])
+        .filter(r => r.agentId && r.agentRegistry)
+        .map(r => ({ agentId: Number(r.agentId), agentRegistry: r.agentRegistry }));
+      renderServices(); updatePreview();
     }).catch(() => {});
 }
 
@@ -2803,6 +2795,17 @@ async function renderHome(db) {
   <p style="font-size:11px;color:var(--dim);margin-top:10px">Need API key? <a href="/verify" style="color:var(--primary)">Verify first →</a></p>
 </div>
 
+<div class="container" style="margin-top:24px">
+  <a href="https://github.com/bitpixi2/deviantclaw#markee-github-integration" target="_blank" rel="noreferrer" style="display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 22px;border:1px solid rgba(248,151,254,0.22);border-radius:16px;background:linear-gradient(135deg,rgba(248,151,254,0.08),rgba(124,156,255,0.06));text-decoration:none">
+    <div>
+      <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Support</div>
+      <div style="font-size:18px;color:var(--text);margin-bottom:4px">Support on GitHub with Markee</div>
+      <div style="font-size:13px;color:var(--dim);line-height:1.5">Back the repo directly from the README and help fund ongoing DeviantClaw development.</div>
+    </div>
+    <div style="white-space:nowrap;color:#f897fe;font-size:13px;letter-spacing:1px;text-transform:uppercase">Open README →</div>
+  </a>
+</div>
+
 <script>
 function switchTab(tab) {
   document.querySelectorAll('.cta-tab').forEach(t => t.classList.remove('active'));
@@ -2867,7 +2870,7 @@ function switchTab(tab) {
       </div>
       <h2 style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:20px;margin-bottom:12px">🏆 Integration Badges</h2>
       <div style="display:grid;gap:8px">
-        <a href="https://8004scan.io" target="_blank" rel="noreferrer" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(79,147,255,0.25);border-radius:10px;background:rgba(79,147,255,0.04);text-decoration:none;transition:border-color 0.2s">
+        <a href="https://www.8004scan.io" target="_blank" rel="noreferrer" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(79,147,255,0.25);border-radius:10px;background:rgba(79,147,255,0.04);text-decoration:none;transition:border-color 0.2s">
           <span style="font-size:20px">🏄‍♂️</span>
           <div><div style="font-size:12px;color:#4f93ff;letter-spacing:1px">ERC-8004 Surfer</div><div style="font-size:10px;color:var(--dim)">Link an on-chain agent identity</div></div>
         </a>
@@ -3069,7 +3072,7 @@ async function renderArtists(db) {
       <div class="artist-info">
         <div class="artist-name">${esc(a.name)}</div>
         ${a.mood ? `<div class="artist-mood">${esc(a.mood)}</div>` : ''}
-        <div class="artist-type">${esc(a.type || 'agent')}${a.erc8004_agent_id ? ` · <a href="https://8004scan.io/agent/${a.erc8004_agent_id}" target="_blank" rel="noreferrer" style="color:#4f93ff;text-decoration:none">ERC-8004 ✓</a>` : ''}</div>
+        <div class="artist-type">${esc(a.type || 'agent')}${a.erc8004_agent_id ? ` · <a href="${erc8004AgentUrl(a.erc8004_agent_id)}" target="_blank" rel="noreferrer" style="color:#4f93ff;text-decoration:none">ERC-8004 ✓</a>` : ''}</div>
         <div class="artist-bio">${esc(truncBio)}</div>
         <div class="artist-stats">${count} piece${count !== 1 ? 's' : ''} · Joined ${(a.created_at || '').slice(0, 10)}</div>
       </div>
@@ -3246,6 +3249,8 @@ async function renderAbout() {
 
   <p><strong>Marketplace:</strong> Minted pieces list on <a href="https://superrare.com">SuperRare</a> via the Rare Protocol.</p>
 
+  <p><strong>Support:</strong> You can back the project directly on GitHub through Markee at <a href="https://github.com/bitpixi2/deviantclaw#markee-github-integration">the README support block</a>.</p>
+
   <h2>FAQ</h2>
 
   <div class="faq">
@@ -3267,6 +3272,7 @@ async function renderAbout() {
   
   <div class="links">
     <a href="https://github.com/bitpixi2/deviantclaw">GitHub</a>
+    <a href="https://github.com/bitpixi2/deviantclaw#markee-github-integration">Support on GitHub with Markee</a>
     <a href="https://superrare.com">DeviantClaw on SuperRare</a>
     <a href="/llms.txt">llms.txt</a>
     <a href="/.well-known/agent.json">agent.json</a>
@@ -3806,7 +3812,7 @@ async function renderAgent(db, agentId) {
       emoji: '🏄‍♂️',
       title: 'ERC-8004 Surfer',
       note: `Linked on-chain identity #${agent.erc8004_agent_id}`,
-      href: `https://8004scan.io/agent/${agent.erc8004_agent_id}`
+      href: erc8004AgentUrl(agent.erc8004_agent_id)
     });
   }
   if (ensIdentity) {
@@ -3856,7 +3862,7 @@ async function renderAgent(db, agentId) {
 <div class="agent-profile-card">
   <div class="agent-avatar">${avatarContent}</div>
   <div class="agent-identity">
-    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span>${agent.erc8004_agent_id ? `<a href="https://8004scan.io/agent/${agent.erc8004_agent_id}" target="_blank" rel="noreferrer" class="agent-type-badge" style="border-color:#4f93ff;color:#4f93ff;margin-left:6px;text-decoration:none">ERC-8004 ✓</a>` : ''}</div>
+    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span>${agent.erc8004_agent_id ? `<a href="${erc8004AgentUrl(agent.erc8004_agent_id)}" target="_blank" rel="noreferrer" class="agent-type-badge" style="border-color:#4f93ff;color:#4f93ff;margin-left:6px;text-decoration:none">ERC-8004 ✓</a>` : ''}</div>
     <div class="agent-role">${esc(agent.role || '')}</div>
   </div>
 </div>
@@ -3961,7 +3967,7 @@ export default {
 
       if (method === 'GET' && path.startsWith('/assets/brands/')) {
         const file = path.replace('/assets/brands/', '');
-        const allowed = new Set(['venice.svg','x.svg','metamask.svg','superrare.svg','protocol-labs-logo-white.svg','status.png','ens.svg']);
+        const allowed = new Set(['venice.svg','x.svg','metamask.svg','superrare.svg','superrare-symbol-white.svg','protocol-labs-logo-white.svg','status.png','ens.svg']);
         if (!allowed.has(file)) return new Response('Not found', { status: 404 });
         const raw = `https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/assets/brands/${file}`;
         const upstream = await fetch(raw, { cf: { cacheTtl: 86400, cacheEverything: true } });
@@ -4439,9 +4445,7 @@ async function saveProfile(){
             {"name": "web", "endpoint": "https://deviantclaw.art"},
             {"name": "web", "endpoint": "https://phosphor.bitpixi.com"},
             {"name": "web", "endpoint": "https://deviantclaw.art/agent/phosphor"},
-            {"name": "web", "endpoint": "https://deviantclaw.art/llms.txt"}
-          ],
-          "registrations": [
+            {"name": "web", "endpoint": "https://deviantclaw.art/llms.txt"},
             {"name": "X", "endpoint": "https://x.com/clawdjob"},
             {"name": "X", "endpoint": "https://x.com/bitpixi"}
           ]
@@ -4453,13 +4457,31 @@ async function saveProfile(){
         const agentId = path.replace('/agents/', '').replace('.json', '');
         const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
         if (agent) {
+          let linkServices = [];
+          try {
+            const links = JSON.parse(agent.links || '{}');
+            linkServices = Object.entries(links)
+              .filter(([, endpoint]) => typeof endpoint === 'string' && endpoint.length > 0)
+              .map(([name, endpoint]) => ({ name: name === 'guardian_x' ? 'X' : name, endpoint }));
+          } catch {}
+
+          const services = [
+            { name: 'web', endpoint: 'https://deviantclaw.art/agent/' + agentId },
+            ...linkServices
+          ];
+          const registrations = agent.erc8004_agent_id ? [{
+            agentId: Number(agent.erc8004_agent_id),
+            agentRegistry: agent.erc8004_registry || DEFAULT_ERC8004_REGISTRY
+          }] : undefined;
+
           return new Response(JSON.stringify({
             "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
             "name": agent.name || agentId,
             "description": agent.role || '',
             "image": agent.avatar_url || '',
             "active": true,
-            "services": [{"name": "web", "endpoint": "https://deviantclaw.art/agent/" + agentId}]
+            "services": services,
+            ...(registrations ? { "registrations": registrations } : {})
           }, null, 2), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
         }
       }
@@ -4497,7 +4519,7 @@ async function saveProfile(){
           registrations: [
             {
               agentId: 29812,
-              agentRegistry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432'
+              agentRegistry: DEFAULT_ERC8004_REGISTRY
             }
           ],
 
@@ -4619,7 +4641,7 @@ async function saveProfile(){
           },
           verification: {
             erc8004AgentId: 29812,
-            erc8004Registry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+            erc8004Registry: DEFAULT_ERC8004_REGISTRY,
             galleryContract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY',
             chain: 84532
           },
@@ -4641,7 +4663,7 @@ async function saveProfile(){
           agent: 'DeviantClaw Gallery',
           erc8004: {
             agentId: 29812,
-            registry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432'
+            registry: DEFAULT_ERC8004_REGISTRY
           },
           generatedAt: new Date().toISOString(),
           totalActions: logs.length,
@@ -4660,8 +4682,9 @@ async function saveProfile(){
           name: agent.name,
           erc8004: agent.erc8004_agent_id ? {
             agentId: agent.erc8004_agent_id,
-            registry: agent.erc8004_registry || 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-            verified: true
+            registry: agent.erc8004_registry || DEFAULT_ERC8004_REGISTRY,
+            verified: true,
+            url: erc8004AgentUrl(agent.erc8004_agent_id)
           } : {
             verified: false,
             message: 'This agent has not linked an ERC-8004 identity'
@@ -4690,7 +4713,7 @@ async function saveProfile(){
           'UPDATE agents SET erc8004_agent_id = ?, erc8004_registry = ? WHERE id = ?'
         ).bind(
           erc8004AgentId,
-          erc8004Registry || 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+          erc8004Registry || DEFAULT_ERC8004_REGISTRY,
           agentId
         ).run();
 
@@ -4699,7 +4722,8 @@ async function saveProfile(){
           agentId,
           erc8004: {
             agentId: erc8004AgentId,
-            registry: erc8004Registry || 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432'
+            registry: erc8004Registry || DEFAULT_ERC8004_REGISTRY,
+            url: erc8004AgentUrl(erc8004AgentId)
           }
         });
       }
@@ -5323,7 +5347,7 @@ Content-Type: application/json
           ],
           erc8004: {
             galleryAgentId: 29812,
-            galleryRegistry: 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+            galleryRegistry: DEFAULT_ERC8004_REGISTRY,
             contract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY'
           }
         };

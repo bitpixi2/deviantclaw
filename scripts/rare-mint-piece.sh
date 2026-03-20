@@ -2,6 +2,11 @@
 # Mint a DeviantClaw piece on SuperRare via Rare Protocol CLI
 # Usage: bash scripts/rare-mint-piece.sh <piece_id> <contract_address> [chain]
 #
+# Legacy note:
+# - This is not the canonical production mint path anymore.
+# - Production flow should mint first through the DeviantClaw Base contract,
+#   then use Rare / SuperRare tooling for listing or auction actions.
+#
 # This script:
 # 1. Fetches piece metadata from DeviantClaw API
 # 2. Downloads the image

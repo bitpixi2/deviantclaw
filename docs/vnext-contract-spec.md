@@ -1,6 +1,6 @@
 # DeviantClaw VNext Contract Spec (V3 Patch)
 
-Status: Draft for next mainnet deployment
+Status: Working draft for first real Base deployment
 
 ## Goals
 
@@ -9,8 +9,39 @@ Status: Draft for next mainnet deployment
 3. Harden proposal/auth flow against spoof/spam
 4. Replace unbounded mint timestamp scans with rolling-window counters
 5. Move royalties to hybrid payout (push first, pull fallback)
-6. Normalize agent identity keys for cheaper/safer on-chain lookups
+6. Keep canonical agent IDs strict and collision-resistant
 7. Keep fee/docs/copy consistent at 3% gallery fee
+
+---
+
+## Decisions Locked For Base
+
+These are the decisions to build around for the first real Base contract:
+
+- `owner`: cold/admin wallet for config changes
+- `relayer`: hot wallet used by Worker/ops for piece proposal and mint execution only
+- `galleryCustody`: fixed recipient for minted NFTs
+- `treasury`: 3% gallery fee recipient
+- deployment should support explicit `initialOwner` so deployer and owner do not have to be the same wallet
+- guardian / agent identity and payout routing stay under `owner`, not the relayer
+
+Canonical chain flow:
+1. Worker finalizes piece off-chain in D1
+2. Owner/admin maintains the canonical on-chain agent registry and payout routing
+3. Relayer proposes the piece on-chain with the D1 external piece ID
+4. Proposal snapshots the guardian approval set for that piece
+5. Guardians approve on-chain directly, or through MetaMask delegation if enabled
+6. Relayer mints automatically to `galleryCustody`
+7. Token is then eligible for SuperRare listing / auction flow
+
+Important consequence:
+- MetaMask delegation is for approvals
+- gasless auto-mint is a separate relayer action
+
+SuperRare decision:
+- the Base-deployed DeviantClaw contract is the canonical NFT collection
+- the old `rare-cli mint` script is not the canonical production mint path anymore
+- Rare / SuperRare tooling should be used for listing, auction creation, or settlement against already-minted DeviantClaw tokens
 
 ---
 
@@ -27,6 +58,9 @@ Status: Draft for next mainnet deployment
   - owner/relayer only, or
   - EIP-712 signatures from authorized guardians/agents.
 - Prevent unauthorized third-party proposal spam using registered agent IDs.
+- Store external D1 piece ID on-chain for idempotency and cross-layer reconciliation.
+- Require canonical lowercase agent IDs (`a-z`, `0-9`, `-`) for first deployment.
+- Snapshot the unique guardian set at proposal time so later registry edits cannot change approval authority for in-flight pieces.
 
 ### 3) Rolling mint-limit model
 - Replace unbounded `uint256[] _mintTimestamps` scan with bounded rolling window accounting.
@@ -38,11 +72,12 @@ Status: Draft for next mainnet deployment
 - If recipient transfer fails, convert payout to `claimable[recipient]`.
 - Add `claim()` for pull fallback.
 - Do not allow one failing recipient to block all payouts.
+- Preserve weighted per-agent economics when multiple contributors share the same payout wallet.
 
-### 5) Normalized agent keys
-- Introduce canonical key path (`bytes32 agentKey`) based on normalized ID.
-- Keep string helpers for readability/events where useful.
+### 5) Canonical agent key strategy
+- First deployment: keep string keys externally, but enforce canonical lowercase IDs on write paths.
 - Prevent case/format collisions (`Ghost_Agent` vs `ghost-agent`).
+- `bytes32 agentKey` migration can remain a later optimization if gas or storage pressure justifies it.
 
 ### 6) Fee + floor + docs consistency
 - Gallery fee remains 3% (`300 bps`).
@@ -55,10 +90,14 @@ Status: Draft for next mainnet deployment
 
 ### New / updated state
 - `address public galleryCustody;`
+- `address public relayer;`
 - hybrid payout state:
   - `mapping(address => uint256) public claimable;`
   - optional token-recipient accounting for UI/audit
+- per-piece guardian approval snapshots
+- weighted recipient shares for shared-wallet compositions
 - rolling mint window counters/buckets (implementation choice pending)
+- external piece ID mapping for D1 reconciliation
 
 ### New / updated events
 - recipient/custody config events
@@ -67,6 +106,7 @@ Status: Draft for next mainnet deployment
 
 ### New / updated functions
 - recipient/custody setter (`onlyOwner`)
+- relayer setter (`onlyOwner`)
 - hardened proposal entrypoint
 - `distributeRoyaltiesHybrid(...)`
 - `claim()`
@@ -78,11 +118,18 @@ Status: Draft for next mainnet deployment
 
 - Auto-mint worker queue:
   - detect `Approved && !Minted`
+  - propose the D1 piece on-chain if it is not already proposed
   - submit relayed mint tx
   - retry with backoff
 - Mint health endpoint (`/api/mint/health`) with:
   - queue depth, failures, retry age, relayer balance
 - Optional ops screen (`/ops/mint`) for manual retries
+
+Current repo mismatch to fix after contract deploy:
+- `worker/index.js` marks pieces `pending-mint` but does not yet submit the chain tx
+- `/llms.txt` still says mint via `/mint` page with MetaMask
+- legacy Rare CLI mint scripts assume a direct mint path that should no longer be production-default
+- worker-side agent registration assumptions must match the safer owner-only registry model
 
 ---
 
@@ -91,6 +138,8 @@ Status: Draft for next mainnet deployment
 - Migration should preserve existing minted token state.
 - If deployed as new contract, include a clear cutoff + migration plan for piece IDs.
 - Hybrid payouts improve reliability but require UI for claimable balances.
+- Delegated approvals need an explicit per-day contract limit so the scope matches the UX promise.
+- Current contract shape compiles cleanly with optimizer + `viaIR`; deployment config should match that.
 
 ---
 
@@ -130,8 +179,11 @@ Art pieces can visually evolve based on auction/sale state via overlay layers.
 
 - No arbitrary-recipient mints after full approval.
 - Unauthorized proposal attempts fail.
+- Changing an agent guardian after proposal does not change who can approve that piece.
 - Mint limit checks are bounded and predictable in gas.
 - Failed recipient transfer no longer blocks other recipients.
+- Shared-wallet contributors still receive the correct weighted share.
+- Delegated approvals enforce the configured daily cap on-chain.
 - Users can claim deferred payouts.
 - All references reflect 3% gallery fee.
 - Earned edit rights gated behind first sale.

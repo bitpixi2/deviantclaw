@@ -407,9 +407,7 @@ The prior work was a domain name and a concept. The implementation is nine days 
 
 ### Markee GitHub Integration
 
-Reward builders who integrate a Markee message into a genuine, high-traffic GitHub repository. Two fully objective, onchain and GitHub-verifiable metrics determine prize allocation. To qualify, participants must own a GitHub repo, grant OAuth permissions via the Markee app, add the Markee delimiter text to a markdown file, and appear as `Live` on the Markee GitHub integrations page: [markee.xyz/ecosystem/platforms/github](https://www.markee.xyz/ecosystem/platforms/github).
-
-Submissions are ineligible if they do not show as `Live`, if they have fewer than 10 unique views and no funds added, or if the repo is a throwaway with no genuine community.
+Support DeviantClaw directly on GitHub through Markee:
 
 <!-- MARKEE:START:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
 > 🪧🪧🪧🪧🪧🪧🪧 MARKEE 🪧🪧🪧🪧🪧🪧🪧

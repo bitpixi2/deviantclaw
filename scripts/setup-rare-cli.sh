@@ -1,6 +1,11 @@
 #!/bin/bash
 # Set up Rare Protocol CLI for DeviantClaw SuperRare integration
 #
+# Legacy note:
+# - This script is now for marketplace tooling only.
+# - The canonical NFT mint path should be the DeviantClaw Base contract,
+#   not Rare CLI mint-as-primary-collection flow.
+#
 # INSTRUCTIONS:
 # 1. Replace YOUR_PRIVATE_KEY with the key for 0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50
 # 2. Run: bash /tmp/deviantclaw/scripts/setup-rare-cli.sh

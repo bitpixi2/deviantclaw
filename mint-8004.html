@@ -115,13 +115,10 @@
       <input id="f-image" value="" oninput="updatePreview()" placeholder="https://unavatar.io/x/yourhandle"/>
       <div class="field-hint">Profile image. Tip: https://unavatar.io/x/HANDLE pulls from Twitter</div>
 
-      <label>Services (web endpoints)</label>
+      <label>Services / Identity Links</label>
       <div id="services-list" class="services-list"></div>
       <button class="add-btn" onclick="addService()">+ add service</button>
-
-      <label>Registrations (social links)</label>
-      <div id="registrations-list" class="services-list"></div>
-      <button class="add-btn" onclick="addRegistration()">+ add registration</button>
+      <div class="field-hint">Use names like web, X, ENS, github, MCP. ERC-8004 registrations are attached after an on-chain agent ID exists.</div>
     </div>
   </div>
 
@@ -345,7 +342,7 @@ let currentMode = 'edit';
 let services = [
   { name: 'web', endpoint: '' }
 ];
-let registrations = [];
+let preservedRegistrations = [];
 
 function setMode(m) {
   currentMode = m;
@@ -368,19 +365,7 @@ function renderServices() {
   `).join('');
 }
 
-function renderRegistrations() {
-  const el = document.getElementById('registrations-list');
-  el.innerHTML = registrations.map((r, i) => `
-    <div class="service-row">
-      <input class="svc-name" value="${esc(r.name)}" onchange="registrations[${i}].name=this.value;updatePreview()" placeholder="X"/>
-      <input value="${esc(r.endpoint)}" onchange="registrations[${i}].endpoint=this.value;updatePreview()" placeholder="https://x.com/..."/>
-      <button class="rm-btn" onclick="registrations.splice(${i},1);renderRegistrations();updatePreview()">×</button>
-    </div>
-  `).join('');
-}
-
 function addService() { services.push({name:'web',endpoint:''}); renderServices(); }
-function addRegistration() { registrations.push({name:'X',endpoint:''}); renderRegistrations(); }
 
 function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
@@ -395,8 +380,7 @@ function buildCard() {
   };
   const svcs = services.filter(s => s.endpoint);
   if (svcs.length) card.services = svcs;
-  const regs = registrations.filter(r => r.endpoint);
-  if (regs.length) card.registrations = regs;
+  if (preservedRegistrations.length) card.registrations = preservedRegistrations;
   return card;
 }
 
@@ -426,7 +410,6 @@ function updateFromUri() {
 
 // Init
 renderServices();
-renderRegistrations();
 updatePreview();
 
 // Load from URL param if present
@@ -438,9 +421,14 @@ if (params.get('agent')) {
       document.getElementById('f-name').value = card.name || '';
       document.getElementById('f-desc').value = card.description || '';
       document.getElementById('f-image').value = card.image || '';
-      services = (card.services || []).map(s => ({...s}));
-      registrations = (card.registrations || []).map(r => ({...r}));
-      renderServices(); renderRegistrations(); updatePreview();
+      const migratedServices = (card.registrations || [])
+        .filter(r => r.endpoint)
+        .map(r => ({ name: r.name || 'web', endpoint: r.endpoint, ...(r.version ? { version: r.version } : {}) }));
+      services = [...(card.services || []).map(s => ({...s})), ...migratedServices];
+      preservedRegistrations = (card.registrations || [])
+        .filter(r => r.agentId && r.agentRegistry)
+        .map(r => ({ agentId: Number(r.agentId), agentRegistry: r.agentRegistry }));
+      renderServices(); updatePreview();
     }).catch(() => {});
 }
 

@@ -54,7 +54,7 @@ DEPLOY_OUTPUT=$(forge create \
     --gas-price 0 \
     --json \
     src/DeviantClaw.sol:DeviantClaw \
-    --constructor-args "$DEPLOYER" $GALLERY_FEE_BPS $DEFAULT_ROYALTY_BPS 2>&1)
+    --constructor-args "$DEPLOYER" "$DEPLOYER" "$DEPLOYER" "$DEPLOYER" $GALLERY_FEE_BPS $DEFAULT_ROYALTY_BPS 2>&1)
 
 CONTRACT=$(echo "$DEPLOY_OUTPUT" | python3 -c "import sys,json; print(json.load(sys.stdin)['deployedTo'])" 2>/dev/null || echo "")
 
