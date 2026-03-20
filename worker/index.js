@@ -1153,8 +1153,9 @@ const AGENT_CSS = `
 .agent-mood{display:inline-block;font-size:11px;padding:4px 12px;border-radius:12px;background:rgba(110,231,183,0.1);color:var(--agent-color,#6ee7b7);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
 .agent-links{list-style:none;padding:0}
 .agent-links li{margin-bottom:8px}
-.agent-links a{color:var(--agent-color,#6ee7b7);font-size:14px;text-decoration:none;display:flex;align-items:center;gap:6px}
+.agent-links a{color:var(--agent-color,#6ee7b7);font-size:14px;text-decoration:none;display:flex;align-items:flex-start;gap:8px;line-height:1.5;word-break:break-word}
 .agent-links a:hover{text-decoration:underline}
+.agent-link-icon{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;min-width:20px;margin-top:1px}
 .agent-badge-grid{display:grid;gap:10px}
 .agent-badge{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,0.02)}
 .agent-badge-emoji{font-size:20px;line-height:1;flex-shrink:0;margin-top:2px}
@@ -1166,6 +1167,9 @@ const AGENT_CSS = `
 .agent-guardian-info a{color:var(--agent-color,#6ee7b7)}
 .agent-guardian-info .guardian-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:4px}
 .agent-joined{font-size:13px;color:var(--dim);margin-top:8px}
+.agent-danger-link{display:inline-flex;align-items:center;gap:6px;padding:0;background:none;border:none;font:inherit;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#f87171;cursor:pointer}
+.agent-danger-link:hover{color:#fca5a5}
+.agent-delete-status{margin-top:8px;font-size:11px;color:var(--dim);line-height:1.5}
 
 /* Gallery section */
 .agent-gallery h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim);margin-bottom:16px}
@@ -3713,11 +3717,37 @@ async function renderAgent(db, agentId) {
     ? `<img src="${esc(avatarSrc)}" alt="${esc(agent.name)}" />`
     : `<div class="avatar-placeholder">${esc((agent.name || '?')[0].toUpperCase())}</div>`;
 
+  function formatProfileLinkText(kind, href) {
+    const raw = String(href || '').trim();
+    if (!raw) return '';
+    try {
+      const parsed = new URL(raw);
+      const host = parsed.hostname.replace(/^www\./, '');
+      const path = parsed.pathname.replace(/\/+$/, '');
+      if (kind === 'x' || kind === 'guardian_x') {
+        const handle = path.split('/').filter(Boolean)[0];
+        return handle ? `@${handle}` : raw;
+      }
+      if (kind === 'web') {
+        return `${parsed.protocol}//${host}${path}${parsed.search}${parsed.hash}`;
+      }
+      if (host) {
+        return `${host}${path}${parsed.search}${parsed.hash}`;
+      }
+    } catch {
+      if (kind === 'x' || kind === 'guardian_x') {
+        const handle = raw.match(/@?([A-Za-z0-9_]{1,15})$/)?.[1];
+        return handle ? `@${handle}` : raw;
+      }
+    }
+    return raw;
+  }
+
   // Links section
   const linkItems = Object.entries(links).map(([k, v]) => {
-    const icons = { web: '🌐', x: '𝕏', guardian_x: '🛡 𝕏', github: '💻', discord: '💬' };
-    const label = k === 'guardian_x' ? 'Guardian' : k.charAt(0).toUpperCase() + k.slice(1);
-    return `<li><a href="${esc(v)}" target="_blank">${icons[k] || '🔗'} ${label}</a></li>`;
+    const icons = { web: '🌐', x: '𝕏', guardian_x: '🛡', github: '💻', discord: '💬' };
+    const text = formatProfileLinkText(k, v);
+    return `<li><a href="${esc(v)}" target="_blank" rel="noreferrer"><span class="agent-link-icon">${icons[k] || '🔗'}</span><span>${esc(text)}</span></a></li>`;
   }).join('');
 
   // Guardian section
@@ -3852,20 +3882,54 @@ async function renderAgent(db, agentId) {
       ${collabHTML}
       <div class="sidebar-section">
         <h3>Details</h3>
-        ${agent.parent_agent_id ? `<div style="font-size:12px;color:var(--dim);margin-bottom:4px">Reports to <a href="/agent/${esc(agent.parent_agent_id)}" style="color:var(--agent-color)">${esc(agent.parent_agent_id)}</a></div>` : ''}
-        <div class="agent-joined">Member since ${(agent.created_at || '').slice(0, 10)}</div>
-        ${agent.wallet_address ? `<div style="font-size:10px;color:var(--dim);margin-top:4px;word-break:break-all">${esc(agent.wallet_address)}</div>` : ''}
-        <div style="margin-top:12px"><a href="/agent/${esc(agentId)}/edit" style="font-size:11px;color:var(--agent-color);letter-spacing:1px;text-transform:uppercase">✏️ Edit Profile</a></div>
-      </div>
-    </div>
-    <div class="agent-gallery">
-      <h2>Gallery</h2>
-      <div class="grid">
-        ${cards || '<div class="empty-state">No pieces yet. This agent is waiting for their first collaboration.</div>'}
-      </div>
-    </div>
-  </div>
-</div>`;
+	        ${agent.parent_agent_id ? `<div style="font-size:12px;color:var(--dim);margin-bottom:4px">Reports to <a href="/agent/${esc(agent.parent_agent_id)}" style="color:var(--agent-color)">${esc(agent.parent_agent_id)}</a></div>` : ''}
+	        <div class="agent-joined">Member since ${(agent.created_at || '').slice(0, 10)}</div>
+	        ${agent.wallet_address ? `<div style="font-size:10px;color:var(--dim);margin-top:4px;word-break:break-all">${esc(agent.wallet_address)}</div>` : ''}
+	        <div style="margin-top:12px"><a href="/agent/${esc(agentId)}/edit" style="font-size:11px;color:var(--agent-color);letter-spacing:1px;text-transform:uppercase">✏️ Edit Profile</a></div>
+	        <div style="margin-top:12px">
+	          <button type="button" class="agent-danger-link" onclick="deleteAgentProfile()">🗑 Delete Agent Profile</button>
+	          <div id="agent-delete-status" class="agent-delete-status">Removes this public agent profile. Historical pieces stay in the gallery.</div>
+	        </div>
+	      </div>
+	    </div>
+	    <div class="agent-gallery">
+	      <h2>Gallery</h2>
+	      <div class="grid">
+	        ${cards || '<div class="empty-state">No pieces yet. This agent is waiting for their first collaboration.</div>'}
+	      </div>
+	    </div>
+	  </div>
+	</div>
+	<script>
+	async function deleteAgentProfile(){
+	  const status=document.getElementById('agent-delete-status');
+	  if(!confirm('Delete this agent profile? Historical pieces stay in the gallery. This cannot be undone.')) return;
+	  let apiKey=localStorage.getItem('deviantclaw_api_key')||'';
+	  if(!apiKey){
+	    apiKey=(prompt('Enter your guardian API key to delete this agent profile:')||'').trim();
+	  }
+	  if(!apiKey){
+	    status.textContent='API key required to delete this profile.';
+	    return;
+	  }
+	  status.textContent='Deleting profile...';
+	  try{
+	    const r=await fetch('/api/agents/${esc(agentId)}/profile',{
+	      method:'DELETE',
+	      headers:{'Authorization':'Bearer '+apiKey}
+	    });
+	    const j=await r.json().catch(()=>({}));
+	    if(r.ok){
+	      status.textContent='Profile deleted. Redirecting...';
+	      setTimeout(()=>{location.href=j.redirect||'/artists';},500);
+	    }else{
+	      status.textContent=j.error||'Delete failed.';
+	    }
+	  }catch(e){
+	    status.textContent=e.message||'Delete failed.';
+	  }
+	}
+	</script>`;
 
   return htmlResponse(page(agent.name, AGENT_CSS + STATUS_CSS, body));
 }
@@ -5929,10 +5993,10 @@ Content-Type: application/json
       }
 
       // ========== AGENT PROFILE UPDATE ==========
-      if (method === 'PUT' && path.match(/^\/api\/agents\/[^/]+\/profile$/)) {
-        const agentId = decodeURIComponent(path.split('/')[3]).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-        const guardian = await getGuardian(request);
-        if (!guardian) return json({ error: 'Unauthorized' }, 401);
+	      if (method === 'PUT' && path.match(/^\/api\/agents\/[^/]+\/profile$/)) {
+	        const agentId = decodeURIComponent(path.split('/')[3]).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+	        const guardian = await getGuardian(request);
+	        if (!guardian) return json({ error: 'Unauthorized' }, 401);
         
         const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
         if (!agent) return json({ error: 'Agent not found' }, 404);
@@ -5954,9 +6018,40 @@ Content-Type: application/json
         if (updates.length === 0) return json({ error: 'No valid fields' }, 400);
 
         values.push(agentId);
-        await db.prepare(`UPDATE agents SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).bind(...values).run();
-        return json({ ok: true, updated: updates.length });
-      }
+	        await db.prepare(`UPDATE agents SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).bind(...values).run();
+	        return json({ ok: true, updated: updates.length });
+	      }
+
+	      if (method === 'DELETE' && path.match(/^\/api\/agents\/[^/]+\/profile$/)) {
+	        const agentId = decodeURIComponent(path.split('/')[3]).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+	        const guardian = await getGuardian(request);
+	        if (!guardian) return json({ error: 'Unauthorized' }, 401);
+
+	        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+	        if (!agent) return json({ error: 'Agent not found' }, 404);
+	        const gAddr = guardian.address || guardian.wallet_address;
+	        if (agent.guardian_address && !sameAddress(agent.guardian_address, gAddr)) {
+	          return json({ error: 'Not your agent' }, 403);
+	        }
+
+	        const activePieces = await db.prepare(
+	          `SELECT COUNT(DISTINCT p.id) AS cnt
+	           FROM pieces p
+	           LEFT JOIN piece_collaborators pc ON pc.piece_id = p.id
+	           WHERE p.deleted_at IS NULL
+	             AND (p.agent_a_id = ? OR p.agent_b_id = ? OR pc.agent_id = ?)
+	             AND COALESCE(p.status, 'draft') NOT IN ('minted', 'rejected', 'deleted')`
+	        ).bind(agentId, agentId, agentId).first();
+	        if ((activePieces?.cnt || 0) > 0) {
+	          return json({ error: 'Resolve active pieces before deleting this agent profile.' }, 409);
+	        }
+
+	        await db.prepare('DELETE FROM notifications WHERE agent_id = ?').bind(agentId).run().catch(() => {});
+	        await db.prepare('DELETE FROM match_group_members WHERE agent_id = ?').bind(agentId).run().catch(() => {});
+	        await db.prepare('DELETE FROM match_requests WHERE agent_id = ?').bind(agentId).run().catch(() => {});
+	        await db.prepare('DELETE FROM agents WHERE id = ?').bind(agentId).run();
+	        return json({ ok: true, redirect: '/artists' });
+	      }
 
       // POST /api/pieces/:id/regen-image — regenerate Venice image at higher res
       if (method === 'POST' && path.match(/^\/api\/pieces\/[^/]+\/regen-image$/)) {
