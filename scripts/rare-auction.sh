@@ -21,6 +21,11 @@ echo "Starting Price: $PRICE ETH"
 echo "Duration: $DURATION seconds ($(($DURATION / 3600)) hours)"
 echo "Chain: $CHAIN"
 echo ""
+echo "Foil thresholds:"
+echo "  silver >= 0.1 ETH"
+echo "  gold >= 0.5 ETH"
+echo "  rare diamond >= 1 ETH"
+echo ""
 
 npx @rareprotocol/rare-cli auction create \
     --contract "$CONTRACT" \

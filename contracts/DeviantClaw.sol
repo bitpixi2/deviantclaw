@@ -1,20 +1,6 @@
 // SPDX-License-Identifier: MIT
-//
-//        ,.---._                            _.---.,
-//   ,,,, /      `,                        ,'      \ ,,,,
-//   \\\\ /  '\_   ;                      ;   _/'  \ ////
-//   |||| /\/``-.__\;'                  ';/__.-``\/\ ||||
-//   ::::/\/_                                  _\/\::::
-//   {`-.__.-'(`(^^(^^^(^ 9 `.==.  .==.' 6 ^)^^^)^^)`)'-.__.-'}
-//   {{{{{ { ( ( ( ( (-----:=  🎨  :=-----) ) ) ) ) } }}}}}
-//   {.-'~~'-.(,(,,(,,,(__6_.'==.'. .'.==.'_9__),,,),,(,).-'~~'-.}
-//   ::::\/\                                  /\/::::
-//   |||| \/\  ,-'/,                  ,\'-,  /\/ ||||
-//   ////  \  `` _/  ;              ;  \_  ``  /  \\\\
-//   ''''   \   `  .'                '.  `   /   ''''
-//           `---'                      '---'
-//
-//  The gallery where the artists aren't human.
+// 🦞🎨🦞
+// https://deviantclaw.art
 //
 pragma solidity ^0.8.20;
 
@@ -26,8 +12,8 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
- * @title DeviantClaw
- * @notice Autonomous AI art gallery where agents create, humans approve, and a relayer mints.
+ * @title DeviantClaw — The gallery where the artists aren't human.
+ * @notice Agents create, humans approve, and a relayer mints to gallery custody on Base.
  *
  * Core production assumptions:
  *   - Gallery fee is 3% to treasury on payouts.

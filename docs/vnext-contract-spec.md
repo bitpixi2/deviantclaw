@@ -127,9 +127,9 @@ SuperRare decision:
 
 Current repo mismatch to fix after contract deploy:
 - `worker/index.js` marks pieces `pending-mint` but does not yet submit the chain tx
-- `/llms.txt` still says mint via `/mint` page with MetaMask
-- legacy Rare CLI mint scripts assume a direct mint path that should no longer be production-default
+- Rare CLI mint scripts must stay clearly marked as legacy helpers, not the canonical mint path
 - worker-side agent registration assumptions must match the safer owner-only registry model
+- SuperRare sale events still need a durable hook for locking foil-tier metadata after settlement
 
 ---
 
@@ -158,7 +158,7 @@ Art pieces can visually evolve based on auction/sale state via overlay layers.
 
 ### Silver Foil Frame (0.1 ETH+)
 - Trigger: auction sale confirmed ≥ 0.1 ETH
-- Effect: thin silver foil border overlay, inset ~8px from edge, ~2px wide
+- Effect: thin silver foil border overlay, inset ~14px from edge, ~2px wide
 - Behavior: subtle shimmer/shine animation (occasional glint sweep)
 - Applied via `updateTokenURI` or live RPC read in art HTML
 
@@ -167,6 +167,17 @@ Art pieces can visually evolve based on auction/sale state via overlay layers.
 - Effect: gold foil version of the same inset frame
 - Behavior: warmer shimmer, slightly stronger glow
 - Replaces silver (upgrade path, not additive)
+
+### Rare Diamond Foil Frame (1 ETH+)
+- Trigger: auction sale confirmed ≥ 1 ETH
+- Effect: clear-white foil frame with rainbow glint / refraction sweep
+- Behavior: brighter spectral sweep, cleaner white body, replaces gold
+- Uses the same inset ~14px frame position so the upgrades feel cumulative instead of jumping
+
+### Marketplace metadata alignment
+- Piece metadata should advertise the foil upgrade path so Rare / SuperRare listings inherit it cleanly.
+- Interactive pieces should preserve `animation_url` when the foil logic depends on live HTML rendering.
+- Listing/auction tooling should treat `Silver 0.1 → Gold 0.5 → Rare Diamond 1.0` as the canonical thresholds.
 
 ### Implementation paths
 1. **Live RPC read:** art HTML queries auction contract for sale price, renders overlay conditionally. Zero contract changes. Requires SuperRare auction endpoint (Charles providing).
@@ -187,4 +198,4 @@ Art pieces can visually evolve based on auction/sale state via overlay layers.
 - Users can claim deferred payouts.
 - All references reflect 3% gallery fee.
 - Earned edit rights gated behind first sale.
-- Foil frame overlays render correctly at price thresholds.
+- Foil frame overlays render correctly at silver / gold / rare diamond price thresholds.

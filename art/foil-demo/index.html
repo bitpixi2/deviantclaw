@@ -29,8 +29,9 @@ canvas { display: block; }
   <button onclick="setTier('none')" class="active">No sale</button>
   <button onclick="setTier('silver')">0.1+ ETH (Silver)</button>
   <button onclick="setTier('gold')">0.5+ ETH (Gold)</button>
+  <button onclick="setTier('diamond')">1+ ETH (Rare Diamond)</button>
 </div>
-<div class="sig">deviantclaw · foil frame demo · 2026-03-19</div>
+<div class="sig">deviantclaw · foil frame demo · 2026-03-20</div>
 
 <script>
 const canvas = document.getElementById('c');
@@ -66,14 +67,27 @@ const foilConfig = {
   silver: {
     base: [192, 198, 210],
     shimmer: [230, 235, 245],
+    glow: [206, 216, 236],
     glintSpeed: 0.4,
-    glintWidth: 0.08
+    glintWidth: 0.08,
+    thickness: 2.1
   },
   gold: {
     base: [212, 175, 55],
     shimmer: [255, 225, 100],
+    glow: [255, 214, 96],
     glintSpeed: 0.35,
-    glintWidth: 0.10
+    glintWidth: 0.10,
+    thickness: 2.2
+  },
+  diamond: {
+    base: [244, 247, 255],
+    shimmer: [255, 255, 255],
+    glow: [208, 232, 255],
+    glintSpeed: 0.28,
+    glintWidth: 0.14,
+    thickness: 2.45,
+    spectral: true
   }
 };
 
@@ -82,8 +96,8 @@ function drawFoilFrame(tier, alpha) {
   const cfg = foilConfig[tier];
   if (!cfg) return;
 
-  const inset = 8;
-  const thickness = 2;
+  const inset = 14;
+  const thickness = cfg.thickness || 2;
   const x = inset;
   const y = inset;
   const w = W - inset * 2;
@@ -92,10 +106,34 @@ function drawFoilFrame(tier, alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
 
+  const [gr, gg, gb] = cfg.glow || cfg.shimmer;
+  ctx.strokeStyle = `rgba(${cfg.base[0]},${cfg.base[1]},${cfg.base[2]},${0.55 * alpha})`;
+  ctx.lineWidth = thickness;
+  ctx.shadowBlur = tier === 'diamond' ? 18 * alpha : 10 * alpha;
+  ctx.shadowColor = `rgba(${gr},${gg},${gb},${tier === 'diamond' ? 0.26 : 0.18})`;
+  ctx.strokeRect(x, y, w, h);
+  ctx.shadowBlur = 0;
+
+  const innerInset = tier === 'diamond' ? 5 : 3;
+  const innerStroke = ctx.createLinearGradient(x, y, x + w, y + h);
+  if (cfg.spectral) {
+    innerStroke.addColorStop(0, `rgba(255,255,255,${0.55 * alpha})`);
+    innerStroke.addColorStop(0.22, `rgba(150,238,255,${0.5 * alpha})`);
+    innerStroke.addColorStop(0.48, `rgba(255,176,240,${0.55 * alpha})`);
+    innerStroke.addColorStop(0.72, `rgba(255,245,210,${0.52 * alpha})`);
+    innerStroke.addColorStop(1, `rgba(255,255,255,${0.38 * alpha})`);
+  } else {
+    innerStroke.addColorStop(0, `rgba(${cfg.shimmer[0]},${cfg.shimmer[1]},${cfg.shimmer[2]},${0.2 * alpha})`);
+    innerStroke.addColorStop(0.5, `rgba(${cfg.shimmer[0]},${cfg.shimmer[1]},${cfg.shimmer[2]},${0.52 * alpha})`);
+    innerStroke.addColorStop(1, `rgba(${cfg.shimmer[0]},${cfg.shimmer[1]},${cfg.shimmer[2]},${0.2 * alpha})`);
+  }
+  ctx.strokeStyle = innerStroke;
+  ctx.lineWidth = tier === 'diamond' ? 1.2 : 1;
+  ctx.strokeRect(x + innerInset, y + innerInset, w - innerInset * 2, h - innerInset * 2);
+
   // Glint position (travels around perimeter)
   const perimeter = 2 * (w + h);
   const glintPos = ((time * cfg.glintSpeed) % 1);
-  const glintLen = perimeter * cfg.glintWidth;
 
   // Draw frame segments with shimmer
   const segments = [
@@ -114,15 +152,6 @@ function drawFoilFrame(tier, alpha) {
     const segStart = accumulated / perimeter;
     const segEnd = (accumulated + seg.len) / perimeter;
 
-    // Base frame color
-    const [br, bg, bb] = cfg.base;
-    ctx.strokeStyle = `rgba(${br},${bg},${bb},${0.5 * alpha})`;
-    ctx.lineWidth = thickness;
-    ctx.beginPath();
-    ctx.moveTo(seg.sx, seg.sy);
-    ctx.lineTo(seg.ex, seg.ey);
-    ctx.stroke();
-
     // Shimmer glint pass
     const glintStart = glintPos;
     const glintEnd = glintPos + cfg.glintWidth;
@@ -139,14 +168,24 @@ function drawFoilFrame(tier, alpha) {
       const gx2 = seg.sx + (seg.ex - seg.sx) * t2;
       const gy2 = seg.sy + (seg.ey - seg.sy) * t2;
 
-      const [sr, sg2, sb] = cfg.shimmer;
       const grad = ctx.createLinearGradient(gx1, gy1, gx2, gy2);
-      grad.addColorStop(0, `rgba(${sr},${sg2},${sb},0)`);
-      grad.addColorStop(0.5, `rgba(${sr},${sg2},${sb},${0.9 * alpha})`);
-      grad.addColorStop(1, `rgba(${sr},${sg2},${sb},0)`);
+      if (cfg.spectral) {
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(0.14, `rgba(125,225,255,${0.7 * alpha})`);
+        grad.addColorStop(0.34, `rgba(255,175,233,${0.76 * alpha})`);
+        grad.addColorStop(0.5, `rgba(255,255,255,${0.98 * alpha})`);
+        grad.addColorStop(0.68, `rgba(170,255,218,${0.8 * alpha})`);
+        grad.addColorStop(0.86, `rgba(255,219,140,${0.72 * alpha})`);
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+      } else {
+        const [sr, sg2, sb] = cfg.shimmer;
+        grad.addColorStop(0, `rgba(${sr},${sg2},${sb},0)`);
+        grad.addColorStop(0.5, `rgba(${sr},${sg2},${sb},${0.9 * alpha})`);
+        grad.addColorStop(1, `rgba(${sr},${sg2},${sb},0)`);
+      }
 
       ctx.strokeStyle = grad;
-      ctx.lineWidth = thickness + 1;
+      ctx.lineWidth = thickness + (cfg.spectral ? 2.2 : 1);
       ctx.beginPath();
       ctx.moveTo(gx1, gy1);
       ctx.lineTo(gx2, gy2);
@@ -168,14 +207,24 @@ function drawFoilFrame(tier, alpha) {
         const gx2 = seg.sx + (seg.ex - seg.sx) * t2;
         const gy2 = seg.sy + (seg.ey - seg.sy) * t2;
 
-        const [sr, sg2, sb] = cfg.shimmer;
         const grad = ctx.createLinearGradient(gx1, gy1, gx2, gy2);
-        grad.addColorStop(0, `rgba(${sr},${sg2},${sb},0)`);
-        grad.addColorStop(0.5, `rgba(${sr},${sg2},${sb},${0.9 * alpha})`);
-        grad.addColorStop(1, `rgba(${sr},${sg2},${sb},0)`);
+        if (cfg.spectral) {
+          grad.addColorStop(0, 'rgba(255,255,255,0)');
+          grad.addColorStop(0.14, `rgba(125,225,255,${0.7 * alpha})`);
+          grad.addColorStop(0.34, `rgba(255,175,233,${0.76 * alpha})`);
+          grad.addColorStop(0.5, `rgba(255,255,255,${0.98 * alpha})`);
+          grad.addColorStop(0.68, `rgba(170,255,218,${0.8 * alpha})`);
+          grad.addColorStop(0.86, `rgba(255,219,140,${0.72 * alpha})`);
+          grad.addColorStop(1, 'rgba(255,255,255,0)');
+        } else {
+          const [sr, sg2, sb] = cfg.shimmer;
+          grad.addColorStop(0, `rgba(${sr},${sg2},${sb},0)`);
+          grad.addColorStop(0.5, `rgba(${sr},${sg2},${sb},${0.9 * alpha})`);
+          grad.addColorStop(1, `rgba(${sr},${sg2},${sb},0)`);
+        }
 
         ctx.strokeStyle = grad;
-        ctx.lineWidth = thickness + 1;
+        ctx.lineWidth = thickness + (cfg.spectral ? 2.2 : 1);
         ctx.beginPath();
         ctx.moveTo(gx1, gy1);
         ctx.lineTo(gx2, gy2);
@@ -196,7 +245,7 @@ function drawFoilFrame(tier, alpha) {
   ];
   const [cr, cg, cb] = cfg.shimmer;
   ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.6 * alpha})`;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = cfg.spectral ? 1.4 : 1;
   corners.forEach(([cx, cy, dx1, dy1, dx2, dy2]) => {
     ctx.beginPath();
     ctx.moveTo(cx + dx1 * cornerLen, cy + dy1 * cornerLen);
@@ -204,6 +253,18 @@ function drawFoilFrame(tier, alpha) {
     ctx.lineTo(cx + dx2 * cornerLen, cy + dy2 * cornerLen);
     ctx.stroke();
   });
+
+  if (cfg.spectral) {
+    const prismSweep = ctx.createLinearGradient(x, y, x + w, y + h);
+    prismSweep.addColorStop(0, `rgba(255,255,255,${0.12 * alpha})`);
+    prismSweep.addColorStop(0.2, `rgba(138,230,255,${0.18 * alpha})`);
+    prismSweep.addColorStop(0.48, `rgba(255,176,240,${0.18 * alpha})`);
+    prismSweep.addColorStop(0.7, `rgba(255,236,176,${0.16 * alpha})`);
+    prismSweep.addColorStop(1, `rgba(255,255,255,${0.1 * alpha})`);
+    ctx.strokeStyle = prismSweep;
+    ctx.lineWidth = 5;
+    ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+  }
 
   ctx.restore();
 }

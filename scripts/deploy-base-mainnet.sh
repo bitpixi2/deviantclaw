@@ -19,6 +19,9 @@
 # - Install dependencies first: forge install OpenZeppelin/openzeppelin-contracts
 # - Deploy with a wallet you are comfortable using as the transaction sender.
 #   Ownership is assigned to OWNER_ADDRESS, not necessarily the deployer wallet.
+# - After deploy, point the Worker at the new CONTRACT_ADDRESS and use Rare CLI
+#   for listing / auctions only. Keep foil thresholds aligned:
+#     silver >= 0.1 ETH, gold >= 0.5 ETH, rare diamond >= 1 ETH.
 
 set -euo pipefail
 
@@ -78,3 +81,10 @@ forge create \
   "$RELAYER_ADDRESS" \
   "$GALLERY_FEE_BPS" \
   "$DEFAULT_ROYALTY_BPS"
+
+echo
+echo "Post-deploy checklist:"
+echo "  1. Save the deployed CONTRACT_ADDRESS into the Worker env"
+echo "  2. Set delegationManager and any floor overrides from the owner wallet"
+echo "  3. Configure Rare CLI for listing / auctions against the deployed contract"
+echo "  4. Keep sale-reactive foil tiers aligned: silver 0.1, gold 0.5, rare diamond 1.0"

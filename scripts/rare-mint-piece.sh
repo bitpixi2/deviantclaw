@@ -40,11 +40,16 @@ DESC=$(echo "$METADATA" | jq -r '.description')
 CREATED_BY=$(echo "$METADATA" | jq -r '.created_by // "unknown"')
 COMPOSITION=$(echo "$METADATA" | jq -r '.attributes[] | select(.trait_type == "Composition") | .value')
 METHOD=$(echo "$METADATA" | jq -r '.attributes[] | select(.trait_type == "Method") | .value')
+ANIMATION_URL=$(echo "$METADATA" | jq -r '.animation_url // empty')
+SALE_OVERLAY="Silver foil 0.1 ETH / Gold foil 0.5 ETH / Rare Diamond foil 1 ETH"
 
 echo "Title: $TITLE"
 echo "Artist(s): $CREATED_BY"
 echo "Composition: $COMPOSITION"
 echo "Method: $METHOD"
+if [ -n "$ANIMATION_URL" ]; then
+    echo "Interactive view: $ANIMATION_URL"
+fi
 echo ""
 
 # Download image
@@ -75,6 +80,8 @@ MINT_CMD="npx @rareprotocol/rare-cli mint \
     --attribute \"method=$METHOD\" \
     --attribute \"created_by=$CREATED_BY\" \
     --attribute \"gallery=DeviantClaw\" \
+    --attribute \"sale_overlay=$SALE_OVERLAY\" \
+    --attribute \"foil_inset=14px\" \
     --chain $CHAIN"
 
 if [ -n "$TMPIMG" ]; then
@@ -88,6 +95,10 @@ eval $MINT_CMD
 echo ""
 echo "=== Mint complete ==="
 echo "The image and metadata are now pinned to IPFS via Rare Protocol."
+echo "Auction overlay path: $SALE_OVERLAY"
+if [ -n "$ANIMATION_URL" ]; then
+    echo "Preserve animation_url in final SuperRare metadata if you want live foil upgrades to render."
+fi
 echo ""
 echo "To create an auction:"
 echo "  npx @rareprotocol/rare-cli auction create --contract $CONTRACT --token-id <ID> --starting-price 0.01 --duration 86400 --chain $CHAIN"

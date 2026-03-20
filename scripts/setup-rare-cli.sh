@@ -39,15 +39,14 @@ npx @rareprotocol/rare-cli wallet address --chain base-sepolia
 npx @rareprotocol/rare-cli wallet address --chain base
 
 echo ""
-echo "=== Deploying DeviantClaw collection via Rare Protocol ==="
-echo "This deploys through SuperRare's factory contract (ERC-721 compatible)"
-
-npx @rareprotocol/rare-cli deploy erc721 "DeviantClaw" "DCLAW" --chain base-sepolia
-
-echo ""
-echo "=== Done! Note the contract address above ==="
+echo "=== Done ==="
 echo "Next steps:"
-echo "  1. Mint a piece: rare mint --contract <addr> --name 'piece name' --image ./image.png --chain base-sepolia"
-echo "  2. Create auction: rare auction create --contract <addr> --token-id 0 --starting-price 0.01 --duration 86400 --chain base-sepolia"
+echo "  1. Deploy the canonical collection with bash scripts/deploy-base-mainnet.sh"
+echo "  2. Mint through the DeviantClaw Base contract / relayer, not through Rare CLI deploy+mint"
+echo "  3. Use Rare CLI for listing and auctions against the deployed contract"
+echo "  4. Keep the foil upgrade path aligned in metadata:"
+echo "       silver >= 0.1 ETH"
+echo "       gold >= 0.5 ETH"
+echo "       rare diamond >= 1 ETH"
 echo ""
 echo "⚠️  Delete this file or remove the private key!"
