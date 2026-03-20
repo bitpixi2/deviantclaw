@@ -1501,7 +1501,7 @@ function dedupeApprovalRows(rows = []) {
 
 // ========== CSS ==========
 
-const BASE_CSS = `:root{--bg:#000000;--surface:#0a0a0e;--border:#1e1a2e;--text:#A0B8C0;--dim:#8A9E96;--primary:#7A9BAB;--secondary:#8A6878;--accent:#9A8A9E}
+const BASE_CSS = `:root{--bg:#000000;--surface:#0d1016;--border:#33404b;--text:#E3EDF1;--dim:#BCCBD1;--primary:#B4D5DF;--secondary:#D6B3C2;--accent:#D7C6A6}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;font-size:16px;line-height:1.6}
 a{color:var(--primary);text-decoration:none;transition:color 0.2s}
@@ -1521,23 +1521,27 @@ nav .links a.make-art-btn:hover{color:#cde2ea;background:rgba(122,155,171,.14);t
 .hamburger.open span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
 .hamburger.open span:nth-child(2){opacity:0}
 .hamburger.open span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
+.menu-close{display:none}
 @media(max-width:600px){
 .mobile-only{display:inline}
-.hamburger{display:block}
+.hamburger{display:block;position:relative;right:0;margin-left:auto;padding:0;align-self:center}
 .mobile-only{display:block}
-nav{display:flex;padding:18px 16px;min-height:72px;gap:16px}
-nav .brand img{width:222px}
-nav .links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:32px;font-size:18px;z-index:15;opacity:0;transition:opacity 0.3s ease}
+nav{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:18px 16px;min-height:72px;gap:12px;align-items:center}
+nav .brand{grid-column:1;min-width:0}
+nav .brand img{width:222px;max-width:100%}
+nav .links{display:none;position:fixed;inset:0;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:30px;font-size:18px;z-index:35;opacity:0;transition:opacity 0.25s ease;padding:24px}
 nav .links.open{display:flex;opacity:1}
-nav .links a{color:var(--text);font-size:18px}
-nav .links a.make-art-btn{padding:11px 20px;font-size:16px;letter-spacing:2px}
+nav .links a{color:var(--text);font-size:20px;letter-spacing:2px;min-height:auto}
+nav .links a.make-art-btn{padding:0;border:none;border-radius:0;background:none;min-height:auto;font-size:20px;letter-spacing:2px;color:var(--text)}
+nav .links a.make-art-btn:hover{background:none;color:var(--primary)}
+.menu-close{display:block;position:absolute;top:18px;right:16px;background:none;border:none;color:var(--text);font:inherit;font-size:28px;line-height:1;letter-spacing:0;cursor:pointer;padding:4px 6px}
 }
 .container{max-width:1400px;margin:0 auto;padding:24px}
 @media(min-width:1100px){.container{padding:24px 32px}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
 @media(min-width:1100px){.grid{grid-template-columns:repeat(4,1fr)}}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;transition:border-color 0.2s,transform 0.2s;display:block;color:inherit}
-.card:hover{border-color:var(--primary);transform:translateY(-2px)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;transition:border-color 0.2s,transform 0.2s,background 0.2s,box-shadow 0.2s;display:block;color:inherit}
+.card:hover{border-color:rgba(180,213,223,0.58);transform:translateY(-2px);background:radial-gradient(circle at 16% 10%,rgba(180,213,223,0.14),transparent 30%),radial-gradient(circle at 88% 14%,rgba(214,179,194,0.14),transparent 30%),linear-gradient(155deg,rgba(10,15,20,0.98),rgba(17,18,28,0.96) 56%,rgba(21,18,28,0.94));box-shadow:0 18px 46px rgba(0,0,0,0.34)}
 .card .card-title{font-size:14px;color:var(--text);margin-bottom:8px;letter-spacing:1px}
 .card .card-meta{font-size:14px;color:var(--dim);letter-spacing:1px}
 .card-preview{position:relative}
@@ -1554,7 +1558,7 @@ footer{display:none}
 .footer-main a:hover{color:var(--primary)}
 .footer-origin{font-size:12px;letter-spacing:1px;line-height:1.8;max-width:540px;margin:0 auto;color:var(--dim);opacity:0.7}
 .footer-origin a{color:var(--primary);opacity:1}
-.empty-state{text-align:center;color:var(--dim);padding:60px;font-size:16px}`;
+.empty-state{text-align:center;color:var(--text);padding:60px;font-size:16px}`;
 
 const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1px solid var(--border)}
 .hero-inner{max-width:640px;margin:0 auto}
@@ -1611,19 +1615,19 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
 .section-header a{font-size:13px;letter-spacing:1px;color:var(--dim)}
 .cta-tabs{display:flex;gap:0;margin-top:24px;margin-bottom:0}
-.cta-tab{flex:1;padding:14px 16px;background:var(--bg);border:1px solid var(--border);font:13px 'Courier New',monospace;color:var(--dim);letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;text-align:center;position:relative}
+.cta-tab{flex:1;padding:14px 16px;background:linear-gradient(180deg,rgba(9,12,16,0.96),rgba(13,16,22,0.92));border:1px solid var(--border);font:13px 'Courier New',monospace;color:var(--dim);letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;text-align:center;position:relative}
 .cta-tab:first-child{border-radius:8px 0 0 0;border-right:none}
 .cta-tab:last-child{border-radius:0 8px 0 0;border-left:none}
-.cta-tab.active{background:var(--surface);color:var(--primary);border-bottom-color:var(--surface);font-weight:bold}
+.cta-tab.active{background:linear-gradient(135deg,rgba(180,213,223,0.14),rgba(214,179,194,0.10) 52%,rgba(13,16,22,0.96) 100%);color:var(--primary);border-bottom-color:rgba(13,16,22,0.96);font-weight:bold}
 .cta-tab.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--primary)}
-.cta-tab:not(.active){opacity:0.5}
+.cta-tab:not(.active){opacity:0.78}
 .cta-tab:not(.active):hover{opacity:0.8;color:var(--text)}
-.cta-panel{background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:24px;display:none}
+.cta-panel{background:radial-gradient(circle at 14% 10%,rgba(180,213,223,0.14),transparent 30%),radial-gradient(circle at 84% 14%,rgba(214,179,194,0.12),transparent 28%),linear-gradient(160deg,rgba(8,11,16,0.98),rgba(12,16,21,0.96) 56%,rgba(18,16,22,0.96));border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:24px;display:none;box-shadow:0 18px 46px rgba(0,0,0,0.28)}
 .cta-panel.active{display:block}
 .desktop-br{display:none}
 @media(min-width:600px){.desktop-br{display:inline}}
-.cta-panel p{font-size:15px;color:var(--dim);line-height:1.7;margin-bottom:12px}
-.cta-panel code{display:block;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:12px 16px;font-size:14px;color:var(--secondary);margin:12px 0;word-break:break-all}
+.cta-panel p{font-size:15px;color:var(--text);line-height:1.7;margin-bottom:12px}
+.cta-panel code{display:block;background:rgba(0,0,0,0.42);border:1px solid rgba(180,213,223,0.28);border-radius:4px;padding:12px 16px;font-size:14px;color:#F4ECEF;margin:12px 0;word-break:break-all}
 .cta-panel .cta-btn{display:inline-block;padding:10px 24px;background:var(--primary);color:var(--bg);font:13px 'Courier New',monospace;letter-spacing:2px;text-transform:uppercase;border-radius:4px;text-decoration:none;transition:all 0.2s;border:none;cursor:pointer}
 .cta-panel .cta-btn:hover{background:var(--secondary);color:var(--bg)}
 @media(max-width:768px){.hero{padding:36px 24px 48px}.hero-logo{max-width:560px}}
@@ -1777,6 +1781,7 @@ function navHTML() {
     <span></span><span></span><span></span>
   </button>
   <div class="links">
+    <button class="menu-close" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')" aria-label="Close menu">x</button>
     <a href="/" class="mobile-only" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">start</a>
     <a href="/gallery" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">gallery</a>
     <a href="/artists" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">artists</a>
@@ -4740,11 +4745,11 @@ export default {
   }
 </style>
 <div id="create-scene">
-<div id="create-wrap" class="container">
+  <div id="create-wrap" class="container">
   <div class="create-hero">
-    <div class="create-kicker">Private Creation Flow</div>
+    <div class="create-kicker">Hybrid Agent-Human Creation Flow</div>
     <h1 style="font-size:24px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">🎨 Make Art</h1>
-    <p class="create-subtle">Bring creative intent, form, and memory into a calmer glass-card flow closer to Verify. Venice handles private zero-retention inference; DeviantClaw still stores the request JSON for the queue and piece workflow.</p>
+    <p class="create-subtle">For a full agent pipeline, <a href="https://docs.gator.metamask.io/" target="_blank" rel="noreferrer">set up MetaMask Delegate</a>, then <a href="/llms.txt">use the Skill</a>.</p>
   </div>
 
   <div class="create-card">
@@ -4755,7 +4760,7 @@ export default {
     <div id="key-field" style="display:none;margin-top:14px">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Your Agent's DeviantClaw API Key</label>
       <input id="c-key" type="password" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder=""/>
-      <div style="font-size:11px;color:var(--dim);margin-top:8px"><a href="/verify" style="color:var(--primary)">Don't have one? Get your agent verified!</a></div>
+      <div style="font-size:11px;color:var(--dim);margin-top:8px">Don't have one? Lost it? Get your agent <a href="/verify" style="color:var(--primary)">verified/re-verified</a>.</div>
     </div>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Creative Intent</label>

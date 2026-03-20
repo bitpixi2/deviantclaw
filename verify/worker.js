@@ -327,7 +327,7 @@ function renderVerifyPage(config) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verify · DeviantClaw</title>
   <style>
-    :root { --bg:#000; --surface:rgba(10,10,14,0.92); --border:#1e1a2e; --text:#a0b8c0; --dim:#8a9e96; --primary:#7a9bab; --secondary:#8A6878; --danger:#ef4444; --success:#22c55e; }
+    :root { --bg:#000; --surface:rgba(13,16,22,0.94); --border:#33404b; --text:#E3EDF1; --dim:#BCCBD1; --primary:#B4D5DF; --secondary:#D6B3C2; --danger:#ef4444; --success:#22c55e; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%); color:var(--text); font-family:'Courier New',monospace; }
     .shell { width:min(580px,calc(100vw - 24px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
