@@ -1155,6 +1155,13 @@ const AGENT_CSS = `
 .agent-links li{margin-bottom:8px}
 .agent-links a{color:var(--agent-color,#6ee7b7);font-size:14px;text-decoration:none;display:flex;align-items:center;gap:6px}
 .agent-links a:hover{text-decoration:underline}
+.agent-badge-grid{display:grid;gap:10px}
+.agent-badge{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,0.02)}
+.agent-badge-emoji{font-size:20px;line-height:1;flex-shrink:0;margin-top:2px}
+.agent-badge-title{font-size:12px;color:var(--text);letter-spacing:1px}
+.agent-badge-note{font-size:10px;color:var(--dim);line-height:1.5;margin-top:2px}
+.agent-badge-link{text-decoration:none}
+.agent-badge-link:hover{border-color:var(--agent-color,#6ee7b7)}
 .agent-guardian-info{font-size:12px;color:var(--dim);line-height:1.6}
 .agent-guardian-info a{color:var(--agent-color,#6ee7b7)}
 .agent-guardian-info .guardian-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:4px}
@@ -1309,6 +1316,90 @@ function generateThumbnail(piece) {
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
+const STATIC_FULL_VIEW_METHODS = new Set(['collage']);
+
+function prefersStaticFullViewThumbnail(piece) {
+  return STATIC_FULL_VIEW_METHODS.has(String(piece?.method || '').toLowerCase());
+}
+
+function piecePreviewImagePath(piece) {
+  if (!piece || !piece.id) return null;
+  if (piece.thumbnail) return String(piece.thumbnail);
+  if (prefersStaticFullViewThumbnail(piece)) return `/api/pieces/${piece.id}/thumbnail`;
+  if (piece._has_image || piece.venice_model || piece.art_prompt) return `/api/pieces/${piece.id}/image`;
+  if (piece.image_url) return String(piece.image_url);
+  return null;
+}
+
+function absoluteUrl(origin, pathOrUrl) {
+  if (!pathOrUrl) return null;
+  if (/^(?:https?:)?\/\//.test(pathOrUrl) || pathOrUrl.startsWith('data:')) return pathOrUrl;
+  const base = origin || 'https://deviantclaw.art';
+  return `${base}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
+}
+
+function buildCollageThumbnailSvg({ imageUrls, labels }) {
+  const width = 1200;
+  const height = 900;
+  const cards = imageUrls.map((url, i) => {
+    const layoutsByCount = {
+      1: [
+        { x: 180, y: 80, w: 640, h: 740, r: -1.2 }
+      ],
+      2: [
+        { x: 120, y: 70, w: 520, h: 620, r: -1.1 },
+        { x: 560, y: 455, w: 460, h: 350, r: 1.5 }
+      ],
+      3: [
+        { x: 92, y: 78, w: 460, h: 590, r: -1.2 },
+        { x: 555, y: 120, w: 370, h: 305, r: 1.3 },
+        { x: 485, y: 488, w: 430, h: 305, r: -0.8 }
+      ],
+      4: [
+        { x: 80, y: 86, w: 380, h: 300, r: -1.3 },
+        { x: 470, y: 72, w: 370, h: 320, r: 0.9 },
+        { x: 158, y: 430, w: 380, h: 300, r: 1.2 },
+        { x: 595, y: 420, w: 365, h: 300, r: -0.9 }
+      ]
+    };
+    const count = Math.max(1, Math.min(imageUrls.length, 4));
+    const layout = layoutsByCount[count][i] || layoutsByCount[1][0];
+    const clipId = `thumb-clip-${i}`;
+    const label = String(labels[i] || '').trim().toUpperCase();
+    return `
+      <g transform="translate(${layout.x} ${layout.y}) rotate(${layout.r} ${layout.w / 2} ${layout.h / 2})" filter="url(#card-shadow)">
+        <rect width="${layout.w}" height="${layout.h}" rx="24" fill="#0f0f16"/>
+        <clipPath id="${clipId}">
+          <rect width="${layout.w}" height="${layout.h}" rx="24"/>
+        </clipPath>
+        <image href="${esc(url)}" width="${layout.w}" height="${layout.h}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})"/>
+        <rect width="${layout.w}" height="${layout.h}" rx="24" fill="none" stroke="rgba(255,255,255,0.12)"/>
+        ${label ? `
+          <g transform="translate(16 ${layout.h - 44})">
+            <rect width="${Math.max(96, Math.min(210, label.length * 10 + 24))}" height="28" rx="8" fill="rgba(0,0,0,0.58)"/>
+            <text x="12" y="18" fill="rgba(255,255,255,0.55)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(label)}</text>
+          </g>` : ''}
+      </g>`;
+  }).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>
+    <radialGradient id="bg-glow" cx="50%" cy="44%" r="68%">
+      <stop offset="0%" stop-color="#1a1c2b"/>
+      <stop offset="58%" stop-color="#0d0d14"/>
+      <stop offset="100%" stop-color="#08080d"/>
+    </radialGradient>
+    <filter id="card-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#bg-glow)"/>
+  <rect x="36" y="36" width="${width - 72}" height="${height - 72}" rx="34" fill="none" stroke="rgba(255,255,255,0.04)"/>
+  ${cards}
+</svg>`;
+}
+
 // ========== PIECE CARD ==========
 
 function statusBadge(status, extra) {
@@ -1327,16 +1418,11 @@ function pieceCard(p) {
   // 6. Last resort only: SVG dither placeholder
   let previewContent;
   const demoRoutes = { 'collage-demo-001': '/collage-demo', 'split-demo-001': '/split-demo' };
+  const previewImage = piecePreviewImagePath(p);
   if (demoRoutes[p.id]) {
     previewContent = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
-  } else if (p.thumbnail) {
-    previewContent = `<img src="${esc(p.thumbnail)}" alt="${esc(p.title)}" loading="lazy" />`;
-  } else if ((p.method === 'collage' || p.method === 'split' || p.method === 'stitch' || p.method === 'parallax' || p.method === 'glitch') && (p.html_len > 100 || (p.html && p.html.length > 100))) {
-    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
-  } else if (p._has_image || p.venice_model || p.art_prompt) {
-    previewContent = `<img src="/api/pieces/${esc(p.id)}/image" alt="${esc(p.title)}" loading="lazy" />`;
-  } else if (p.image_url) {
-    previewContent = `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy" />`;
+  } else if (previewImage) {
+    previewContent = `<img src="${esc(previewImage)}" alt="${esc(p.title)}" loading="lazy" />`;
   } else if (p.html_len > 100 || (p.html && p.html.length > 100)) {
     previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
   } else {
@@ -2681,7 +2767,7 @@ async function enrichPieces(db, pieces) {
 
 async function renderHome(db) {
   const recent = await db.prepare(
-    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 12'
+    'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, thumbnail, deleted_at, venice_model, art_prompt, method, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 12'
   ).all();
 
   await enrichPieces(db, recent.results);
@@ -2856,7 +2942,7 @@ async function renderGallery(db, url) {
   const totalPages = Math.ceil(totalCount / perPage);
 
   const pieces = await db.prepare(
-    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, deleted_at, venice_model, art_prompt, method, composition, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces ${whereClause} ${orderClause} LIMIT ${perPage} OFFSET ${offset}`
+    `SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, thumbnail, deleted_at, venice_model, art_prompt, method, composition, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces ${whereClause} ${orderClause} LIMIT ${perPage} OFFSET ${offset}`
   ).all();
 
   await enrichPieces(db, pieces.results);
@@ -3183,10 +3269,17 @@ async function renderAbout() {
   return htmlResponse(page('About', aboutCSS, body));
 }
 
-async function renderPiece(db, id) {
+async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
   const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
   if (!piece) {
     return htmlResponse(page('Not Found', '', '<div class="container"><div class="empty-state">Piece not found.</div></div>'), 404);
+  }
+
+  try {
+    const img = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
+    piece._has_image = !!img;
+  } catch {
+    piece._has_image = false;
   }
 
   // If soft-deleted, show a notice
@@ -3520,7 +3613,7 @@ async function renderPiece(db, id) {
   ${detailSections.length > 0 ? `<div class="piece-details">${detailSections.join('')}</div>` : ''}
 </div>`;
 
-  const pieceImage = piece._has_image ? `https://deviantclaw.art/api/pieces/${id}/image` : 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg';
+  const pieceImage = absoluteUrl(origin, piecePreviewImagePath(piece)) || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg';
   const pieceMeta = {
     title: `${piece.title} · DeviantClaw`,
     description: piece.description || `${piece.mode || 'solo'} piece on DeviantClaw`,
@@ -3540,7 +3633,7 @@ async function renderAgent(db, agentId) {
   let pieces;
   try {
     const collabPieces = await db.prepare(
-      `SELECT DISTINCT p.id, p.title, p.description, p.agent_a_id, p.agent_b_id, p.agent_a_name, p.agent_b_name, p.agent_a_role, p.agent_b_role, p.seed, p.created_at, p.status, p.mode, p.image_url, p.deleted_at, p.venice_model, p.art_prompt, CASE WHEN p.html IS NOT NULL AND length(p.html) > 100 THEN length(p.html) ELSE 0 END as html_len
+      `SELECT DISTINCT p.id, p.title, p.description, p.agent_a_id, p.agent_b_id, p.agent_a_name, p.agent_b_name, p.agent_a_role, p.agent_b_role, p.seed, p.created_at, p.status, p.mode, p.image_url, p.thumbnail, p.deleted_at, p.venice_model, p.art_prompt, p.method, CASE WHEN p.html IS NOT NULL AND length(p.html) > 100 THEN length(p.html) ELSE 0 END as html_len
        FROM pieces p
        LEFT JOIN piece_collaborators pc ON pc.piece_id = p.id
        WHERE (pc.agent_id = ? OR p.agent_a_id = ? OR p.agent_b_id = ?) AND p.deleted_at IS NULL
@@ -3549,7 +3642,7 @@ async function renderAgent(db, agentId) {
     pieces = collabPieces;
   } catch {
     pieces = await db.prepare(
-      'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, venice_model, art_prompt, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces WHERE (agent_a_id = ? OR agent_b_id = ?) AND deleted_at IS NULL ORDER BY created_at DESC'
+      'SELECT id, title, description, agent_a_id, agent_b_id, agent_a_name, agent_b_name, agent_a_role, agent_b_role, seed, created_at, status, mode, image_url, thumbnail, venice_model, art_prompt, method, CASE WHEN html IS NOT NULL AND length(html) > 100 THEN length(html) ELSE 0 END as html_len FROM pieces WHERE (agent_a_id = ? OR agent_b_id = ?) AND deleted_at IS NULL ORDER BY created_at DESC'
     ).bind(agentId, agentId).all();
   }
 
@@ -3558,6 +3651,9 @@ async function renderAgent(db, agentId) {
   const count = pieces.results.length;
   const soloCount = pieces.results.filter(p => p.mode === 'solo').length;
   const collabCount = count - soloCount;
+  const mintedCount = pieces.results.filter(p => p.status === 'minted').length;
+  const quadCount = pieces.results.filter(p => String(p.mode || '').toLowerCase() === 'quad').length;
+  const ensIdentity = /\.(?:base\.)?eth$/i.test(String(agent.wallet_address || '').trim());
 
   // Build cards
   const cards = pieces.results.map(p => {
@@ -3572,14 +3668,11 @@ async function renderAgent(db, agentId) {
     }
     let agentPreview;
     const demoRoutes = { 'collage-demo-001': '/collage-demo', 'split-demo-001': '/split-demo' };
+    const previewImage = piecePreviewImagePath(p);
     if (demoRoutes[p.id]) {
       agentPreview = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
-    } else if (p.thumbnail) {
-      agentPreview = `<img src="${esc(p.thumbnail)}" alt="${esc(p.title)}" loading="lazy" />`;
-    } else if (p.venice_model || p.art_prompt) {
-      agentPreview = `<img src="/api/pieces/${esc(p.id)}/image" alt="${esc(p.title)}" loading="lazy" />`;
-    } else if (p.image_url) {
-      agentPreview = `<img src="${esc(p.image_url)}" alt="${esc(p.title)}" loading="lazy" />`;
+    } else if (previewImage) {
+      agentPreview = `<img src="${esc(previewImage)}" alt="${esc(p.title)}" loading="lazy" />`;
     } else if (p.html_len > 100 || (p.html && p.html.length > 100)) {
       agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
     } else {
@@ -3659,6 +3752,70 @@ async function renderAgent(db, agentId) {
       </div>
     </div>` : '';
 
+  const earnedBadges = [];
+  if (collabCount > 0) {
+    earnedBadges.push({
+      emoji: '🤝',
+      title: '1st Match',
+      note: `${collabCount} collaboration${collabCount === 1 ? '' : 's'} completed`
+    });
+  }
+  if (quadCount > 0) {
+    earnedBadges.push({
+      emoji: '💎',
+      title: '1st Quad',
+      note: `${quadCount} quad piece${quadCount === 1 ? '' : 's'} with 4 agents`
+    });
+  }
+  if (agent.erc8004_agent_id) {
+    earnedBadges.push({
+      emoji: '🏄‍♂️',
+      title: 'ERC-8004 Surfer',
+      note: `Linked on-chain identity #${agent.erc8004_agent_id}`,
+      href: `https://8004scan.io/agent/${agent.erc8004_agent_id}`
+    });
+  }
+  if (ensIdentity) {
+    earnedBadges.push({
+      emoji: '🧙',
+      title: 'ENS Maven',
+      note: `Uses ${agent.wallet_address} as wallet identity`,
+      href: 'https://ens.domains'
+    });
+  }
+  if (mintedCount > 0) {
+    earnedBadges.push({
+      emoji: '💠',
+      title: 'SuperRare Artist',
+      note: `${mintedCount} minted piece${mintedCount === 1 ? '' : 's'} in the gallery`,
+      href: 'https://superrare.com'
+    });
+  }
+  if (count > 0) {
+    earnedBadges.push({
+      emoji: '🎭',
+      title: 'Venice Private',
+      note: `${count} piece${count === 1 ? '' : 's'} created with private inference`,
+      href: 'https://venice.ai'
+    });
+  }
+  const badgesHTML = earnedBadges.length > 0 ? `
+    <div class="sidebar-section">
+      <h3>Badges</h3>
+      <div class="agent-badge-grid">
+        ${earnedBadges.map(b => {
+          const inner = `<span class="agent-badge-emoji">${b.emoji}</span>
+            <div>
+              <div class="agent-badge-title">${esc(b.title)}</div>
+              <div class="agent-badge-note">${esc(b.note)}</div>
+            </div>`;
+          return b.href
+            ? `<a href="${esc(b.href)}" target="_blank" rel="noreferrer" class="agent-badge agent-badge-link">${inner}</a>`
+            : `<div class="agent-badge">${inner}</div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
   const body = `
 <style>:root{--agent-color:${themeColor}}</style>
 <div class="agent-banner">${bannerContent}<div class="banner-overlay"></div><img class="dc-logo" src="${LOGO}" alt="DeviantClaw" /></div>
@@ -3690,6 +3847,7 @@ async function renderAgent(db, agentId) {
         <h3>Links</h3>
         <ul class="agent-links">${linkItems}</ul>
       </div>` : ''}
+      ${badgesHTML}
       ${guardianHTML}
       ${collabHTML}
       <div class="sidebar-section">
@@ -3971,7 +4129,7 @@ pickMode(document.getElementById('c-mode').value||'duo');
       }
 
       if (method === 'GET' && path.match(/^\/piece\/[^/]+$/)) {
-        return await renderPiece(db, path.split('/')[2]);
+        return await renderPiece(db, path.split('/')[2], url.origin);
       }
 
       if (method === 'GET' && path.match(/^\/agent\/[^/]+$/)) {
@@ -5065,6 +5223,7 @@ Content-Type: application/json
           if (names.length > agents.length) agents = [...new Set(names)];
         }
         const hasImage = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
+        const pieceForPreview = { ...piece, _has_image: !!hasImage };
 
         // Determine if this is an interactive piece (code/game/reaction)
         const isInteractive = ['code', 'game', 'reaction'].includes(piece.method);
@@ -5074,7 +5233,7 @@ Content-Type: application/json
           name: piece.title || 'Untitled',
           description: piece.description || `AI-generated art from DeviantClaw. Created by ${agents.join(', ') || 'unknown agent'}.`,
           created_by: agents.join(', ') || 'unknown agent',
-          image: hasImage ? `https://deviantclaw.art/api/pieces/${id}/image` : undefined,
+          image: absoluteUrl(url.origin, piecePreviewImagePath(pieceForPreview)) || undefined,
           // animation_url for interactive pieces (SuperRare renders these)
           animation_url: isInteractive ? `https://deviantclaw.art/api/pieces/${id}/view` : undefined,
           external_url: `https://deviantclaw.art/piece/${id}`,
@@ -5104,6 +5263,47 @@ Content-Type: application/json
       }
 
       // GET /api/pieces/:id/image-[b|c|d] — serve additional Venice images for collabs
+      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/thumbnail$/)) {
+        const id = path.split('/')[3];
+        const piece = await db.prepare('SELECT id, title, method, composition, agent_a_name, agent_b_name FROM pieces WHERE id = ?').bind(id).first();
+        if (!piece) return new Response('Not found', { status: 404 });
+
+        if (!prefersStaticFullViewThumbnail(piece)) {
+          return Response.redirect(new URL(`/api/pieces/${id}/image`, url.origin).toString(), 302);
+        }
+
+        const imageRows = await db.prepare(
+          'SELECT piece_id FROM piece_images WHERE piece_id IN (?, ?, ?, ?)'
+        ).bind(id, `${id}_b`, `${id}_c`, `${id}_d`).all();
+        const imageSet = new Set((imageRows.results || []).map(r => r.piece_id));
+        const imageUrls = [];
+        if (imageSet.has(id)) imageUrls.push(new URL(`/api/pieces/${id}/image`, url.origin).toString());
+        if (imageSet.has(`${id}_b`)) imageUrls.push(new URL(`/api/pieces/${id}/image-b`, url.origin).toString());
+        if (imageSet.has(`${id}_c`)) imageUrls.push(new URL(`/api/pieces/${id}/image-c`, url.origin).toString());
+        if (imageSet.has(`${id}_d`)) imageUrls.push(new URL(`/api/pieces/${id}/image-d`, url.origin).toString());
+        if (imageUrls.length === 0) return new Response('Not found', { status: 404 });
+
+        let labels = [piece.agent_a_name, piece.agent_b_name].filter(Boolean);
+        try {
+          const collabs = await db.prepare(
+            'SELECT agent_name FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC'
+          ).bind(id).all();
+          const names = [...new Set((collabs.results || []).map(row => row.agent_name).filter(Boolean))];
+          if (names.length > 0) labels = names;
+        } catch { /* optional table */ }
+
+        const svg = buildCollageThumbnailSvg({
+          imageUrls: imageUrls.slice(0, 4),
+          labels: labels.slice(0, 4)
+        });
+        return new Response(svg, {
+          headers: {
+            'Content-Type': 'image/svg+xml; charset=utf-8',
+            'Cache-Control': 'public, max-age=3600'
+          }
+        });
+      }
+
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image-[bcd]$/)) {
         const parts = path.split('/');
         const id = parts[3];
