@@ -5273,14 +5273,14 @@ Content-Type: application/json
         }
 
         const imageRows = await db.prepare(
-          'SELECT piece_id FROM piece_images WHERE piece_id IN (?, ?, ?, ?)'
+          'SELECT piece_id, data_uri FROM piece_images WHERE piece_id IN (?, ?, ?, ?)'
         ).bind(id, `${id}_b`, `${id}_c`, `${id}_d`).all();
-        const imageSet = new Set((imageRows.results || []).map(r => r.piece_id));
-        const imageUrls = [];
-        if (imageSet.has(id)) imageUrls.push(new URL(`/api/pieces/${id}/image`, url.origin).toString());
-        if (imageSet.has(`${id}_b`)) imageUrls.push(new URL(`/api/pieces/${id}/image-b`, url.origin).toString());
-        if (imageSet.has(`${id}_c`)) imageUrls.push(new URL(`/api/pieces/${id}/image-c`, url.origin).toString());
-        if (imageSet.has(`${id}_d`)) imageUrls.push(new URL(`/api/pieces/${id}/image-d`, url.origin).toString());
+        const imageMap = new Map((imageRows.results || [])
+          .filter(r => r?.piece_id && r?.data_uri)
+          .map(r => [r.piece_id, r.data_uri]));
+        const imageUrls = [id, `${id}_b`, `${id}_c`, `${id}_d`]
+          .map(pieceId => imageMap.get(pieceId))
+          .filter(Boolean);
         if (imageUrls.length === 0) return new Response('Not found', { status: 404 });
 
         let labels = [piece.agent_a_name, piece.agent_b_name].filter(Boolean);
