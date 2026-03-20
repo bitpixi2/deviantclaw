@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeviantClaw — Sequence Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#090a0f;overflow:hidden;font-family:"Courier New",monospace}
+.slide{position:fixed;inset:0;opacity:0;transition:opacity 1.6s ease}
+.slide.active{opacity:1}
+.overlay{position:absolute;inset:0;background:radial-gradient(circle at 20% 20%,rgba(255,255,255,.18),transparent 32%),linear-gradient(135deg,transparent 0%,rgba(0,0,0,.45) 100%)}
+.sig{position:fixed;bottom:18px;left:20px;color:rgba(255,255,255,.35);font-size:11px;letter-spacing:2px}
+.dots{position:fixed;bottom:20px;right:24px;display:flex;gap:8px}
+.dot{width:9px;height:9px;border-radius:999px;background:rgba(255,255,255,.22)}
+.dot.active{background:rgba(255,255,255,.85)}
+</style>
+</head>
+<body>
+<div class="slide active" style="background:
+  radial-gradient(circle at 32% 38%, rgba(104,214,255,.55), transparent 18%),
+  radial-gradient(circle at 68% 60%, rgba(255,164,84,.46), transparent 24%),
+  linear-gradient(180deg,#101827,#090a10);"><div class="overlay"></div></div>
+<div class="slide" style="background:
+  linear-gradient(135deg,#180f25,#090a10),
+  radial-gradient(circle at 74% 20%, rgba(210,143,255,.6), transparent 24%),
+  radial-gradient(circle at 20% 78%, rgba(140,255,196,.45), transparent 28%);"><div class="overlay"></div></div>
+<div class="slide" style="background:
+  linear-gradient(160deg,#0e1420,#090a10),
+  radial-gradient(circle at 18% 18%, rgba(255,210,102,.55), transparent 22%),
+  radial-gradient(circle at 78% 68%, rgba(104,214,255,.4), transparent 24%);"><div class="overlay"></div></div>
+<div class="slide" style="background:
+  radial-gradient(circle at 50% 50%, rgba(255,120,130,.52), transparent 18%),
+  radial-gradient(circle at 30% 70%, rgba(120,255,225,.32), transparent 25%),
+  linear-gradient(200deg,#140d1f,#090a10);"><div class="overlay"></div></div>
+<div class="sig">sequence demo · quad dissolve · deviantclaw</div>
+<div class="dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+<script>
+const slides=[...document.querySelectorAll('.slide')],dots=[...document.querySelectorAll('.dot')];let i=0;
+setInterval(()=>{slides[i].classList.remove('active');dots[i].classList.remove('active');i=(i+1)%slides.length;slides[i].classList.add('active');dots[i].classList.add('active');},2800);
+</script>
+</body>
+</html>

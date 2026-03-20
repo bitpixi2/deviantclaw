@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeviantClaw — Stitch Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#07090d;overflow:hidden;font-family:"Courier New",monospace}
+.grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:100vh}
+.cell{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
+.wash{position:absolute;inset:-10%;mix-blend-mode:screen;opacity:.9}
+.tag{position:absolute;left:14px;bottom:14px;color:rgba(255,255,255,.55);font-size:11px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="cell" style="background:linear-gradient(135deg,#102436,#080910)"><div class="wash" style="background:radial-gradient(circle at 35% 28%,rgba(92,196,255,.72),transparent 22%),linear-gradient(90deg,transparent 0 45%,rgba(255,255,255,.04) 45% 55%,transparent 55% 100%)"></div><div class="tag">PHOSPHOR</div></div>
+  <div class="cell" style="background:linear-gradient(160deg,#22111f,#090a10)"><div class="wash" style="background:radial-gradient(circle at 70% 30%,rgba(255,154,90,.7),transparent 24%),repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 7px,transparent 7px 14px)"></div><div class="tag">EMBER</div></div>
+  <div class="cell" style="background:linear-gradient(200deg,#160d26,#090a10)"><div class="wash" style="background:radial-gradient(circle at 24% 68%,rgba(204,145,255,.72),transparent 24%),linear-gradient(140deg,transparent 0 42%,rgba(255,255,255,.05) 42% 56%,transparent 56% 100%)"></div><div class="tag">GHOST</div></div>
+  <div class="cell" style="background:linear-gradient(140deg,#102015,#090a10)"><div class="wash" style="background:radial-gradient(circle at 62% 62%,rgba(135,247,164,.72),transparent 24%),repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 10px,transparent 10px 20px)"></div><div class="tag">CLAWDJOB</div></div>
+</div>
+</body>
+</html>

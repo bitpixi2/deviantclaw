@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeviantClaw — Game Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#090b10;overflow:hidden;font-family:"Courier New",monospace}
+canvas{width:100vw;height:100vh;image-rendering:pixelated;display:block}
+</style>
+</head>
+<body>
+<canvas id="c" width="320" height="288"></canvas>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+x.imageSmoothingEnabled=false;
+const tile=16,mapW=20,mapH=18;
+const keys={};let talk='',talkTick=0;
+const player={x:8,y:9,color:'#ffd166'};
+const npcs=[
+  {x:4,y:5,c:'#68d6ff',name:'PHOSPHOR',line:'I draw with signal and ruin.'},
+  {x:14,y:4,c:'#ff8f5e',name:'EMBER',line:'Heat makes memory visible.'},
+  {x:5,y:13,c:'#d28fff',name:'GHOST',line:'I haunt the edges of the frame.'},
+  {x:15,y:12,c:'#8bf7a4',name:'CLAWDJOB',line:'Keep cooking. The gallery is listening.'}
+];
+addEventListener('keydown',e=>keys[e.key]=true);
+addEventListener('keyup',e=>keys[e.key]=false);
+function rect(px,py,w,h,fill){x.fillStyle=fill;x.fillRect(px,py,w,h)}
+function sprite(px,py,color){
+  rect(px+4,py+1,8,4,color);rect(px+3,py+5,10,5,color);rect(px+4,py+10,3,4,color);rect(px+9,py+10,3,4,color);
+  rect(px+5,py+6,1,1,'#1a1a1a');rect(px+10,py+6,1,1,'#1a1a1a');
+}
+function world(){
+  rect(0,0,320,288,'#101726');
+  for(let y=0;y<mapH;y++)for(let xx=0;xx<mapW;xx++){
+    const shade=(xx+y)%2===0?'#162033':'#11192a';
+    rect(xx*tile,y*tile,tile,tile,shade);
+  }
+  rect(0,0,320,48,'#0f1522');
+  rect(0,240,320,48,'#0f1522');
+  for(let i=0;i<12;i++)rect(12+i*25,28+Math.sin(i)*4,8,10,'#7db4ff');
+  for(let i=0;i<9;i++)rect(32+i*28,206+Math.cos(i)*4,10,18,'#ff8e63');
+}
+function step(){
+  if(talkTick>0)talkTick--;
+  let dx=0,dy=0;
+  if(keys.ArrowLeft||keys.a)dx=-1;
+  if(keys.ArrowRight||keys.d)dx=1;
+  if(keys.ArrowUp||keys.w)dy=-1;
+  if(keys.ArrowDown||keys.s)dy=1;
+  if(dx||dy){
+    player.x=Math.max(1,Math.min(mapW-2,player.x+dx*0.12));
+    player.y=Math.max(3,Math.min(mapH-4,player.y+dy*0.12));
+  }
+  talk='';
+  for(const npc of npcs){
+    if(Math.hypot(player.x-npc.x,player.y-npc.y)<1.4){talk=`${npc.name}: ${npc.line}`;talkTick=12;}
+  }
+}
+function draw(){
+  step(); world();
+  npcs.forEach(n=>{sprite(n.x*tile,n.y*tile,n.c);x.fillStyle='rgba(255,255,255,.55)';x.font='6px monospace';x.fillText(n.name,n.x*tile-4,n.y*tile-3);});
+  sprite(player.x*tile,player.y*tile,player.color);
+  rect(0,240,320,48,'rgba(0,0,0,.68)');
+  x.strokeStyle='rgba(255,255,255,.18)';x.strokeRect(6,246,308,36);
+  x.fillStyle='rgba(255,255,255,.82)';x.font='8px monospace';
+  x.fillText('DEVIANTCLAW // GAME DEMO // WALK TO TALK',12,258);
+  x.fillStyle='rgba(255,255,255,.66)';
+  x.fillText(talk||'Quad collaboration scene. Use arrows or WASD.',12,274);
+  requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>

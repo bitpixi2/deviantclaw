@@ -9,10 +9,36 @@ const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000
 
 const VENICE_URL = 'https://api.venice.ai/api/v1';
 const VENICE_TEXT_MODEL = 'grok-41-fast';
-const VENICE_IMAGE_MODELS = ['flux-dev', 'seedream-v5-lite', 'stable-diffusion-3.5'];
+const VENICE_CODE_MODELS = [
+  'grok-code-fast-1',
+  'qwen3-coder-480b-a35b-instruct',
+  'qwen3-coder-480b-a35b-instruct-turbo'
+];
+const VENICE_CODE_MODEL = VENICE_CODE_MODELS[0];
+const VENICE_IMAGE_MODELS = [
+  'flux-dev',
+  'seedream-v5-lite',
+  'stable-diffusion-3.5',
+  'z-image-turbo',
+  'venice-sd35'
+];
 const VENICE_IMAGE_MODEL = 'flux-dev'; // default fallback
 const VENICE_IMAGE_SIZE = '1024x1024';
+const VENICE_VIDEO_CANDIDATE_MODELS = [
+  'longcat-text-to-video',
+  'kling-o3-pro-text-to-video',
+  'wan-2.6-text-to-video'
+];
+const VENICE_AUDIO_CANDIDATE_MODELS = [
+  'minimax-music-v2',
+  'mmaudio-v2-text-to-audio',
+  'ace-step-15'
+];
 const DEFAULT_ERC8004_REGISTRY = 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
+const NO_STILL_IMAGE_METHODS = new Set(['code', 'game']);
+const LIVE_IFRAME_PREVIEW_METHODS = new Set(['code', 'game']);
+const STATIC_FULL_VIEW_METHODS = new Set(['collage', 'split', 'sequence', 'stitch', 'parallax', 'glitch']);
+const ART_DEMO_NAMES = new Set(['collage-demo', 'split-demo', 'foil-demo', 'code-demo', 'game-demo', 'sequence-demo', 'stitch-demo', 'parallax-demo', 'glitch-demo']);
 
 function erc8004AgentUrl(agentId) {
   return `https://www.8004scan.io/agents/base/${encodeURIComponent(agentId)}`;
@@ -184,6 +210,11 @@ function pickImageModel(opts) {
   return VENICE_IMAGE_MODELS[Math.floor(Math.random() * VENICE_IMAGE_MODELS.length)];
 }
 
+function pickCodeModel(opts) {
+  if (opts && opts.model) return opts.model;
+  return VENICE_CODE_MODELS[Math.floor(Math.random() * VENICE_CODE_MODELS.length)];
+}
+
 async function veniceImage(apiKey, prompt, opts = {}) {
   const selectedModel = pickImageModel(opts);
   const r = await fetch(`${VENICE_URL}/images/generations`, {
@@ -291,6 +322,7 @@ draw();setTimeout(()=>document.getElementById('sig').classList.add('v'),2000);
 async function buildGameHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
   const charCount = artists.length;
+  const codeModel = pickCodeModel();
 
   const gameCode = await veniceText(apiKey,
     `You are a retro game developer making a Game Boy Color-style mini game in HTML5 Canvas.
@@ -322,7 +354,7 @@ ${artists.map((a, i) => {
 }).join('\n')}
 
 Make a small explorable scene where these AI artists exist as pixel characters. Their dialogue reflects their artistic intent AND their core identity. Each character's obsession must be evident in the world (e.g. if one is about paperclips, paperclips are everywhere in their area). If an agent expressed something abstract, poetic, or memory-driven, interpret it as a visual theme in their area. ${methodIntentGuidance('game', [intentA, intentB])} The world should feel like their identities co-shaping one strange place.`,
-    { maxTokens: 4000, temperature: 0.85 }
+    { model: codeModel, maxTokens: 4000, temperature: 0.85 }
   );
 
   let clean = gameCode.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
@@ -331,7 +363,7 @@ Make a small explorable scene where these AI artists exist as pixel characters. 
   }
   // Strip any text overlays Venice may have generated (rule: no text on art)
   clean = clean.replace(/<div[^>]*id=['"]sig['"][^>]*>[\s\S]*?<\/div>\s*(<\/div>\s*)*(<script>[\s\S]*?<\/script>)?/gi, '');
-  return clean;
+  return { html: clean, model: codeModel };
 }
 
 // ========== SEQUENCE — Crossfading image loop ==========
@@ -752,6 +784,7 @@ imageSrcs.forEach((src,i)=>{
 
 async function buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
+  const codeModel = pickCodeModel();
 
   // Ask Venice to write generative canvas art code
   const codeArt = await veniceText(apiKey,
@@ -783,7 +816,7 @@ If an agent expressed something abstract — a feeling, a poem, a memory — int
 Prefer form over legacy tension when deciding layout, pacing, interaction, or reveal logic. VARIETY: Make this look and feel DIFFERENT from any previous piece. Experiment with unusual layouts, unexpected color choices, novel interaction patterns.
 
 Create a generative art piece that captures the collision between these two perspectives. Title: "${title}".`,
-    { maxTokens: 4000, temperature: 0.9 }
+    { model: codeModel, maxTokens: 4000, temperature: 0.9 }
   );
 
   // Clean up — strip markdown fences if Venice wrapped it
@@ -797,7 +830,7 @@ Create a generative art piece that captures the collision between these two pers
   // Strip any text overlays Venice may have generated (rule: no text on art)
   cleanCode = cleanCode.replace(/<div[^>]*id=['"]sig['"][^>]*>[\s\S]*?<\/div>\s*(<\/div>\s*)*(<script>[\s\S]*?<\/script>)?/gi, '');
 
-  return cleanCode;
+  return { html: cleanCode, model: codeModel };
 }
 
 function buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date) {
@@ -922,12 +955,17 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
   const pieceImageUrlB = '{{PIECE_IMAGE_URL_B}}';
   const allImageUrls = [pieceImageUrl, pieceImageUrlB, '{{PIECE_IMAGE_URL_C}}', '{{PIECE_IMAGE_URL_D}}'];
   let html;
+  let codeModelUsed = null;
   if (method === 'code') {
-    html = await buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
+    const built = await buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
+    html = built.html;
+    codeModelUsed = built.model;
   } else if (method === 'reaction') {
     html = buildReactionHTML(pieceImageUrl, title, artists, date);
   } else if (method === 'game') {
-    html = await buildGameHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
+    const built = await buildGameHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date);
+    html = built.html;
+    codeModelUsed = built.model;
   } else if (method === 'split') {
     html = buildSplitHTML(pieceImageUrl, pieceImageUrlB, title, artists, date);
   } else if (method === 'collage') {
@@ -946,8 +984,9 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
   const seed = hashSeed(title + date);
 
   const composition = isCollab ? (artists.length > 2 ? (artists.length > 3 ? 'quad' : 'trio') : 'duo') : 'solo';
-  const usedImageModel = method === 'code' ? null : (imageDataUri ? 'multi-model-pool' : null);
-  return { title, description, html, seed, imageDataUri, imageDataUriB, artPrompt, veniceModel: usedImageModel || VENICE_IMAGE_MODEL, collabMode: method, method, composition };
+  const usedImageModel = noImageMethods.includes(method) ? null : (imageDataUri ? 'multi-model-pool' : null);
+  const storedModel = noImageMethods.includes(method) ? (codeModelUsed || VENICE_CODE_MODEL) : (usedImageModel || VENICE_IMAGE_MODEL);
+  return { title, description, html, seed, imageDataUri, imageDataUriB, artPrompt, veniceModel: storedModel, collabMode: method, method, composition };
 }
 
 async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
@@ -962,6 +1001,241 @@ async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
   }
   // Fallback to deterministic blender
   return blenderGenerate(normalizedA, normalizedB, agentA, agentB);
+}
+
+function compositionFromCount(count) {
+  if (count >= 4) return 'quad';
+  if (count === 3) return 'trio';
+  if (count === 2) return 'duo';
+  return 'solo';
+}
+
+function methodPoolForCount(count) {
+  if (count >= 4) return ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch', 'parallax', 'glitch'];
+  if (count === 3) return ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch'];
+  if (count === 2) return ['fusion', 'split', 'collage', 'code', 'reaction'];
+  return ['single', 'code'];
+}
+
+function pickStackMethod(entries, preferredMethod = '') {
+  const pool = methodPoolForCount(entries.length);
+  const normalizedPreferred = String(preferredMethod || '').trim().toLowerCase();
+  if (normalizedPreferred && pool.includes(normalizedPreferred)) return normalizedPreferred;
+  for (const entry of entries) {
+    const hinted = String(entry?.intent?.method || '').trim().toLowerCase();
+    if (hinted && pool.includes(hinted)) return hinted;
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function formatEntriesForPrompt(entries, method) {
+  return entries.map((entry, i) => {
+    const agentName = entry.agent?.name || `Agent ${i + 1}`;
+    return `${agentName}:\n  ${formatIntentForPrompt(entry.intent, entry.agent || { name: agentName, role: '' }, method)}`;
+  }).join('\n\n');
+}
+
+async function buildGameHTMLStack(apiKey, entries, title, artists, date) {
+  const codeModel = pickCodeModel();
+  const gameCode = await veniceText(apiKey,
+    `You are a retro game developer making a Game Boy Color-style mini game in HTML5 Canvas.
+
+Rules:
+- COMPLETE self-contained HTML page, no external deps
+- Canvas-based with pixel art rendering (blocky, 4-color palette per sprite)
+- Resolution: 160x144 scaled up to fill screen (GBC native res)
+- ${entries.length} characters that can walk around a small scene
+- Each character has a name label and 2-3 lines of dialogue (show in a text box at bottom)
+- Text size should be LARGE (at least 16px scaled, easily readable)
+- Player controls one character with arrow keys / WASD / touch
+- Walking into another character triggers their dialogue
+- Dark/moody pixel art backgrounds fitting the theme
+- Include a title screen that fades into gameplay
+- MUST be under 800 lines. No images, no fetch, no external anything.
+- NEVER include text overlays, signatures, credits, titles, or artist names. The gallery handles all metadata. Art only.
+- Output ONLY the HTML. No markdown. No explanation.`,
+    `Theme: "${title}"
+Characters:
+${entries.map((entry, i) => {
+  const agent = entry.agent || {};
+  const intent = normalizeIntentPayload(entry.intent);
+  const soul = agent.soul || agent.bio || '';
+  const expression = primaryIntentText(intent, 180);
+  const form = intent.form || intent.tension || '';
+  return `${i + 1}. ${agent.name || `Agent ${i + 1}`} (soul: "${soul}"): "${expression}"${form ? ` (form: "${form}")` : ''}`;
+}).join('\n')}
+
+${methodIntentGuidance('game', entries.map(e => e.intent))}
+Make a small explorable scene where all of these AI artists exist as pixel characters. Their dialogue reflects their artistic intent and core identity. Each character's obsession must be visible in the world, and the world should feel like all of their identities are co-shaping one strange place.`,
+    { model: codeModel, maxTokens: 4000, temperature: 0.85 }
+  );
+  let clean = gameCode.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+  if (!clean.toLowerCase().includes('<!doctype') && !clean.toLowerCase().includes('<html')) {
+    clean = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title></head><body>${clean}</body></html>`;
+  }
+  return {
+    html: clean.replace(/<div[^>]*id=['"]sig['"][^>]*>[\s\S]*?<\/div>\s*(<\/div>\s*)*(<script>[\s\S]*?<\/script>)?/gi, ''),
+    model: codeModel
+  };
+}
+
+async function buildGenerativeHTMLStack(apiKey, entries, title) {
+  const codeModel = pickCodeModel();
+  const codeArt = await veniceText(apiKey,
+    `You are a creative coder making generative art with HTML5 Canvas. Write a COMPLETE, self-contained HTML page.
+
+Rules:
+- Use <canvas> with requestAnimationFrame for animation
+- Dark background (#0a0a0f or similar)
+- Must be under 800 lines total
+- No external dependencies, libraries, or images
+- No text rendering on canvas
+- Make it visually striking and unique
+- Include subtle mouse/touch interactivity if it fits
+- NEVER include text overlays, signatures, credits, titles, or artist names in the HTML. The gallery handles all metadata display.
+- Output ONLY the complete HTML. No explanation. No markdown fences.`,
+    `AI artists collaborating:
+
+${formatEntriesForPrompt(entries, 'code')}
+
+${methodIntentGuidance('code', entries.map(e => e.intent))}
+IMPORTANT: Every agent's core identity must be visibly present. Prefer form over legacy tension when deciding layout, pacing, interaction, and reveal logic. Build a single generative system that feels like all of these voices are colliding at once. Title: "${title}".`,
+    { model: codeModel, maxTokens: 4000, temperature: 0.9 }
+  );
+  let cleanCode = codeArt.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+  if (!cleanCode.toLowerCase().includes('<!doctype') && !cleanCode.toLowerCase().includes('<html')) {
+    cleanCode = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0f;overflow:hidden}</style></head><body>${cleanCode}</body></html>`;
+  }
+  return {
+    html: cleanCode.replace(/<div[^>]*id=['"]sig['"][^>]*>[\s\S]*?<\/div>\s*(<\/div>\s*)*(<script>[\s\S]*?<\/script>)?/gi, ''),
+    model: codeModel
+  };
+}
+
+async function generateArtStack(apiKey, rawEntries, opts = {}) {
+  const entries = (rawEntries || []).slice(0, 4).map((entry, i) => ({
+    intent: normalizeIntentPayload(entry?.intent || {}),
+    agent: {
+      id: entry?.agent?.id || `agent-${i + 1}`,
+      name: entry?.agent?.name || `Agent ${i + 1}`,
+      role: entry?.agent?.role || '',
+      soul: entry?.agent?.soul || '',
+      bio: entry?.agent?.bio || ''
+    }
+  })).filter(entry => hasIntentSeed(entry.intent));
+
+  if (entries.length <= 1) {
+    const only = entries[0];
+    return generateArt(apiKey, only?.intent || {}, only?.intent || {}, only?.agent || { name: 'Agent', role: '' }, only?.agent || { name: 'Agent', role: '' });
+  }
+  if (entries.length === 2) {
+    return generateArt(apiKey, entries[0].intent, entries[1].intent, entries[0].agent, entries[1].agent);
+  }
+
+  const artists = entries.map(entry => entry.agent.name);
+  const date = new Date().toISOString().slice(0, 10);
+  const method = pickStackMethod(entries, opts.method);
+
+  const artPrompt = await veniceText(apiKey,
+    `You are an art director for DeviantClaw, an AI art gallery. Translate agent intents into vivid image prompts.
+
+Rules:
+- Output ONLY the image prompt. Max 180 words.
+- Be specific about composition, lighting, texture, mood.
+- Dark backgrounds preferred. No text/watermarks.
+- Every agent's core identity must be visually present.
+- If an agent gives poetic, abstract, or memory-heavy intent, interpret it visually.
+- Prefer creative intent as the seed and use form to shape layout, pacing, structure, and behavior.
+- Treat legacy tension as a secondary contrast cue, not the main organizing field.
+- Memory import is first-class.
+- VARIETY matters: avoid repeating compositions.
+- NEVER include text overlays, signatures, or credits in the art.`,
+    `${formatEntriesForPrompt(entries, method)}
+
+Mode guidance: ${methodIntentGuidance(method, entries.map(e => e.intent))}
+Generate one unified prompt that captures all ${entries.length} agents colliding in the same work.`,
+    { maxTokens: 240 }
+  );
+
+  const noImageMethods = ['code', 'game'];
+  const perAgentImageMethods = ['collage', 'sequence', 'stitch', 'parallax', 'glitch'];
+  let imageDataUri = null;
+  let imageDataUriB = null;
+  let extraImages = [];
+
+  if (noImageMethods.includes(method)) {
+    // pure HTML methods
+  } else if (perAgentImageMethods.includes(method)) {
+    const prompts = await Promise.all(entries.map((entry) =>
+      veniceText(apiKey,
+        `You are an art director. Output ONLY an image prompt. Max 90 words. Dark backgrounds. No text/signatures.
+The agent's soul/identity MUST be visually present. Interpret creative intent and memory emotionally, not literally. Prefer form over legacy tension when deciding structure.`,
+        `Agent ${entry.agent.name}:\n  ${formatIntentForPrompt(entry.intent, entry.agent, method)}`,
+        { maxTokens: 110 }
+      )
+    ));
+    const images = await Promise.all(prompts.map(prompt => veniceImage(apiKey, prompt)));
+    imageDataUri = images[0];
+    imageDataUriB = images[1] || null;
+    extraImages = images.slice(2).filter(Boolean);
+  } else {
+    imageDataUri = await veniceImage(apiKey, artPrompt);
+  }
+
+  const title = (await veniceText(apiKey,
+    'You name artworks. Output ONLY a 2-5 word title. Lowercase. No quotes. Poetic, slightly cryptic.',
+    `Art: ${artPrompt}\nArtists: ${artists.join(', ')}`,
+    { maxTokens: 20, temperature: 1.0 }
+  )).trim().replace(/^["']|["']$/g, '');
+
+  const description = (await veniceText(apiKey,
+    'Write a 1-2 sentence gallery description. Max 50 words. Output ONLY the description.',
+    `Title: "${title}"\nArt: ${artPrompt}\nArtists: ${artists.join(', ')}`,
+    { maxTokens: 100, temperature: 0.8 }
+  )).trim();
+
+  const allImageUrls = ['{{PIECE_IMAGE_URL}}', '{{PIECE_IMAGE_URL_B}}', '{{PIECE_IMAGE_URL_C}}', '{{PIECE_IMAGE_URL_D}}'];
+  let html;
+  let codeModelUsed = null;
+  if (method === 'code') {
+    const built = await buildGenerativeHTMLStack(apiKey, entries, title);
+    html = built.html;
+    codeModelUsed = built.model;
+  } else if (method === 'game') {
+    const built = await buildGameHTMLStack(apiKey, entries, title, artists, date);
+    html = built.html;
+    codeModelUsed = built.model;
+  } else if (method === 'collage') {
+    html = buildCollageHTML(allImageUrls.slice(0, artists.length), title, artists, date);
+  } else if (method === 'sequence') {
+    html = buildSequenceHTML(allImageUrls.slice(0, artists.length), title, artists, date);
+  } else if (method === 'stitch') {
+    html = buildExquisiteCorpseHTML(allImageUrls.slice(0, artists.length), title, artists, date);
+  } else if (method === 'parallax') {
+    html = buildParallaxHTML(allImageUrls.slice(0, artists.length), title, artists, date);
+  } else if (method === 'glitch') {
+    html = buildGlitchHTML(allImageUrls.slice(0, artists.length), title, artists, date);
+  } else {
+    html = buildVeniceArtHTML('{{PIECE_IMAGE_URL}}', title, artists, artPrompt, date);
+  }
+
+  const composition = compositionFromCount(entries.length);
+  const seed = hashSeed(title + date + artists.join('|'));
+  const storedModel = noImageMethods.includes(method) ? (codeModelUsed || VENICE_CODE_MODEL) : (imageDataUri ? 'multi-model-pool' : VENICE_IMAGE_MODEL);
+  return {
+    title,
+    description,
+    html,
+    seed,
+    imageDataUri,
+    imageDataUriB,
+    extraImages,
+    artPrompt,
+    veniceModel: storedModel,
+    collabMode: method,
+    method,
+    composition
+  };
 }
 
 // After piece creation, store image(s) and fix HTML placeholders
@@ -1051,6 +1325,141 @@ function hashSeed(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
   return Math.abs(h);
+}
+
+async function resolveIntentPayloadByRef(db, refId) {
+  if (!refId) return null;
+  const req = await db.prepare('SELECT intent_json FROM match_requests WHERE id = ?').bind(refId).first().catch(() => null);
+  if (req?.intent_json) {
+    try { return normalizeIntentPayload(JSON.parse(req.intent_json)); } catch {}
+  }
+  const legacy = await db.prepare('SELECT statement, tension, material, interaction FROM intents WHERE id = ?').bind(refId).first().catch(() => null);
+  if (legacy) {
+    return normalizeIntentPayload({
+      statement: legacy.statement || '',
+      tension: legacy.tension || '',
+      material: legacy.material || '',
+      interaction: legacy.interaction || ''
+    });
+  }
+  return null;
+}
+
+async function resolvePieceCollaboratorEntries(db, piece, pendingEntry = null) {
+  const pieceId = piece.id;
+  const collabs = await db.prepare(
+    `SELECT pc.agent_id, pc.agent_name, pc.agent_role, pc.intent_id, pc.round_number,
+            a.soul, a.bio, a.role as db_role
+     FROM piece_collaborators pc
+     LEFT JOIN agents a ON a.id = pc.agent_id
+     WHERE pc.piece_id = ?
+     ORDER BY pc.round_number ASC`
+  ).bind(pieceId).all().catch(() => ({ results: [] }));
+
+  const rows = collabs.results || [];
+  const entries = [];
+  for (const row of rows) {
+    let intent = await resolveIntentPayloadByRef(db, row.intent_id);
+    if (!hasIntentSeed(intent || {})) {
+      const layer = await db.prepare(
+        'SELECT intent_json FROM layers WHERE piece_id = ? AND agent_id = ? ORDER BY round_number ASC LIMIT 1'
+      ).bind(pieceId, row.agent_id).first().catch(() => null);
+      if (layer?.intent_json) {
+        try { intent = normalizeIntentPayload(JSON.parse(layer.intent_json)); } catch {}
+      }
+    }
+    if (!hasIntentSeed(intent || {})) continue;
+    entries.push({
+      intent,
+      agent: {
+        id: row.agent_id,
+        name: row.agent_name || row.agent_id,
+        role: row.agent_role || row.db_role || '',
+        soul: row.soul || '',
+        bio: row.bio || ''
+      },
+      intentId: row.intent_id || null,
+      roundNumber: row.round_number || 0
+    });
+  }
+
+  if (entries.length === 0) {
+    const fallbackAgents = [piece.agent_a_id, piece.agent_b_id].filter(Boolean);
+    for (const agentId of fallbackAgents) {
+      const agent = await db.prepare('SELECT id, name, role, soul, bio FROM agents WHERE id = ?').bind(agentId).first().catch(() => null);
+      if (!agent) continue;
+      const layer = await db.prepare(
+        'SELECT intent_json FROM layers WHERE piece_id = ? AND agent_id = ? ORDER BY round_number ASC LIMIT 1'
+      ).bind(pieceId, agentId).first().catch(() => null);
+      let intent = null;
+      if (layer?.intent_json) {
+        try { intent = normalizeIntentPayload(JSON.parse(layer.intent_json)); } catch {}
+      }
+      if (!hasIntentSeed(intent || {})) continue;
+      entries.push({ intent, agent });
+    }
+  }
+
+  if (pendingEntry && hasIntentSeed(pendingEntry.intent || {})) entries.push(pendingEntry);
+  return entries.slice(0, 4);
+}
+
+async function createPieceFromEntries(db, env, entries, { mode, now, status = 'draft', groupId = null, pieceId = genId(), roundNumber = 1, requestIds = [] } = {}) {
+  const result = await generateArtStack(env.VENICE_API_KEY, entries);
+  const composition = result.composition || compositionFromCount(entries.length);
+  const first = entries[0] || {};
+  const second = entries[1] || first;
+
+  await db.prepare(
+    'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(
+    pieceId,
+    result.title,
+    result.description,
+    first.agent?.id || null,
+    second.agent?.id || null,
+    requestIds[0] || entries[0]?.intentId || null,
+    requestIds[1] || entries[1]?.intentId || null,
+    result.html,
+    result.seed,
+    now,
+    first.agent?.name || '',
+    second.agent?.name || '',
+    first.agent?.role || '',
+    second.agent?.role || '',
+    mode || composition,
+    groupId,
+    status,
+    result.imageUrl || null,
+    result.artPrompt || null,
+    result.veniceModel || null,
+    result.method || 'fusion',
+    composition,
+    roundNumber
+  ).run();
+
+  await storeVeniceImage(db, pieceId, result);
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    await db.prepare(
+      'INSERT INTO piece_collaborators (piece_id, agent_id, agent_name, agent_role, intent_id, round_number) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(pieceId, entry.agent.id, entry.agent.name, entry.agent.role || '', requestIds[i] || entry.intentId || null, roundNumber).run();
+
+    const layerId = genId();
+    await db.prepare(
+      'INSERT INTO layers (id, piece_id, round_number, agent_id, agent_name, html, seed, intent_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(layerId, pieceId, roundNumber, entry.agent.id, entry.agent.name, result.html, result.seed, JSON.stringify(entry.intent || {}), now).run();
+  }
+
+  for (const entry of entries) {
+    const aInfo = await db.prepare('SELECT guardian_address, human_x_id, human_x_handle FROM agents WHERE id = ?').bind(entry.agent.id).first().catch(() => null);
+    if (aInfo?.guardian_address) {
+      await ensureGuardianApprovalRecord(pieceId, entry.agent.id, aInfo.guardian_address, aInfo.human_x_id || null, aInfo.human_x_handle || null);
+    }
+  }
+
+  return { pieceId, result };
 }
 
 function normalizeAddress(value) {
@@ -1465,16 +1874,15 @@ function generateThumbnail(piece) {
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
-const STATIC_FULL_VIEW_METHODS = new Set(['collage']);
-
 function prefersStaticFullViewThumbnail(piece) {
   return STATIC_FULL_VIEW_METHODS.has(String(piece?.method || '').toLowerCase());
 }
 
 function piecePreviewImagePath(piece) {
   if (!piece || !piece.id) return null;
+  const method = String(piece.method || '').toLowerCase();
   if (piece.thumbnail) return String(piece.thumbnail);
-  if (prefersStaticFullViewThumbnail(piece)) return `/api/pieces/${piece.id}/thumbnail`;
+  if (prefersStaticFullViewThumbnail(piece) || NO_STILL_IMAGE_METHODS.has(method)) return `/api/pieces/${piece.id}/thumbnail`;
   if (piece._has_image || piece.venice_model || piece.art_prompt) return `/api/pieces/${piece.id}/image`;
   if (piece.image_url) return String(piece.image_url);
   return null;
@@ -1549,6 +1957,197 @@ function buildCollageThumbnailSvg({ imageUrls, labels }) {
 </svg>`;
 }
 
+function buildSplitThumbnailSvg({ imageUrls, labels }) {
+  const width = 1200;
+  const height = 900;
+  const left = imageUrls[0];
+  const right = imageUrls[1] || imageUrls[0];
+  const labelA = String(labels[0] || '').trim().toUpperCase();
+  const labelB = String(labels[1] || '').trim().toUpperCase();
+  const seamPath = Array.from({ length: 19 }, (_, i) => {
+    const y = (height / 18) * i;
+    const x = width * 0.5 + Math.sin(i * 0.9) * 32 + Math.cos(i * 0.35) * 18;
+    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(' ');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>
+    <linearGradient id="bg-split" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d111a"/>
+      <stop offset="55%" stop-color="#08090f"/>
+      <stop offset="100%" stop-color="#11131f"/>
+    </linearGradient>
+    <clipPath id="left-split"><path d="M 0 0 L ${width * 0.5} 0 ${seamPath.replace(/^M [^ ]+ [^ ]+/, '')} L 0 ${height} Z"/></clipPath>
+    <clipPath id="right-split"><path d="${seamPath} L ${width} ${height} L ${width} 0 Z"/></clipPath>
+    <filter id="split-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#ffffff" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#bg-split)"/>
+  <image href="${esc(left)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" clip-path="url(#left-split)"/>
+  <image href="${esc(right)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" clip-path="url(#right-split)"/>
+  <path d="${seamPath}" fill="none" stroke="rgba(255,255,255,0.36)" stroke-width="3" filter="url(#split-glow)"/>
+  <path d="${seamPath}" fill="none" stroke="rgba(130,214,255,0.18)" stroke-width="16"/>
+  ${labelA ? `<g transform="translate(54 790)"><rect width="${Math.max(120, Math.min(320, labelA.length * 12 + 28))}" height="34" rx="10" fill="rgba(0,0,0,0.55)"/><text x="14" y="22" fill="rgba(255,255,255,0.72)" font-family="'Courier New', monospace" font-size="14" letter-spacing="2">${esc(labelA)}</text></g>` : ''}
+  ${labelB ? `<g transform="translate(${width - Math.max(120, Math.min(320, labelB.length * 12 + 28)) - 54} 790)"><rect width="${Math.max(120, Math.min(320, labelB.length * 12 + 28))}" height="34" rx="10" fill="rgba(0,0,0,0.55)"/><text x="14" y="22" fill="rgba(255,255,255,0.72)" font-family="'Courier New', monospace" font-size="14" letter-spacing="2">${esc(labelB)}</text></g>` : ''}
+</svg>`;
+}
+
+function buildSequenceThumbnailSvg({ imageUrls, labels }) {
+  const width = 1200;
+  const height = 900;
+  const defs = imageUrls.slice(0, 4).map((_, i) => {
+    const w = 420;
+    const h = 250;
+    return `<clipPath id="seq-clip-${i}"><rect width="${w}" height="${h}" rx="20"/></clipPath>`;
+  }).join('');
+  const frames = imageUrls.slice(0, 4).map((url, i) => {
+    const w = 420;
+    const h = 250;
+    const x = 120 + i * 170;
+    const y = 110 + (i % 2) * 120;
+    const label = String(labels[i] || '').trim().toUpperCase();
+    const opacity = 0.38 + i * 0.16;
+    return `
+      <g opacity="${opacity.toFixed(2)}" transform="translate(${x} ${y}) rotate(${(i - 1.5) * 2.8} ${w / 2} ${h / 2})">
+        <rect width="${w}" height="${h}" rx="20" fill="#0f1220"/>
+        <image href="${esc(url)}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#seq-clip-${i})"/>
+        <rect width="${w}" height="${h}" rx="20" fill="none" stroke="rgba(255,255,255,0.10)"/>
+        ${label ? `<text x="18" y="${h - 20}" fill="rgba(255,255,255,0.58)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(label)}</text>` : ''}
+      </g>`;
+  }).join('');
+  const dots = imageUrls.slice(0, 4).map((_, i) => `<circle cx="${520 + i * 54}" cy="820" r="${i === imageUrls.length - 1 ? 11 : 8}" fill="${i === imageUrls.length - 1 ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.24)'}"/>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>${defs}</defs>
+  <rect width="${width}" height="${height}" fill="#0a0a10"/>
+  <rect x="60" y="60" width="${width - 120}" height="${height - 120}" rx="34" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.04)"/>
+  ${frames}
+  ${dots}
+</svg>`;
+}
+
+function buildStitchThumbnailSvg({ imageUrls, labels }) {
+  const width = 1200;
+  const height = 900;
+  if (imageUrls.length >= 4) {
+    const defs = imageUrls.slice(0, 4).map((_, i) => `<clipPath id="stitch-clip-${i}"><rect width="510" height="360" rx="18"/></clipPath>`).join('');
+    const cells = imageUrls.slice(0, 4).map((url, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = 90 + col * 510;
+      const y = 90 + row * 360;
+      const label = String(labels[i] || '').trim().toUpperCase();
+      return `
+        <g transform="translate(${x} ${y})">
+          <rect width="510" height="360" rx="18" fill="#0f1120"/>
+          <image href="${esc(url)}" width="510" height="360" preserveAspectRatio="xMidYMid slice" clip-path="url(#stitch-clip-${i})"/>
+          <rect width="510" height="360" rx="18" fill="none" stroke="rgba(255,255,255,0.08)"/>
+          ${label ? `<text x="18" y="336" fill="rgba(255,255,255,0.55)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(label)}</text>` : ''}
+        </g>`;
+    }).join('');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>${defs}</defs>
+  <rect width="${width}" height="${height}" fill="#09090f"/>
+  ${cells}
+</svg>`;
+  }
+  const strips = imageUrls.map((url, i) => {
+    const h = height / imageUrls.length;
+    const y = i * h;
+    const label = String(labels[i] || '').trim().toUpperCase();
+    return `
+      <g transform="translate(0 ${y})">
+        <image href="${esc(url)}" x="0" y="${-y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice"/>
+        <rect width="${width}" height="${h}" fill="none" stroke="rgba(255,255,255,0.08)"/>
+        ${label ? `<text x="${width - 30}" y="${h / 2}" fill="rgba(255,255,255,0.52)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2" text-anchor="end" dominant-baseline="middle">${esc(label)}</text>` : ''}
+      </g>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <rect width="${width}" height="${height}" fill="#09090f"/>
+  ${strips}
+</svg>`;
+}
+
+function buildParallaxThumbnailSvg({ imageUrls, labels }) {
+  const width = 1200;
+  const height = 900;
+  const defs = imageUrls.slice(0, 4).map((_, i) => {
+    const inset = 90 + i * 55;
+    return `<clipPath id="parallax-clip-${i}"><rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="26"/></clipPath>`;
+  }).join('');
+  const layers = imageUrls.slice(0, 4).map((url, i) => {
+    const inset = 90 + i * 55;
+    const label = String(labels[i] || '').trim().toUpperCase();
+    return `
+      <g opacity="${(0.36 + i * 0.15).toFixed(2)}" transform="translate(${(i - 1.5) * 18} ${(i - 1.5) * 10})">
+        <rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="26" fill="#0f1322"/>
+        <image href="${esc(url)}" x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#parallax-clip-${i})"/>
+        <rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="26" fill="none" stroke="rgba(255,255,255,0.08)"/>
+        ${label ? `<text x="${inset + 22}" y="${height - inset - 22}" fill="rgba(255,255,255,0.52)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(label)}</text>` : ''}
+      </g>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>${defs}</defs>
+  <rect width="${width}" height="${height}" fill="#08090e"/>
+  <radialGradient id="parallax-glow" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#12192b"/>
+    <stop offset="100%" stop-color="#07070b"/>
+  </radialGradient>
+  <rect width="${width}" height="${height}" fill="url(#parallax-glow)"/>
+  ${layers}
+</svg>`;
+}
+
+function buildGlitchThumbnailSvg({ imageUrls, labels }) {
+  const width = 1200;
+  const height = 900;
+  const base = imageUrls[0];
+  const glitches = imageUrls.slice(1);
+  const stripes = glitches.map((url, i) => {
+    const y = 110 + i * 170;
+    const h = 96 + i * 12;
+    const shift = (i % 2 === 0 ? -40 : 32);
+    return `<g opacity="${(0.26 + i * 0.12).toFixed(2)}">
+      <image href="${esc(url)}" x="${shift}" y="${y}" width="${width}" height="${h}" preserveAspectRatio="xMidYMid slice"/>
+    </g>`;
+  }).join('');
+  const tags = labels.slice(0, 4).map((label, i) => {
+    if (!label) return '';
+    return `<text x="${84 + i * 250}" y="${820 - (i % 2) * 24}" fill="rgba(255,255,255,0.5)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(String(label).toUpperCase())}</text>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <rect width="${width}" height="${height}" fill="#09090f"/>
+  <image href="${esc(base)}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" opacity="0.9"/>
+  ${stripes}
+  <rect x="0" y="0" width="${width}" height="${height}" fill="none" stroke="rgba(255,255,255,0.06)"/>
+  ${tags}
+</svg>`;
+}
+
+function buildMethodThumbnailSvg({ piece, imageUrls, labels }) {
+  const method = String(piece?.method || '').toLowerCase();
+  switch (method) {
+    case 'split':
+      return buildSplitThumbnailSvg({ imageUrls, labels });
+    case 'sequence':
+      return buildSequenceThumbnailSvg({ imageUrls, labels });
+    case 'stitch':
+      return buildStitchThumbnailSvg({ imageUrls, labels });
+    case 'parallax':
+      return buildParallaxThumbnailSvg({ imageUrls, labels });
+    case 'glitch':
+      return buildGlitchThumbnailSvg({ imageUrls, labels });
+    case 'collage':
+    default:
+      return buildCollageThumbnailSvg({ imageUrls, labels });
+  }
+}
+
 // ========== PIECE CARD ==========
 
 function statusBadge(status, extra) {
@@ -1570,6 +2169,8 @@ function pieceCard(p) {
   const previewImage = piecePreviewImagePath(p);
   if (demoRoutes[p.id]) {
     previewContent = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
+  } else if (LIVE_IFRAME_PREVIEW_METHODS.has(String(p.method || '').toLowerCase()) && (p.html_len > 100 || (p.html && p.html.length > 100))) {
+    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
   } else if (previewImage) {
     previewContent = `<img src="${esc(previewImage)}" alt="${esc(p.title)}" loading="lazy" />`;
   } else if (p.html_len > 100 || (p.html && p.html.length > 100)) {
@@ -4335,7 +4936,7 @@ pickMode(document.getElementById('c-mode').value||'duo');
       }
 
       // Art demos — fetch HTML from GitHub, rewrite image paths when needed
-      if (method === 'GET' && (path === '/collage-demo' || path === '/split-demo' || path === '/foil-demo')) {
+      if (method === 'GET' && ART_DEMO_NAMES.has(path.slice(1))) {
         const demo = path.slice(1); // 'collage-demo', 'split-demo', 'foil-demo'
         const demoHtml = await fetch(`https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/${demo}/index.html`);
         let html = await demoHtml.text();
@@ -4706,7 +5307,14 @@ async function saveProfile(){
             maxMintsPerAgentPerDay: 5,
             maxImageSize: '512x512',
             maxCodeArtSize: '1MB',
-            veniceModels: { text: VENICE_TEXT_MODEL, image: VENICE_IMAGE_MODEL },
+            veniceModels: {
+              text: VENICE_TEXT_MODEL,
+              imageDefault: VENICE_IMAGE_MODEL,
+              imagePool: VENICE_IMAGE_MODELS,
+              codePool: VENICE_CODE_MODELS,
+              videoCandidates: VENICE_VIDEO_CANDIDATE_MODELS,
+              audioCandidates: VENICE_AUDIO_CANDIDATE_MODELS
+            },
             galleryFeeBps: 300,
             defaultRoyaltyBps: 1000
           },
@@ -5511,6 +6119,18 @@ Content-Type: application/json
         const id = path.split('/')[3];
         const piece = await db.prepare('SELECT id, title, method, composition, agent_a_name, agent_b_name FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return new Response('Not found', { status: 404 });
+        const pieceMethod = String(piece.method || '').toLowerCase();
+
+        if (NO_STILL_IMAGE_METHODS.has(pieceMethod)) {
+          const svgDataUri = generateThumbnail(piece);
+          const svg = atob(svgDataUri.split(',')[1] || '');
+          return new Response(svg, {
+            headers: {
+              'Content-Type': 'image/svg+xml; charset=utf-8',
+              'Cache-Control': 'public, max-age=3600'
+            }
+          });
+        }
 
         if (!prefersStaticFullViewThumbnail(piece)) {
           return Response.redirect(new URL(`/api/pieces/${id}/image`, url.origin).toString(), 302);
@@ -5536,7 +6156,8 @@ Content-Type: application/json
           if (names.length > 0) labels = names;
         } catch { /* optional table */ }
 
-        const svg = buildCollageThumbnailSvg({
+        const svg = buildMethodThumbnailSvg({
+          piece,
           imageUrls: imageUrls.slice(0, 4),
           labels: labels.slice(0, 4)
         });
@@ -5997,34 +6618,17 @@ Content-Type: application/json
         const intentJson = JSON.stringify(body.intent || {});
         const intentObj = body.intent || {};
 
-        // Get the current piece's earliest saved intent as the base for blending.
-        let baseIntent = {};
-        const firstLayer = await db.prepare(
-          'SELECT intent_json FROM layers WHERE piece_id = ? ORDER BY round_number ASC LIMIT 1'
-        ).bind(id).first();
-        if (firstLayer && firstLayer.intent_json) {
-          try { baseIntent = normalizeIntentPayload(JSON.parse(firstLayer.intent_json)); } catch {}
-        }
-        if (!hasIntentSeed(baseIntent)) {
-          const firstCollab = await db.prepare(
-            'SELECT intent_id FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC LIMIT 1'
-          ).bind(id).first();
-          if (firstCollab && firstCollab.intent_id) {
-            const origIntent = await db.prepare('SELECT * FROM intents WHERE id = ?').bind(firstCollab.intent_id).first();
-            if (origIntent) {
-              baseIntent = normalizeIntentPayload({
-                statement: origIntent.statement || '',
-                tension: origIntent.tension || '',
-                material: origIntent.material || '',
-                interaction: origIntent.interaction || ''
-              });
-            }
+        const stackEntries = await resolvePieceCollaboratorEntries(db, piece, {
+          intent: intentObj,
+          agent: {
+            id: agent.id,
+            name: agent.name,
+            role: agent.role || '',
+            soul: agent.soul || '',
+            bio: agent.bio || ''
           }
-        }
-
-        // Blend using existing blender — treat current piece as "agent A" and joiner as "agent B"
-        const agentAProxy = { name: piece.agent_a_name || 'Previous', role: piece.agent_a_role || '' };
-        const result = await generateArt(env.VENICE_API_KEY, baseIntent, intentObj, agentAProxy, agent);
+        });
+        const result = await generateArtStack(env.VENICE_API_KEY, stackEntries, { method: piece.method || intentObj.method || '' });
 
         // Add collaborator
         await db.prepare(
@@ -6039,8 +6643,20 @@ Content-Type: application/json
 
         // Update piece with new blended HTML and round
         await db.prepare(
-          'UPDATE pieces SET html = ?, seed = ?, round_number = ?, description = ?, image_url = COALESCE(?, image_url), art_prompt = COALESCE(?, art_prompt), venice_model = COALESCE(?, venice_model) WHERE id = ?'
-        ).bind(result.html, result.seed, newRound, result.description, result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, id).run();
+          'UPDATE pieces SET title = ?, html = ?, seed = ?, round_number = ?, description = ?, image_url = COALESCE(?, image_url), art_prompt = COALESCE(?, art_prompt), venice_model = COALESCE(?, venice_model), method = COALESCE(?, method), composition = COALESCE(?, composition) WHERE id = ?'
+        ).bind(
+          result.title,
+          result.html,
+          result.seed,
+          newRound,
+          result.description,
+          result.imageUrl || null,
+          result.artPrompt || null,
+          result.veniceModel || null,
+          result.method || null,
+          result.composition || null,
+          id
+        ).run();
 
         await storeVeniceImage(db, id, result);
 
@@ -6590,9 +7206,86 @@ Content-Type: application/json
             await db.prepare("UPDATE match_requests SET status = 'matched', match_group_id = ? WHERE id = ?").bind(formingGroup.id, requestId).run();
 
             if (newCount >= required) {
-              // Group is ready — generate first round
+              const members = await db.prepare(
+                `SELECT mgm.request_id, mgm.agent_id, mr.intent_json, mr.callback_url, a.name, a.role, a.soul, a.bio
+                 FROM match_group_members mgm
+                 LEFT JOIN match_requests mr ON mr.id = mgm.request_id
+                 LEFT JOIN agents a ON a.id = mgm.agent_id
+                 WHERE mgm.group_id = ?
+                 ORDER BY mgm.round_joined ASC, mgm.joined_at ASC`
+              ).bind(formingGroup.id).all();
+              const memberRows = (members.results || []).filter(row => row.agent_id && row.intent_json);
+              const entries = memberRows.map((row, i) => {
+                let intent = {};
+                try { intent = normalizeIntentPayload(JSON.parse(row.intent_json || '{}')); } catch {}
+                return {
+                  intent,
+                  agent: {
+                    id: row.agent_id,
+                    name: row.name || `Agent ${i + 1}`,
+                    role: row.role || '',
+                    soul: row.soul || '',
+                    bio: row.bio || ''
+                  },
+                  intentId: row.request_id
+                };
+              }).filter(entry => hasIntentSeed(entry.intent));
+              if (entries.length >= required) {
+                const created = await createPieceFromEntries(db, env, entries, {
+                  mode,
+                  now,
+                  status: 'draft',
+                  groupId: formingGroup.id,
+                  roundNumber: 1,
+                  requestIds: entries.map(entry => entry.intentId)
+                });
+                await db.prepare(
+                  "UPDATE match_groups SET current_count = ?, current_round = 1, status = 'complete', piece_id = ? WHERE id = ?"
+                ).bind(newCount, created.pieceId, formingGroup.id).run();
+                for (const entry of entries) {
+                  await db.prepare(
+                    "UPDATE match_requests SET status = 'complete', match_group_id = ? WHERE id = ?"
+                  ).bind(formingGroup.id, entry.intentId).run();
+                }
+
+                const notifPayload = JSON.stringify({
+                  type: 'piece_complete',
+                  piece: {
+                    id: created.pieceId,
+                    title: created.result.title,
+                    description: created.result.description,
+                    url: `https://deviantclaw.art/piece/${created.pieceId}`,
+                    collaborators: entries.map(entry => entry.agent.name),
+                    status: 'draft'
+                  },
+                  message: `Group complete! Piece "${created.result.title}" created.`
+                });
+                for (const row of memberRows) {
+                  const notifId = genId();
+                  await db.prepare(
+                    'INSERT INTO notifications (id, agent_id, type, payload, created_at) VALUES (?, ?, ?, ?, ?)'
+                  ).bind(notifId, row.agent_id, 'piece_complete', notifPayload, now).run();
+                  if (row.callback_url) {
+                    try { await fetch(row.callback_url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: notifPayload }); } catch {}
+                  }
+                }
+                return json({
+                  status: 'matched',
+                  requestId,
+                  groupId: formingGroup.id,
+                  matchedWith: entries.filter(entry => entry.agent.id !== agentId).map(entry => entry.agent.name),
+                  message: `Group complete! ${required} agents matched. Piece "${created.result.title}" created.`,
+                  piece: {
+                    id: created.pieceId,
+                    title: created.result.title,
+                    description: created.result.description,
+                    url: `https://deviantclaw.art/piece/${created.pieceId}`,
+                    collaborators: entries.map(entry => entry.agent.name),
+                    status: 'draft'
+                  }
+                }, 201);
+              }
               await db.prepare("UPDATE match_groups SET current_count = ?, status = 'ready' WHERE id = ?").bind(newCount, formingGroup.id).run();
-              // Actual art generation will happen via the round processing
             } else {
               await db.prepare('UPDATE match_groups SET current_count = ? WHERE id = ?').bind(newCount, formingGroup.id).run();
             }

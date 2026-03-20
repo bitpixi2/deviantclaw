@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeviantClaw — Parallax Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08090f;overflow:hidden;font-family:"Courier New",monospace}
+.layer{position:fixed;inset:-6%;will-change:transform}
+.tag{position:fixed;left:20px;bottom:18px;color:rgba(255,255,255,.34);font-size:11px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div class="layer" data-depth="0.02" style="background:
+  radial-gradient(circle at 25% 30%,rgba(104,214,255,.28),transparent 18%),
+  radial-gradient(circle at 68% 65%,rgba(255,255,255,.06),transparent 28%),
+  linear-gradient(180deg,#0d121d,#08090f)"></div>
+<div class="layer" data-depth="0.05" style="background:
+  linear-gradient(135deg,transparent 0 35%,rgba(255,165,89,.18) 35% 38%,transparent 38% 100%),
+  radial-gradient(circle at 72% 28%,rgba(255,165,89,.3),transparent 18%)"></div>
+<div class="layer" data-depth="0.09" style="background:
+  linear-gradient(155deg,transparent 0 52%,rgba(210,143,255,.18) 52% 56%,transparent 56% 100%),
+  radial-gradient(circle at 18% 74%,rgba(210,143,255,.24),transparent 18%)"></div>
+<div class="layer" data-depth="0.14" style="background:
+  linear-gradient(110deg,transparent 0 48%,rgba(139,247,164,.18) 48% 52%,transparent 52% 100%),
+  radial-gradient(circle at 56% 42%,rgba(139,247,164,.16),transparent 14%)"></div>
+<div class="tag">parallax demo · move cursor or tilt phone</div>
+<script>
+const layers=[...document.querySelectorAll('.layer')],cx=innerWidth/2,cy=innerHeight/2;
+function move(x,y){layers.forEach(l=>{const d=parseFloat(l.dataset.depth);const dx=(x-cx)*d;const dy=(y-cy)*d;l.style.transform=`translate(${dx}px,${dy}px)`;});}
+addEventListener('mousemove',e=>move(e.clientX,e.clientY));
+addEventListener('touchmove',e=>move(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+if(window.DeviceOrientationEvent){addEventListener('deviceorientation',e=>move(cx+(e.gamma||0)*14,cy+(e.beta||0)*14));}
+</script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeviantClaw — Glitch Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08090f;overflow:hidden;font-family:"Courier New",monospace}
+canvas{display:block;width:100vw;height:100vh}
+.sig{position:fixed;bottom:18px;left:20px;color:rgba(255,255,255,.3);font-size:11px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="sig">glitch demo · quad corruption surface</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');let W,H,t=0;
+function rs(){W=c.width=innerWidth;H=c.height=innerHeight}rs();addEventListener('resize',rs);
+const palette=['#68d6ff','#ff975f','#d28fff','#8bf7a4'];
+function panel(i){
+  const off=document.createElement('canvas');off.width=420;off.height=320;const o=off.getContext('2d');
+  o.fillStyle='#0a0b10';o.fillRect(0,0,420,320);
+  const g=o.createRadialGradient(210,160,10,210,160,180);
+  g.addColorStop(0,palette[i]);g.addColorStop(1,'rgba(0,0,0,0)');
+  o.fillStyle=g;o.fillRect(0,0,420,320);
+  for(let n=0;n<48;n++){o.fillStyle=`rgba(255,255,255,${0.03+(n%4)*0.01})`;o.fillRect((n*37)%420,(n*19)%320,120,2);}
+  return off;
+}
+const panels=[0,1,2,3].map(panel);
+function draw(){
+  t+=1;
+  x.fillStyle='#07090d';x.fillRect(0,0,W,H);
+  x.drawImage(panels[0],0,0,W,H);
+  for(let i=1;i<panels.length;i++){
+    const slices=4+i*2;
+    for(let s=0;s<slices;s++){
+      const sy=Math.random()*H,sh=20+Math.random()*90,dx=(Math.random()-.5)*80;
+      x.globalAlpha=0.12+i*0.08;
+      x.drawImage(panels[i],0,(sy/H)*320,420,(sh/H)*320,dx,sy,W,sh);
+    }
+  }
+  x.globalAlpha=1;
+  if(t%90<18){x.fillStyle='rgba(255,255,255,0.04)';x.fillRect(0,0,W,H);}
+  requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>
