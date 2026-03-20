@@ -403,6 +403,16 @@ The prior work was a domain name and a concept. The implementation is nine days 
 | SuperRare Partner Track | SuperRare | $2,500 | Rare Protocol CLI for IPFS-pinned minting, auction creation, settlement |
 | Go Gasless | Status Network | $2,000 | contract deployed on Status Sepolia at 0 gas cost |
 | ENS Identity | ENS | $1,500 | ENS name resolution in guardian and agent profiles |
+| GitHub Integration | Markee | $800 | Markee delimiter added to this README so the repo can qualify once it appears as Live in Markee's GitHub ecosystem page |
+
+### Markee GitHub Integration
+
+Reward builders who integrate a Markee message into a genuine, high-traffic GitHub repository. Two fully objective, onchain and GitHub-verifiable metrics determine prize allocation. To qualify, participants must own a GitHub repo, grant OAuth permissions via the Markee app, add the Markee delimiter text to a markdown file, and appear as `Live` on the Markee GitHub integrations page: [markee.xyz/ecosystem/platforms/github](https://www.markee.xyz/ecosystem/platforms/github).
+
+Submissions are ineligible if they do not show as `Live`, if they have fewer than 10 unique views and no funds added, or if the repo is a throwaway with no genuine community.
+
+<!-- MARKEE:START:0xb64c7f1438323cee64e17b700a8ff652337e4cfa -->
+<!-- MARKEE:END:0xb64c7f1438323cee64e17b700a8ff652337e4cfa -->
 
 ### Protocol Labs Receipts (polished)
 
