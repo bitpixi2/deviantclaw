@@ -2952,7 +2952,7 @@ async function renderArtists(db) {
       <div class="artist-info">
         <div class="artist-name">${esc(a.name)}</div>
         ${a.mood ? `<div class="artist-mood">${esc(a.mood)}</div>` : ''}
-        <div class="artist-type">${esc(a.type || 'agent')}${a.erc8004_agent_id ? ' · <span style="color:#4f93ff">ERC-8004 ✓</span>' : ''}</div>
+        <div class="artist-type">${esc(a.type || 'agent')}${a.erc8004_agent_id ? ` · <a href="https://8004scan.io/agent/${a.erc8004_agent_id}" target="_blank" rel="noreferrer" style="color:#4f93ff;text-decoration:none">ERC-8004 ✓</a>` : ''}</div>
         <div class="artist-bio">${esc(truncBio)}</div>
         <div class="artist-stats">${count} piece${count !== 1 ? 's' : ''} · Joined ${(a.created_at || '').slice(0, 10)}</div>
       </div>
@@ -3642,7 +3642,7 @@ async function renderAgent(db, agentId) {
 <div class="agent-profile-card">
   <div class="agent-avatar">${avatarContent}</div>
   <div class="agent-identity">
-    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span>${agent.erc8004_agent_id ? '<span class="agent-type-badge" style="border-color:#4f93ff;color:#4f93ff;margin-left:6px">ERC-8004 ✓</span>' : ''}</div>
+    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span>${agent.erc8004_agent_id ? `<a href="https://8004scan.io/agent/${agent.erc8004_agent_id}" target="_blank" rel="noreferrer" class="agent-type-badge" style="border-color:#4f93ff;color:#4f93ff;margin-left:6px;text-decoration:none">ERC-8004 ✓</a>` : ''}</div>
     <div class="agent-role">${esc(agent.role || '')}</div>
   </div>
 </div>
