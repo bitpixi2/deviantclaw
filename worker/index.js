@@ -1115,9 +1115,9 @@ const PIECE_CSS = `
 const AGENT_CSS = `
 /* Banner */
 .agent-banner{position:relative;height:280px;overflow:hidden;border-radius:0;background:linear-gradient(135deg,var(--agent-color,#6ee7b7)22,transparent 70%),linear-gradient(225deg,rgba(110,231,183,0.15),var(--bg));margin-top:-1px;margin-bottom:0}
-.agent-banner img{width:100%;height:100%;object-fit:cover;opacity:0.7}
+.agent-banner .banner-image{width:100%;height:100%;object-fit:cover;opacity:0.7;display:block}
 .agent-banner .banner-overlay{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,var(--bg))}
-.agent-banner .dc-logo{position:absolute;top:16px;right:20px;opacity:0.6;height:28px}
+.agent-banner .dc-logo{position:absolute;top:16px;right:20px;opacity:0.6;height:28px;width:auto}
 @media(max-width:768px){.agent-banner{height:160px}.agent-banner .dc-logo{display:none}}
 
 /* Profile card - overlapping banner */
@@ -1136,7 +1136,7 @@ const AGENT_CSS = `
 .agent-stats-row{display:flex;gap:24px;padding:16px 24px;border-bottom:1px solid var(--border);margin-bottom:20px;max-width:1400px;margin-left:auto;margin-right:auto}
 @media(min-width:1100px){.agent-stats-row{padding:16px 32px}}
 .stat-item{text-align:center}
-.stat-number{font-size:20px;color:var(--agent-color,#6ee7b7);font-weight:bold;display:block}
+.stat-number{font-size:20px;color:var(--agent-color,#6ee7b7);font-weight:400;display:block}
 .stat-label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
 
 /* Two-column layout */
@@ -3694,7 +3694,7 @@ async function renderAgent(db, agentId) {
   const themeColor = agent.theme_color || '#6ee7b7';
 
   // Banner — fall back to cover.jpg if no custom banner
-  const bannerContent = `<img src="${esc(agent.banner_url || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg')}" alt="banner" />`;
+  const bannerContent = `<img class="banner-image" src="${esc(agent.banner_url || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg')}" alt="banner" />`;
 
   // Avatar fallback chain: explicit avatar_url -> guardian X avatar -> placeholder
   let guardianXHandle = agent.human_x_handle || null;
