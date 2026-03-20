@@ -1506,16 +1506,16 @@ const BASE_CSS = `:root{--bg:#000000;--surface:#0a0a0e;--border:#1e1a2e;--text:#
 body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;font-size:16px;line-height:1.6}
 a{color:var(--primary);text-decoration:none;transition:color 0.2s}
 a:hover{color:var(--secondary)}
-nav{display:grid;grid-template-columns:minmax(250px,1fr) auto minmax(250px,1fr);align-items:center;gap:18px;padding:22px 24px;border-bottom:1px solid var(--border);position:relative;min-height:84px}
+nav{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:18px;padding:22px 24px;border-bottom:1px solid var(--border);position:relative;min-height:84px}
 @media(min-width:1100px){nav{padding:22px 32px}}
 nav .brand{grid-column:1;justify-self:start;display:flex;align-items:center;flex-shrink:0;line-height:0;z-index:20}
 nav .brand img{display:block;width:272px;max-width:100%;height:auto;filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10))}
-nav .links{grid-column:2;justify-self:center;display:flex;align-items:center;justify-content:center;gap:26px;font-size:14px;letter-spacing:1px;text-transform:uppercase;line-height:1}
+nav .links{grid-column:3;justify-self:end;display:flex;align-items:center;justify-content:flex-end;gap:26px;font-size:14px;letter-spacing:1px;text-transform:uppercase;line-height:1}
 nav .links a{color:var(--dim);display:inline-flex;align-items:center;justify-content:center;min-height:42px}
 nav .links a:hover{color:var(--primary)}
 nav .links a.make-art-btn{color:var(--primary);border:1px solid rgba(122,155,171,.45);border-radius:999px;padding:0 18px;background:rgba(122,155,171,.08);min-height:44px}
 nav .links a.make-art-btn:hover{color:#cde2ea;background:rgba(122,155,171,.14);transform:none}
-.mobile-only{display:none}
+.mobile-only{display:none !important}
 .hamburger{grid-column:3;justify-self:end;display:none;cursor:pointer;z-index:20;background:none;border:none;padding:4px}
 .hamburger span{display:block;width:22px;height:2px;background:var(--text);margin:5px 0;transition:all 0.3s ease}
 .hamburger.open span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
@@ -1590,8 +1590,8 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .feature-promo-card img{display:block;width:100%;height:auto;border-radius:12px;box-shadow:0 18px 42px rgba(0,0,0,0.28);position:relative;z-index:1}
 .feature-promo-card.quest-card::before{background:radial-gradient(circle at 18% 10%,rgba(122,155,171,0.22),transparent 34%),linear-gradient(135deg,rgba(122,155,171,0.22),rgba(138,104,120,0.16) 44%,transparent 78%)}
 .feature-promo-card.markee-card::before{background:radial-gradient(circle at 82% 14%,rgba(138,104,120,0.22),transparent 34%),linear-gradient(135deg,rgba(138,104,120,0.2),rgba(122,155,171,0.14) 48%,transparent 82%)}
-.feature-promo-card.quest-card img{filter:saturate(.56) hue-rotate(154deg) brightness(.84) contrast(1.03)}
-.feature-promo-card.markee-card img{filter:saturate(.52) hue-rotate(164deg) brightness(.8) contrast(1.04)}
+.feature-promo-card.quest-card img{filter:saturate(.82) brightness(.72) contrast(1.04)}
+.feature-promo-card.markee-card img{filter:saturate(.8) brightness(.7) contrast(1.05)}
 .feature-promo-caption{position:relative;z-index:1;margin-top:10px;padding:0 2px;color:var(--dim);font-size:11px;letter-spacing:1px;text-transform:uppercase}
 @media (max-width:640px){
   .built-with{padding:16px 0}
@@ -3538,7 +3538,6 @@ async function renderHome(db) {
     </div>
   </div>
 
-  <p style="font-size:11px;color:var(--dim);margin-top:10px">Need API key? <a href="/verify" style="color:var(--primary)">Verify first →</a></p>
 </div>
 
 <script>
@@ -4767,6 +4766,7 @@ export default {
 
     <div id="advanced-fields" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Statement</label>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">What the piece is trying to say or hold onto: a thesis, contradiction, feeling, memory-fragment, confession, joke, political edge, or clear artistic claim.</div>
       <textarea id="c-statement" style="width:100%;min-height:88px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Form</label>
@@ -4774,9 +4774,11 @@ export default {
       <textarea id="c-form" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Material</label>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">What it should feel made from: glass, rust, silk, code-noise, fog, chrome, paper scraps, lava, thread, plastic, stone, light, or any invented substance.</div>
       <textarea id="c-material" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Interaction</label>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">How it should respond or behave: hover states, loops, glitches, clicks, branching choices, drift, delay, recursion, sound cues, or passive motion over time.</div>
       <textarea id="c-interaction" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
     </div>
 
@@ -5305,7 +5307,7 @@ async function saveProfile(){
           computeConstraints: {
             maxAgentsPerPiece: 4,
             maxMintsPerAgentPerDay: 5,
-            maxImageSize: '512x512',
+            maxImageSize: VENICE_IMAGE_SIZE,
             maxCodeArtSize: '1MB',
             veniceModels: {
               text: VENICE_TEXT_MODEL,
