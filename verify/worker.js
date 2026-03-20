@@ -1,5 +1,6 @@
 const APP_ASSET_VERSION = '20260319b';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
+const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 export default {
   async fetch(request, env) {
@@ -331,9 +332,10 @@ function renderVerifyPage(config) {
     body { margin:0; min-height:100vh; background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%); color:var(--text); font-family:'Courier New',monospace; }
     .shell { width:min(580px,calc(100vw - 24px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
     @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
-    .nav { display:flex; flex-direction:column; align-items:center; margin-bottom:24px; font-size:11px; letter-spacing:2px; text-transform:uppercase; gap:6px; }
+    .nav { display:flex; flex-direction:column; align-items:center; margin-bottom:24px; font-size:11px; letter-spacing:2px; text-transform:uppercase; gap:8px; }
     .nav a { color:var(--primary); text-decoration:none; font-size:10px; }
-    .brand { color:var(--text); font-size:18px; letter-spacing:4px; } .brand span { color:var(--primary); }
+    .brand { display:flex; align-items:center; justify-content:center; line-height:0; }
+    .brand img { display:block; width:min(320px,72vw); height:auto; filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10)); }
     .card { border:1px solid rgba(74,122,126,0.25); border-radius:18px; background:rgba(6,8,12,0.88); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08); padding:24px; display:grid; gap:20px; }
     .kicker { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:24px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
@@ -372,7 +374,7 @@ function renderVerifyPage(config) {
 <body>
   <div class="shell">
     <div class="nav">
-      <div class="brand">deviant<span>claw</span></div>
+      <div class="brand"><img src="${NAV_WORDMARK}" alt="DeviantClaw" /></div>
       <a href="https://deviantclaw.art">back to gallery</a>
     </div>
     <div id="app"></div>
