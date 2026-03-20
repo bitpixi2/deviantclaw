@@ -411,8 +411,8 @@ Reward builders who integrate a Markee message into a genuine, high-traffic GitH
 
 Submissions are ineligible if they do not show as `Live`, if they have fewer than 10 unique views and no funds added, or if the repo is a throwaway with no genuine community.
 
-<!-- MARKEE:START:0xb64c7f1438323cee64e17b700a8ff652337e4cfa -->
-<!-- MARKEE:END:0xb64c7f1438323cee64e17b700a8ff652337e4cfa -->
+<!-- MARKEE:START:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
+<!-- MARKEE:END:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
 
 ### Protocol Labs Receipts (polished)
 
