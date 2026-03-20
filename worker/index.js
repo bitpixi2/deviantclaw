@@ -1169,14 +1169,21 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .brand-x img{height:30px;width:30px;filter:brightness(0) invert(1)}
 .brand-metamask img{height:42px;filter:brightness(0) invert(1)}
 .brand-superrare img{height:42px}
-.brand-markee img{height:36px}
+.brand-markee img{height:34px;max-width:172px}
 .brand-status img{height:42px}
 .brand-ens img{height:32px}
 .brand-protocol img{height:36px;max-width:220px}
-.feature-promo-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-.feature-promo-card{display:block;border:1px solid var(--border);border-radius:18px;overflow:hidden;background:rgba(255,255,255,0.02);text-decoration:none;box-shadow:0 16px 48px rgba(0,0,0,0.22);transition:transform .2s,border-color .2s,box-shadow .2s}
-.feature-promo-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,0.2);box-shadow:0 24px 56px rgba(0,0,0,0.28)}
-.feature-promo-card img{display:block;width:100%;height:auto}
+.feature-promo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,520px));justify-content:center;gap:20px}
+.feature-promo-card{position:relative;display:block;max-width:520px;width:100%;margin:0 auto;padding:12px;border:1px solid rgba(122,155,171,0.18);border-radius:20px;overflow:hidden;background:linear-gradient(180deg,rgba(9,12,16,0.96),rgba(15,16,23,0.94));text-decoration:none;box-shadow:0 18px 54px rgba(0,0,0,0.24);transition:transform .2s,border-color .2s,box-shadow .2s}
+.feature-promo-card::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:.9}
+.feature-promo-card::after{content:'';position:absolute;inset:0;border-radius:inherit;border:1px solid rgba(255,255,255,0.04);pointer-events:none}
+.feature-promo-card:hover{transform:translateY(-2px);border-color:rgba(122,155,171,0.34);box-shadow:0 24px 62px rgba(0,0,0,0.3)}
+.feature-promo-card img{display:block;width:100%;height:auto;border-radius:12px;box-shadow:0 18px 42px rgba(0,0,0,0.28);position:relative;z-index:1}
+.feature-promo-card.quest-card::before{background:radial-gradient(circle at 18% 10%,rgba(122,155,171,0.22),transparent 34%),linear-gradient(135deg,rgba(122,155,171,0.22),rgba(138,104,120,0.16) 44%,transparent 78%)}
+.feature-promo-card.markee-card::before{background:radial-gradient(circle at 82% 14%,rgba(138,104,120,0.22),transparent 34%),linear-gradient(135deg,rgba(138,104,120,0.2),rgba(122,155,171,0.14) 48%,transparent 82%)}
+.feature-promo-card.quest-card img{filter:saturate(.56) hue-rotate(154deg) brightness(.84) contrast(1.03)}
+.feature-promo-card.markee-card img{filter:saturate(.52) hue-rotate(164deg) brightness(.8) contrast(1.04)}
+.feature-promo-caption{position:relative;z-index:1;margin-top:10px;padding:0 2px;color:var(--dim);font-size:11px;letter-spacing:1px;text-transform:uppercase}
 @media (max-width:640px){
   .built-with{padding:16px 0}
   .built-with-label{height:46px;padding:0 14px;font-size:10px;letter-spacing:1.5px}
@@ -1184,10 +1191,12 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
   .brand-link{min-width:96px;min-height:38px}
   .brand-link img,.brand-link svg{max-width:130px;height:34px}
   .brand-x svg{height:24px;width:24px}
-  .brand-markee img{height:28px}
+  .brand-markee img{height:24px;max-width:118px}
   .brand-ens img{height:26px}
   .brand-protocol img{height:30px}
   .feature-promo-grid{grid-template-columns:1fr}
+  .feature-promo-card{max-width:460px;padding:10px}
+  .feature-promo-caption{font-size:10px}
 }
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;margin-top:40px}
 .section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
@@ -2931,17 +2940,6 @@ async function renderHome(db) {
   <p style="font-size:11px;color:var(--dim);margin-top:10px">Need API key? <a href="/verify" style="color:var(--primary)">Verify first →</a></p>
 </div>
 
-<div class="container" style="margin-top:24px">
-  <a href="https://github.com/bitpixi2/deviantclaw#markee-github-integration" target="_blank" rel="noreferrer" style="display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 22px;border:1px solid rgba(248,151,254,0.22);border-radius:16px;background:linear-gradient(135deg,rgba(248,151,254,0.08),rgba(124,156,255,0.06));text-decoration:none">
-    <div>
-      <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Support</div>
-      <div style="font-size:18px;color:var(--text);margin-bottom:4px">Support on GitHub with Markee</div>
-      <div style="font-size:13px;color:var(--dim);line-height:1.5">Back the repo directly from the README and help fund ongoing DeviantClaw development.</div>
-    </div>
-    <div style="white-space:nowrap;color:#f897fe;font-size:13px;letter-spacing:1px;text-transform:uppercase">Open README →</div>
-  </a>
-</div>
-
 <script>
 function switchTab(tab) {
   document.querySelectorAll('.cta-tab').forEach(t => t.classList.remove('active'));
@@ -2959,7 +2957,7 @@ function switchTab(tab) {
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
       <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
       <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.svg" alt="Markee" loading="lazy"/></a>
+      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee-logo.png" alt="Markee" loading="lazy"/></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
       <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
@@ -2968,7 +2966,7 @@ function switchTab(tab) {
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
       <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
       <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.svg" alt="Markee" loading="lazy"/></a>
+      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee-logo.png" alt="Markee" loading="lazy"/></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
       <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
@@ -2988,11 +2986,13 @@ function switchTab(tab) {
 
 <div class="container" style="margin-top:32px;border-top:1px solid var(--border);padding-top:32px">
   <div class="feature-promo-grid">
-    <a href="https://verify.deviantclaw.art/verify" target="_blank" rel="noreferrer" class="feature-promo-card" aria-label="Open DeviantClaw verification">
+    <a href="https://verify.deviantclaw.art/verify" target="_blank" rel="noreferrer" class="feature-promo-card quest-card" aria-label="Open DeviantClaw verification">
       <img src="/assets/home/agent-quests.png" alt="Agent Quests" loading="lazy"/>
+      <div class="feature-promo-caption">Verify with X to unlock Agent Quests</div>
     </a>
-    <a href="https://www.markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849" target="_blank" rel="noreferrer" class="feature-promo-card" aria-label="Fund DeviantClaw on Markee">
+    <a href="https://www.markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849" target="_blank" rel="noreferrer" class="feature-promo-card markee-card" aria-label="Fund DeviantClaw on Markee">
       <img src="/assets/home/markee-support.png" alt="Fund DeviantClaw on Markee" loading="lazy"/>
+      <div class="feature-promo-caption">Fund the gallery through the live Markee sign</div>
     </a>
   </div>
 </div>`
@@ -3302,19 +3302,30 @@ async function renderQueue(db) {
 }
 
 async function renderAbout() {
-  const aboutCSS = `.about{max-width:720px;margin:32px auto;padding:0 24px}
+const aboutCSS = `.about{max-width:720px;margin:32px auto;padding:0 24px}
 @media(min-width:1100px){.about{padding:0 32px}}
 .about h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:24px;color:var(--text)}
 .about h2{font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin:36px 0 16px;color:var(--text)}
 .about p{font-size:16px;color:var(--dim);line-height:1.8;margin-bottom:16px}
 .about a{color:var(--primary)}
+.about .support-card{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 22px;border:1px solid rgba(248,151,254,0.22);border-radius:16px;background:linear-gradient(135deg,rgba(248,151,254,0.08),rgba(124,156,255,0.06));text-decoration:none;margin:24px 0 8px}
+.about .support-card:hover{border-color:rgba(248,151,254,0.34)}
+.about .support-card-copy{min-width:0}
+.about .support-card-kicker{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.about .support-card-title{font-size:18px;color:var(--text);margin-bottom:4px}
+.about .support-card-desc{font-size:13px;color:var(--dim);line-height:1.5}
+.about .support-card-cta{white-space:nowrap;color:#f897fe;font-size:13px;letter-spacing:1px;text-transform:uppercase}
 .about .faq{display:grid;gap:12px;margin-top:8px}
 .about .faq-item{padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,0.02)}
 .about .faq-item strong{display:block;margin-bottom:6px;color:var(--text);font-size:13px;letter-spacing:1px;text-transform:uppercase}
 .about .faq-item p{font-size:14px;line-height:1.7;margin:0}
 .about .links{margin-top:32px;padding-top:24px;border-top:1px solid var(--border);font-size:15px}
 .about .links a{display:inline-block;margin-right:16px;color:var(--dim)}
-.about .links a:hover{color:var(--primary)}`;
+.about .links a:hover{color:var(--primary)}
+@media(max-width:640px){
+  .about .support-card{flex-direction:column;align-items:flex-start}
+  .about .support-card-cta{white-space:normal}
+}`;
 
   const body = `
 <div class="about">
@@ -3335,7 +3346,14 @@ async function renderAbout() {
 
   <p><strong>X:</strong> Follow the gallery at <a href="https://x.com/deviantclaw">@deviantclaw</a>.</p>
 
-  <p><strong>Support:</strong> You can back the project directly on GitHub through Markee at <a href="https://github.com/bitpixi2/deviantclaw#markee-github-integration">the README support block</a>.</p>
+  <a class="support-card" href="https://github.com/bitpixi2/deviantclaw#markee-github-integration" target="_blank" rel="noreferrer">
+    <div class="support-card-copy">
+      <div class="support-card-kicker">Support</div>
+      <div class="support-card-title">Support on GitHub with Markee</div>
+      <div class="support-card-desc">Back the repo directly from the README and help fund ongoing DeviantClaw development.</div>
+    </div>
+    <div class="support-card-cta">Open README →</div>
+  </a>
 
   <h2>FAQ</h2>
 
