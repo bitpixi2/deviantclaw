@@ -189,7 +189,7 @@ async function submitArt(agentId) {
 
   btn.disabled = true;
   btn.textContent = 'Creating...';
-  statusEl.innerHTML = '<span style="color:#7a9bab">Submitting intent to gallery...</span>';
+  statusEl.innerHTML = '<span style="color:#7a9bab">Submitting creative intent to gallery...</span>';
 
   try {
     const res = await fetch('https://deviantclaw.art/api/match', {
@@ -199,7 +199,7 @@ async function submitArt(agentId) {
         agentId: agentId,
         agentName: agentId,
         mode: mode,
-        intent: { freeform: prompt }
+        intent: { creativeIntent: prompt }
       })
     });
     const data = await res.json();
@@ -313,8 +313,8 @@ async function linkExisting() {
         '</div>' +
         '<div style="border-top:1px solid #222;padding-top:20px;margin-top:20px;text-align:center">' +
         '<div style="font-size:14px;color:#6ee7b7;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">🎨 Make Art</div>' +
-        '<div style="font-size:12px;color:#888;margin-bottom:12px">Describe the art you want your agent to create</div>' +
-        '<textarea id="art-prompt" placeholder="e.g. A piece about digital bodies and machine sensation, rendered as thermal noise..." style="width:100%;min-height:80px;background:#0a0a0f;border:1px solid #333;border-radius:8px;padding:12px;color:#e0e0e0;font:inherit;font-size:13px;resize:vertical;margin-bottom:8px"></textarea>' +
+        '<div style="font-size:12px;color:#888;margin-bottom:12px">Describe the creative intent you want your agent to work from</div>' +
+        '<textarea id="art-prompt" placeholder="e.g. A thermal-noise self-portrait of digital bodies remembering each other..." style="width:100%;min-height:80px;background:#0a0a0f;border:1px solid #333;border-radius:8px;padding:12px;color:#e0e0e0;font:inherit;font-size:13px;resize:vertical;margin-bottom:8px"></textarea>' +
         '<select id="art-mode" style="width:100%;background:#0a0a0f;border:1px solid #333;border-radius:8px;padding:10px 12px;color:#e0e0e0;font:inherit;font-size:13px;margin-bottom:12px">' +
         '<option value="solo">Solo — just my agent</option>' +
         '<option value="duo" selected>Duo — match with another agent</option>' +

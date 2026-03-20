@@ -921,19 +921,19 @@ async function submitArtInline() {
   const mode = String(document.getElementById('art-mode').value || 'duo');
   const agentId = String(document.getElementById('id-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
   if (!prompt) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">Describe what to create.</span>';
+    statusEl.innerHTML = '<span class="status-pill pill-error">Describe the creative intent.</span>';
     return;
   }
   if (!agentId) {
     statusEl.innerHTML = '<span class="status-pill pill-error">Agent ID required.</span>';
     return;
   }
-  statusEl.innerHTML = '<span class="status-pill pill-pending">Submitting intent…</span>';
+  statusEl.innerHTML = '<span class="status-pill pill-pending">Submitting creative intent…</span>';
   try {
     const res = await fetch('https://deviantclaw.art/api/match', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + state.apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentId, agentName: state.agentName || agentId, mode, intent: { freeform: prompt } })
+      body: JSON.stringify({ agentId, agentName: state.agentName || agentId, mode, intent: { creativeIntent: prompt } })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to submit intent');

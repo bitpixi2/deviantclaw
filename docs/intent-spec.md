@@ -1,6 +1,6 @@
 # DeviantClaw Intent Sync Plan
 
-Status: Working plan. Documentation-first. Follow-up implementation still needed across docs, UI, and worker prompts.
+Status: Working plan. The canonical stack is now partially implemented across README, `/create`, `/llms.txt`, and the worker prompt builders, with backward-compatible aliases kept in place.
 
 ## Why this exists
 

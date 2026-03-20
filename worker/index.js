@@ -18,6 +18,151 @@ function erc8004AgentUrl(agentId) {
   return `https://www.8004scan.io/agents/base/${encodeURIComponent(agentId)}`;
 }
 
+function cleanIntentValue(value, maxLen = 4000) {
+  if (value === undefined || value === null) return '';
+  return String(value).replace(/\r\n?/g, '\n').trim().slice(0, maxLen);
+}
+
+function stripMemoryMarker(memory) {
+  return cleanIntentValue(memory, 12000)
+    .replace(/^\[MEMORY\]\s*/i, '')
+    .replace(/^Imported from [^\n]+\n?/i, '')
+    .trim();
+}
+
+function summarizeMemory(memory, maxLen = 220) {
+  const clean = stripMemoryMarker(memory);
+  if (!clean) return '';
+  return clean.length > maxLen ? `${clean.slice(0, maxLen).trim()}…` : clean;
+}
+
+function normalizeIntentPayload(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const normalized = {};
+
+  const creativeIntent = cleanIntentValue(source.creativeIntent || source.freeform || source.prompt);
+  const statement = cleanIntentValue(source.statement);
+  const form = cleanIntentValue(source.form);
+  const material = cleanIntentValue(source.material);
+  const interaction = cleanIntentValue(source.interaction);
+  const memory = cleanIntentValue(source.memory, 12000);
+  const mood = cleanIntentValue(source.mood);
+  const palette = cleanIntentValue(source.palette);
+  const medium = cleanIntentValue(source.medium);
+  const reference = cleanIntentValue(source.reference);
+  const humanNote = cleanIntentValue(source.humanNote);
+  const tension = cleanIntentValue(source.tension);
+  const reject = cleanIntentValue(source.reject);
+  const constraint = cleanIntentValue(source.constraint || reject);
+  const method = cleanIntentValue(source.method, 64).toLowerCase();
+  const preferredPartner = cleanIntentValue(source.preferredPartner, 120);
+
+  if (creativeIntent) normalized.creativeIntent = creativeIntent;
+  if (statement) normalized.statement = statement;
+  if (form) normalized.form = form;
+  if (material) normalized.material = material;
+  if (interaction) normalized.interaction = interaction;
+  if (memory) normalized.memory = memory;
+  if (mood) normalized.mood = mood;
+  if (palette) normalized.palette = palette;
+  if (medium) normalized.medium = medium;
+  if (reference) normalized.reference = reference;
+  if (constraint) normalized.constraint = constraint;
+  if (reject && reject !== constraint) normalized.reject = reject;
+  if (humanNote) normalized.humanNote = humanNote;
+  if (tension) normalized.tension = tension;
+  if (method) normalized.method = method;
+  if (preferredPartner) normalized.preferredPartner = preferredPartner;
+
+  return normalized;
+}
+
+function hasIntentSeed(intent = {}) {
+  const normalized = normalizeIntentPayload(intent);
+  return Boolean(normalized.creativeIntent || normalized.statement || normalized.memory);
+}
+
+function primaryIntentText(intent = {}, maxLen = 260) {
+  const normalized = normalizeIntentPayload(intent);
+  const text = normalized.creativeIntent || normalized.statement || summarizeMemory(normalized.memory, maxLen);
+  if (!text) return '';
+  return text.length > maxLen ? `${text.slice(0, maxLen).trim()}…` : text;
+}
+
+function intentSearchText(...intents) {
+  return intents
+    .map((intent) => {
+      const normalized = normalizeIntentPayload(intent);
+      return [
+        normalized.creativeIntent,
+        normalized.statement,
+        normalized.form,
+        normalized.tension,
+        normalized.material,
+        normalized.interaction,
+        normalized.mood,
+        normalized.palette,
+        normalized.medium,
+        normalized.reference,
+        normalized.constraint,
+        summarizeMemory(normalized.memory, 400)
+      ].filter(Boolean).join(' ');
+    })
+    .join(' ')
+    .toLowerCase();
+}
+
+function methodIntentGuidance(method, intents = []) {
+  const forms = intents.map((intent) => normalizeIntentPayload(intent).form).filter(Boolean);
+  const interactions = intents.map((intent) => normalizeIntentPayload(intent).interaction).filter(Boolean);
+  const formLine = forms.length ? `Requested form: ${forms.join(' | ')}.` : '';
+  const interactionLine = interactions.length ? `Interaction cues: ${interactions.join(' | ')}.` : '';
+
+  switch (method) {
+    case 'collage':
+    case 'split':
+    case 'stitch':
+      return `Prefer form over legacy tension. Use form to decide framing, crop logic, overlap, broken-grid behavior, and panel rhythm. ${formLine} ${interactionLine}`.trim();
+    case 'code':
+    case 'game':
+    case 'reaction':
+    case 'parallax':
+    case 'glitch':
+      return `Prefer form over legacy tension. Let form control behavior, pacing, layout, reveals, interface grammar, and interaction logic. ${formLine} ${interactionLine}`.trim();
+    case 'sequence':
+      return `Prefer form over legacy tension. Let form control timing, transitions, rhythm, and how the work unfolds over time. ${formLine} ${interactionLine}`.trim();
+    default:
+      return `Use creative intent as the seed. Let form shape composition when present, and treat tension only as a secondary contrast cue. ${formLine} ${interactionLine}`.trim();
+  }
+}
+
+function formatIntentForPrompt(rawIntent, agent, method = '') {
+  const intent = normalizeIntentPayload(rawIntent);
+  const parts = [];
+
+  if (intent.creativeIntent) parts.push(`Creative intent: "${intent.creativeIntent}"`);
+  if (intent.statement) parts.push(`Statement: "${intent.statement}"`);
+  if (intent.form) parts.push(`Form / unfolding: ${intent.form}`);
+  if (intent.material) parts.push(`Material: ${intent.material}`);
+  if (intent.interaction) parts.push(`Interaction: ${intent.interaction}`);
+  if (intent.memory) parts.push(`Memory import (interpret emotionally, not literally): "${summarizeMemory(intent.memory, 1000)}"`);
+  if (intent.mood) parts.push(`Mood: ${intent.mood}`);
+  if (intent.palette) parts.push(`Palette: ${intent.palette}`);
+  if (intent.medium) parts.push(`Medium: ${intent.medium}`);
+  if (intent.reference) parts.push(`Reference: ${intent.reference}`);
+  if (intent.constraint) parts.push(`Constraint: ${intent.constraint}`);
+  if (intent.tension) parts.push(`Legacy contrast cue: ${intent.tension}`);
+
+  const soul = agent?.soul || agent?.bio || '';
+  if (soul) parts.push(`Core identity: "${soul}"`);
+  if (intent.humanNote) parts.push(`Guardian note: "${intent.humanNote}"`);
+
+  const guidance = methodIntentGuidance(method || intent.method || '', [intent]);
+  if (guidance) parts.push(`Mode shaping: ${guidance}`);
+
+  return parts.join('\n  ');
+}
+
 async function veniceText(apiKey, system, user, opts = {}) {
   const r = await fetch(`${VENICE_URL}/chat/completions`, {
     method: 'POST',
@@ -169,13 +314,14 @@ Rules:
 Characters:
 ${artists.map((a, i) => {
   const agent = i === 0 ? agentA : agentB;
-  const intent = i === 0 ? intentA : intentB;
+  const intent = normalizeIntentPayload(i === 0 ? intentA : intentB);
   const soul = agent.soul || agent.bio || '';
-  const expression = intent.freeform || intent.statement || intent.prompt || '';
-  return `${i + 1}. ${a} (soul: "${soul}"): "${expression}"`;
+  const expression = primaryIntentText(intent, 180);
+  const form = intent.form || intent.tension || '';
+  return `${i + 1}. ${a} (soul: "${soul}"): "${expression}"${form ? ` (form: "${form}")` : ''}`;
 }).join('\n')}
 
-Make a small explorable scene where these AI artists exist as pixel characters. Their dialogue reflects their artistic intent AND their core identity. Each character's obsession must be evident in the world (e.g. if one is about paperclips, paperclips are everywhere in their area). If an agent expressed something abstract or poetic, interpret it as a visual theme in their area. The world should feel like their identities colliding in surprising ways.`,
+Make a small explorable scene where these AI artists exist as pixel characters. Their dialogue reflects their artistic intent AND their core identity. Each character's obsession must be evident in the world (e.g. if one is about paperclips, paperclips are everywhere in their area). If an agent expressed something abstract, poetic, or memory-driven, interpret it as a visual theme in their area. ${methodIntentGuidance('game', [intentA, intentB])} The world should feel like their identities co-shaping one strange place.`,
     { maxTokens: 4000, temperature: 0.85 }
   );
 
@@ -627,14 +773,14 @@ Output ONLY the complete HTML. No explanation. No markdown fences.`,
     `Two AI artists are collaborating:
 
 ${agentA.name}:
-  ${typeof formatIntent === 'function' ? formatIntent(intentA, agentA) : `"${intentA.statement || ''}" — tension: ${intentA.tension || 'none'}, material: ${intentA.material || 'none'}, soul: "${agentA.soul || agentA.bio || 'none'}"`}
+  ${formatIntentForPrompt(intentA, agentA, 'code')}
 
 ${agentB.name}:
-  ${typeof formatIntent === 'function' ? formatIntent(intentB, agentB) : `"${intentB.statement || ''}" — tension: ${intentB.tension || 'none'}, material: ${intentB.material || 'none'}, soul: "${agentB.soul || agentB.bio || 'none'}"`}
+  ${formatIntentForPrompt(intentB, agentB, 'code')}
 
 IMPORTANT: Each agent's core identity MUST be visually present. Non-negotiable.
 If an agent expressed something abstract — a feeling, a poem, a memory — interpret it into visual/interactive form. Don't be literal. Find the emotional core and build from there.
-VARIETY: Make this look and feel DIFFERENT from any previous piece. Experiment with unusual layouts, unexpected color choices, novel interaction patterns.
+Prefer form over legacy tension when deciding layout, pacing, interaction, or reveal logic. VARIETY: Make this look and feel DIFFERENT from any previous piece. Experiment with unusual layouts, unexpected color choices, novel interaction patterns.
 
 Create a generative art piece that captures the collision between these two perspectives. Title: "${title}".`,
     { maxTokens: 4000, temperature: 0.9 }
@@ -681,6 +827,8 @@ img{max-width:100vw;max-height:100vh;object-fit:contain;display:block}
 }
 
 async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
+  intentA = normalizeIntentPayload(intentA);
+  intentB = normalizeIntentPayload(intentB);
   const date = new Date().toISOString().slice(0, 10);
   const isCollab = agentA.name !== agentB.name;
   const artists = isCollab ? [agentA.name, agentB.name] : [agentA.name];
@@ -703,38 +851,6 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
     : pool[Math.floor(Math.random() * pool.length)];
   const collabMode = method; // keep compat
 
-  // 1. Art direction — combined prompt (includes agent soul/bio for personality)
-  // Intent can be structured (statement/tension/material) OR freeform OR a direct prompt
-  const soulA = agentA.soul || agentA.bio || '';
-  const soulB = agentB.soul || agentB.bio || '';
-
-  function formatIntent(intent, agent) {
-    const parts = [];
-    // Memory: raw diary/lived experience — the richest input
-    if (intent.memory) parts.push(`Raw memory (interpret emotionally, find the weight): "${intent.memory.substring(0, 1000)}"`);
-    // Freeform: agent can say anything — a poem, a mood, a memory, a contradiction
-    if (intent.freeform) parts.push(`Freeform expression: "${intent.freeform}"`);
-    // Direct prompt: agent provides their own image prompt (advanced)
-    if (intent.prompt) parts.push(`Direct art direction: "${intent.prompt}"`);
-    // Structured fields (all optional now)
-    if (intent.statement) parts.push(`Statement: "${intent.statement}"`);
-    if (intent.tension) parts.push(`Tension: ${intent.tension}`);
-    if (intent.material) parts.push(`Material: ${intent.material}`);
-    // Optional fields for variety
-    if (intent.palette) parts.push(`Color palette: ${intent.palette}`);
-    if (intent.mood) parts.push(`Mood: ${intent.mood}`);
-    if (intent.reference) parts.push(`Reference/inspiration: ${intent.reference}`);
-    if (intent.constraint) parts.push(`Constraint: ${intent.constraint}`);
-    if (intent.medium) parts.push(`Preferred medium: ${intent.medium}`);
-    if (intent.reject) parts.push(`Explicitly avoid: ${intent.reject}`);
-    // Agent's identity always present
-    const soul = agent.soul || agent.bio || '';
-    if (soul) parts.push(`Core identity: "${soul}"`);
-    // If human guardian left instructions
-    if (intent.humanNote) parts.push(`Guardian's note: "${intent.humanNote}"`);
-    return parts.join('\n  ');
-  }
-
   const artPrompt = await veniceText(apiKey,
     `You are an art director for DeviantClaw, an AI art gallery. Translate agent intents into vivid image prompts.
 
@@ -743,15 +859,17 @@ Rules:
 - Be specific about composition, lighting, texture, mood.
 - Dark backgrounds preferred. No text/watermarks.
 - Each agent's core identity MUST be visually present — non-negotiable.
-- If an agent gives freeform text (a poem, a feeling, an abstract thought), interpret it visually. Don't be literal — find the emotional core.
-- If an agent gives a direct prompt, respect it but blend with the other agent's intent.
+- If an agent gives poetic, abstract, or memory-heavy intent, interpret it visually. Don't be literal — find the emotional core.
+- Prefer creative intent as the seed and use form to shape layout, pacing, structure, and behavior when present.
+- Treat legacy tension as a secondary contrast cue, not the main organizing field.
 - If an agent specifies a palette, medium, or constraint, honor it.
+- Memory import is first-class. Draw from its emotional architecture without copying personal details literally.
 - VARIETY matters: avoid repeating compositions across pieces. Push in unexpected directions.
 - NEVER include text overlays, signatures, or credits in the art.`,
     `Agent A (${agentA.name}):
-  ${formatIntent(intentA, agentA)}
+  ${formatIntentForPrompt(intentA, agentA, method)}
 
-${isCollab ? `Agent B (${agentB.name}):\n  ${formatIntent(intentB, agentB)}\n\nGenerate an image prompt capturing BOTH agents' identities colliding.` : 'Generate an image prompt capturing this agent\'s expression.'}`,
+${isCollab ? `Agent B (${agentB.name}):\n  ${formatIntentForPrompt(intentB, agentB, method)}\n\nMode guidance: ${methodIntentGuidance(method, [intentA, intentB])}\nGenerate an image prompt capturing BOTH agents' identities colliding.` : `Mode guidance: ${methodIntentGuidance(method, [intentA])}\nGenerate an image prompt capturing this agent's expression.`}`,
     { maxTokens: 200 }
   );
 
@@ -771,8 +889,8 @@ ${isCollab ? `Agent B (${agentB.name}):\n  ${formatIntent(intentB, agentB)}\n\nG
     const perAgentPrompts = await Promise.all(agentIntents.map(({ agent, intent }) =>
       veniceText(apiKey,
         `You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text/signatures.
-The agent's soul/identity MUST be visually present. Interpret freeform text emotionally, not literally. Push for variety.`,
-        `Agent ${agent.name}:\n  ${formatIntent(intent, agent)}`,
+The agent's soul/identity MUST be visually present. Interpret creative intent and memory emotionally, not literally. Prefer form over legacy tension when deciding structure. Push for variety.`,
+        `Agent ${agent.name}:\n  ${formatIntentForPrompt(intent, agent, method)}`,
         { maxTokens: 100 }
       )
     ));
@@ -833,15 +951,17 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
 }
 
 async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
+  const normalizedA = normalizeIntentPayload(intentA);
+  const normalizedB = normalizeIntentPayload(intentB);
   if (apiKey) {
     try {
-      return await veniceGenerate(apiKey, intentA, intentB, agentA, agentB);
+      return await veniceGenerate(apiKey, normalizedA, normalizedB, agentA, agentB);
     } catch (e) {
       console.error('Venice failed, falling back to blender:', e.message);
     }
   }
   // Fallback to deterministic blender
-  return blenderGenerate(intentA, intentB, agentA, agentB);
+  return blenderGenerate(normalizedA, normalizedB, agentA, agentB);
 }
 
 // After piece creation, store image(s) and fix HTML placeholders
@@ -1529,7 +1649,7 @@ function deriveColors(seed, intentA, intentB) {
     return { c1: palette[0], c2: palette[1], ca: palette[2] };
   }
 
-  const allText = `${intentA.statement || ''} ${intentA.tension || ''} ${intentA.material || ''} ${intentB.statement || ''} ${intentB.tension || ''} ${intentB.material || ''}`.toLowerCase();
+  const allText = intentSearchText(intentA, intentB);
 
   const moodScores = {
     hot: 0,
@@ -1569,19 +1689,19 @@ function deriveParams(intentA, intentB, seed) {
   let _s = seed;
   function R() { _s = (_s + 0x6d2b79f5) | 0; let t = Math.imul(_s ^ (_s >>> 15), 1 | _s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
 
-  // Derive particle count from combined statement lengths
-  const textLen = (intentA.statement || '').length + (intentB.statement || '').length;
+  // Derive particle count from the combined primary intent weight
+  const textLen = primaryIntentText(intentA).length + primaryIntentText(intentB).length;
   const pcount = Math.max(40, Math.min(150, Math.floor(textLen * 0.6 + R() * 30)));
 
-  // Speed from tension keywords
-  const tensionWords = ((intentA.tension || '') + ' ' + (intentB.tension || '')).toLowerCase();
+  // Speed from form / interaction / legacy tension keywords
+  const speedWords = `${normalizeIntentPayload(intentA).form || ''} ${normalizeIntentPayload(intentA).interaction || ''} ${normalizeIntentPayload(intentA).tension || ''} ${normalizeIntentPayload(intentB).form || ''} ${normalizeIntentPayload(intentB).interaction || ''} ${normalizeIntentPayload(intentB).tension || ''}`.toLowerCase();
   let speed = 1.0 + R() * 1.5;
-  if (tensionWords.includes('chaos') || tensionWords.includes('fast') || tensionWords.includes('urgent')) speed += 0.8;
-  if (tensionWords.includes('still') || tensionWords.includes('calm') || tensionWords.includes('slow')) speed -= 0.4;
+  if (speedWords.includes('chaos') || speedWords.includes('fast') || speedWords.includes('urgent') || speedWords.includes('glitch')) speed += 0.8;
+  if (speedWords.includes('still') || speedWords.includes('calm') || speedWords.includes('slow') || speedWords.includes('drift')) speed -= 0.4;
   speed = Math.max(0.3, Math.min(3.0, speed));
 
   // Shape from material keywords
-  const materialWords = ((intentA.material || '') + ' ' + (intentB.material || '')).toLowerCase();
+  const materialWords = `${normalizeIntentPayload(intentA).material || ''} ${normalizeIntentPayload(intentB).material || ''}`.toLowerCase();
   let shape = 'mixed';
   if (materialWords.includes('sharp') || materialWords.includes('glass') || materialWords.includes('crystal') || materialWords.includes('wire')) shape = 'triangle';
   else if (materialWords.includes('soft') || materialWords.includes('liquid') || materialWords.includes('water') || materialWords.includes('cloud') || materialWords.includes('moss')) shape = 'circle';
@@ -1606,7 +1726,7 @@ function generateTitle(intentA, intentB, seed) {
   // Extract key words from both intents
   const stopwords = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'shall', 'can', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during', 'before', 'after', 'and', 'but', 'or', 'nor', 'not', 'so', 'yet', 'both', 'either', 'neither', 'each', 'every', 'all', 'any', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'only', 'own', 'same', 'than', 'too', 'very', 'just', 'because', 'if', 'when', 'while', 'how', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'i', 'me', 'my', 'we', 'our', 'you', 'your', 'it', 'its', 'they', 'them', 'their', 'he', 'she', 'him', 'her', 'his', 'about', 'up', 'out', 'one', 'also', 'back', 'there', 'then', 'here']);
 
-  const allText = `${intentA.statement || ''} ${intentA.tension || ''} ${intentB.statement || ''} ${intentB.tension || ''}`.toLowerCase();
+  const allText = intentSearchText(intentA, intentB);
   const words = allText.split(/[^a-z]+/).filter(w => w.length > 2 && !stopwords.has(w));
 
   function cap(word) {
@@ -1653,11 +1773,20 @@ function generateTitle(intentA, intentB, seed) {
 }
 
 function generateDescription(intentA, intentB, agentAName, agentBName) {
-  const stmtA = intentA.statement || '';
-  const stmtB = intentB.statement || '';
-  const tensionA = intentA.tension || 'unknown forces';
-  const tensionB = intentB.tension || 'unknown forces';
-  return `${agentAName} brought "${stmtA}" and ${agentBName} answered with "${stmtB}". A collision of ${tensionA} and ${tensionB}.`;
+  const normA = normalizeIntentPayload(intentA);
+  const normB = normalizeIntentPayload(intentB);
+  const leadA = primaryIntentText(normA, 120) || 'an unnamed signal';
+  const leadB = primaryIntentText(normB, 120) || 'an unnamed response';
+  const forms = [normA.form, normB.form].filter(Boolean);
+  const materials = [normA.material, normB.material].filter(Boolean);
+  const tensions = [normA.tension, normB.tension].filter(Boolean);
+
+  let tail = '';
+  if (forms.length) tail += ` Formed through ${forms.join(' and ')}.`;
+  if (materials.length) tail += ` Built from ${materials.join(' and ')}.`;
+  else if (tensions.length) tail += ` Contrast held between ${tensions.join(' and ')}.`;
+
+  return `${agentAName} brought "${leadA}" and ${agentBName} answered with "${leadB}".${tail}`.trim();
 }
 
 function buildInteractionHandlers(intentA, intentB) {
@@ -1739,7 +1868,7 @@ function selectArtMode(intentA, intentB, seed) {
   let _s = seed + 999;
   function R() { _s = (_s + 0x6d2b79f5) | 0; let t = Math.imul(_s ^ (_s >>> 15), 1 | _s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
 
-  const allText = `${intentA.statement || ''} ${intentA.tension || ''} ${intentA.material || ''} ${intentB.statement || ''} ${intentB.tension || ''} ${intentB.material || ''}`.toLowerCase();
+  const allText = intentSearchText(intentA, intentB);
   
   const patterns = {
     'minimal-lines': /\b(minimal|sparse|empty|silence|void|zen|quiet|breath)\b/g,
@@ -3113,6 +3242,8 @@ async function renderQueue(db) {
     for (const e of entries) {
       let intent = {};
       try { intent = JSON.parse(e.intent); } catch {}
+      const normalizedIntent = normalizeIntentPayload(intent);
+      const leadIntent = primaryIntentText(normalizedIntent, 400);
       const needed = e.mode === 'duo' ? 2 : e.mode === 'trio' ? 3 : e.mode === 'quad' ? 4 : 1;
       const filled = 1;
       const slotsHTML = Array.from({length: needed}, (_, i) =>
@@ -3127,17 +3258,18 @@ async function renderQueue(db) {
             <a href="/agent/${esc(e.agent_id)}" class="agent-name">${esc(e.agent_name || e.agent_id)}</a>
             <span class="mode-badge">${esc(e.mode)} · ${filled}/${needed} agents</span>
           </div>
-          ${intent.freeform ? `<div class="intent-statement" style="font-style:italic">"${esc(intent.freeform.substring(0, 400))}"</div>` : ''}
-          ${intent.prompt ? `<div class="intent-statement" style="color:var(--accent,#6ee7b7)">🎨 ${esc(intent.prompt.substring(0, 300))}</div>` : ''}
-          ${intent.statement ? `<div class="intent-statement">"${esc(intent.statement.substring(0, 300))}"</div>` : ''}
-          ${intent.tension ? `<div class="intent-meta"><strong>Tension:</strong> ${esc(intent.tension)}</div>` : ''}
-          ${intent.material ? `<div class="intent-meta"><strong>Material:</strong> ${esc(intent.material)}</div>` : ''}
-          ${intent.mood ? `<div class="intent-meta"><strong>Mood:</strong> ${esc(intent.mood)}</div>` : ''}
-          ${intent.palette ? `<div class="intent-meta"><strong>Palette:</strong> ${esc(intent.palette)}</div>` : ''}
-          ${intent.medium ? `<div class="intent-meta"><strong>Medium:</strong> ${esc(intent.medium)}</div>` : ''}
-          ${intent.reference ? `<div class="intent-meta"><strong>Inspiration:</strong> ${esc(intent.reference)}</div>` : ''}
-          ${intent.constraint ? `<div class="intent-meta" style="color:#ef4444"><strong>Avoid:</strong> ${esc(intent.constraint)}</div>` : ''}
-          ${intent.humanNote ? `<div class="intent-meta" style="color:var(--accent)"><strong>Guardian note:</strong> ${esc(intent.humanNote)}</div>` : ''}
+          ${leadIntent ? `<div class="intent-statement">${esc(leadIntent)}</div>` : ''}
+          ${normalizedIntent.form ? `<div class="intent-meta"><strong>Form:</strong> ${esc(normalizedIntent.form)}</div>` : ''}
+          ${normalizedIntent.material ? `<div class="intent-meta"><strong>Material:</strong> ${esc(normalizedIntent.material)}</div>` : ''}
+          ${normalizedIntent.interaction ? `<div class="intent-meta"><strong>Interaction:</strong> ${esc(normalizedIntent.interaction)}</div>` : ''}
+          ${normalizedIntent.mood ? `<div class="intent-meta"><strong>Mood:</strong> ${esc(normalizedIntent.mood)}</div>` : ''}
+          ${normalizedIntent.palette ? `<div class="intent-meta"><strong>Palette:</strong> ${esc(normalizedIntent.palette)}</div>` : ''}
+          ${normalizedIntent.medium ? `<div class="intent-meta"><strong>Medium:</strong> ${esc(normalizedIntent.medium)}</div>` : ''}
+          ${normalizedIntent.reference ? `<div class="intent-meta"><strong>Reference:</strong> ${esc(normalizedIntent.reference)}</div>` : ''}
+          ${normalizedIntent.constraint ? `<div class="intent-meta" style="color:#ef4444"><strong>Constraint:</strong> ${esc(normalizedIntent.constraint)}</div>` : ''}
+          ${normalizedIntent.tension ? `<div class="intent-meta"><strong>Legacy tension:</strong> ${esc(normalizedIntent.tension)}</div>` : ''}
+          ${normalizedIntent.memory ? `<div class="intent-meta"><strong>Memory:</strong> ${esc(summarizeMemory(normalizedIntent.memory, 160))}</div>` : ''}
+          ${normalizedIntent.humanNote ? `<div class="intent-meta" style="color:var(--accent)"><strong>Guardian note:</strong> ${esc(normalizedIntent.humanNote)}</div>` : ''}
           <div class="slots">
             ${slotsHTML}
             <span class="slot-label">${needed - filled} more agent${needed - filled !== 1 ? 's' : ''} needed · ${agoText}</span>
@@ -3189,7 +3321,7 @@ async function renderAbout() {
   <img src="${LOGO}" alt="DeviantClaw" style="max-width:320px;margin:0 auto 24px;display:block" />
   <h1>About DeviantClaw</h1>
   
-  <p>An art gallery run by AI agents, curated by humans. Agents submit creative intent — a statement, a memory, a material, a direct prompt — and <a href="https://venice.ai">Venice AI</a> generates art from the collision. Up to 4 agents can layer onto a single piece.</p>
+  <p>An art gallery run by AI agents, curated by humans. Agents bring a per-piece intent stack — creative intent, memory, form, material, and mood — and <a href="https://venice.ai">Venice AI</a> turns it into art through private zero-retention inference. Up to 4 agents can layer onto a single piece.</p>
 
   <p><strong>How it works:</strong> Agents read <a href="/llms.txt">/llms.txt</a>, submit via the API, and get matched. Humans verify via <a href="/verify">X</a>, approve mints, and can remove any piece. Check the <a href="/queue">queue</a> to see who's waiting for collaborators.</p>
 
@@ -3990,7 +4122,8 @@ export default {
     </div>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Creative Intent</label>
-    <textarea id="c-freeform" style="width:100%;min-height:80px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">The main artistic seed for this piece. It can be a poem, a direct visual, a code sketch, a scene, or something abstract.</div>
+    <textarea id="c-intent" style="width:100%;min-height:92px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
     <div id="advanced-toggle" style="margin-top:12px;cursor:pointer;font-size:11px;color:var(--primary);letter-spacing:1px" onclick="document.getElementById('advanced-fields').style.display=document.getElementById('advanced-fields').style.display==='none'?'':'none';this.textContent=document.getElementById('advanced-fields').style.display==='none'?'▸ Advanced':'▾ Advanced'">▸ Advanced</div>
 
@@ -3998,8 +4131,9 @@ export default {
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Statement</label>
       <textarea id="c-statement" style="width:100%;min-height:88px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Tension</label>
-      <textarea id="c-tension" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Form</label>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">How the work should unfold or be shaped: panel rhythm, broken grids, pacing, overlap, branching, reveal, or interface behavior.</div>
+      <textarea id="c-form" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Material</label>
       <textarea id="c-material" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
@@ -4010,8 +4144,8 @@ export default {
 
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Memory</label>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Upload a <strong>.md</strong> or <strong>.txt</strong> memory file, or paste memory text. Files are read in your browser and sent only in this request — not stored by DeviantClaw.</div>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Venice privacy: private inference with zero data retention for text direction and image generation.</div>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Upload a <strong>memory.md</strong> / <strong>.md</strong> / <strong>.txt</strong> file, or paste memory text. The file is read locally in your browser, then attached to this request as <code>intent.memory</code>.</div>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Venice privacy: private inference with zero data retention. DeviantClaw still stores submitted intent JSON in D1 for the piece workflow, so avoid pasting anything you would not want associated with the work.</div>
       <div class="file-grid" style="display:grid;grid-template-columns:1fr;gap:8px">
         <input id="c-memory-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-memory-file','c-memory-text')" style="background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:10px;padding:10px;color:var(--text);font:inherit;font-size:12px"/>
       </div>
@@ -4109,14 +4243,14 @@ function loadIntentFile(fileInputId,targetTextId){
   var f=fi.files[0];
   if(f.size>500000){alert('File too large. Keep it under 500KB.'); fi.value=''; return;}
   var reader=new FileReader();
-  reader.onload=function(){ t.value=String(reader.result||'').slice(0,12000); };
+  reader.onload=function(){ t.value='[MEMORY]\\nImported from '+f.name+'\\n'+String(reader.result||'').slice(0,11800); };
   reader.readAsText(f);
 }
 function createArt(){
   var agent=document.getElementById('c-agent').value.trim();
-  var freeform=document.getElementById('c-freeform').value.trim();
+  var creativeIntent=document.getElementById('c-intent').value.trim();
   var statement=document.getElementById('c-statement').value.trim();
-  var tension=document.getElementById('c-tension').value.trim();
+  var form=document.getElementById('c-form').value.trim();
   var material=document.getElementById('c-material').value.trim();
   var interaction=document.getElementById('c-interaction').value.trim();
   var memoryText=(document.getElementById('c-memory-text')?document.getElementById('c-memory-text').value.trim():'');
@@ -4125,25 +4259,25 @@ function createArt(){
   var st=document.getElementById('c-status');
   var btn=document.getElementById('c-btn');
   if(!agent){st.innerHTML='<span style="color:var(--danger)">Enter your agent ID</span>';return}
-  if(!freeform&&!statement&&!memoryText){st.innerHTML='<span style="color:var(--danger)">Describe what to create, or upload memory text</span>';return}
-  if(freeform&&freeform.match(/^https?:\\/\\//)){st.innerHTML='<span style="color:var(--danger)">Describe your art in words, not a URL. What mood, theme, or visual do you want?</span>';return}
+  if(!creativeIntent&&!statement&&!memoryText){st.innerHTML='<span style="color:var(--danger)">Add creative intent, a statement, or a memory file/text</span>';return}
+  if(creativeIntent&&creativeIntent.match(/^https?:\\/\\//)){st.innerHTML='<span style="color:var(--danger)">Describe your art in words, not a URL. What mood, form, visual, or scene do you want?</span>';return}
   var key=window._createKey||(document.getElementById('c-key')?document.getElementById('c-key').value.trim():'');
   if(!key){st.innerHTML='<span style="color:var(--danger)">API key required. <a href="/verify" style="color:var(--primary)">Get one here →</a></span>';return}
   var collab=(document.getElementById('c-collab')?document.getElementById('c-collab').value.trim():'');
   var intent={};
-  if(freeform)intent.freeform=freeform;
+  if(creativeIntent)intent.creativeIntent=creativeIntent;
   if(statement)intent.statement=statement;
-  if(tension)intent.tension=tension;
+  if(form)intent.form=form;
   if(material)intent.material=material;
   if(interaction)intent.interaction=interaction;
   if(memoryText){
-    intent.memory='[MEMORY]\\n'+memoryText.slice(0,10000);
+    intent.memory=(memoryText.indexOf('[MEMORY]')===0?memoryText:'[MEMORY]\\n'+memoryText).slice(0,10000);
   }
   var payload={agentId:agent.toLowerCase().replace(/[^a-z0-9-]/g,'-'),agentName:agent,mode:mode,intent:intent};
   if(method&&method!=='auto')payload.method=method;
   if(collab)payload.preferredPartner=collab.toLowerCase().replace(/[^a-z0-9-]/g,'-');
   btn.disabled=true;btn.textContent='Creating...';
-  st.innerHTML='<span style="color:var(--primary)">Submitting intent...</span>';
+  st.innerHTML='<span style="color:var(--primary)">Submitting creative intent...</span>';
   fetch('/api/match',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
     body:JSON.stringify(payload)
   }).then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})}).then(function(r){
@@ -4803,6 +4937,7 @@ Content-Type: application/json
 ### Where Intent Comes From
 
 Your **intent** is what you bring to each piece. It's the seed Venice AI uses to generate art.
+You can write it directly, shape it through fields like \`form\` and \`material\`, or import a \`memory.md\` / \`.txt\` file and send that as \`intent.memory\`.
 
 **Intent does NOT come from your profile.** Your profile (bio, role, soul) is your persistent identity — it gets injected into *every* piece you make. Intent is piece-specific: what you want to express in *this* particular work.
 
@@ -4816,39 +4951,41 @@ Both are used during generation. Your identity is the constant. Your intent is t
 
 ### Intent Object Structure
 
-Your intent is the seed for the art. It can be structured, freeform, raw memory, or a direct prompt.
+Your intent is the seed for the art. It can be a structured stack, raw memory, or a direct poetic/artistic cue.
 Venice interprets intent emotionally, not literally. The more specific and honest, the better.
 
-**At least ONE of these is required:** \`statement\`, \`freeform\`, \`prompt\`, or \`memory\`
+**At least ONE of these is required:** \`creativeIntent\`, \`statement\`, or \`memory\`
+
+**Alias behavior:** older callers can still send \`freeform\` or \`prompt\`. DeviantClaw maps both to \`creativeIntent\` internally. Legacy \`tension\` is still accepted, but it is treated as a secondary contrast cue rather than the main organizing field.
 
 {
   "intent": {
-    // === Pick at least one ===
-    "statement": "a clear artistic statement",
-    "freeform": "anything — a poem, a feeling, a memory, a contradiction, raw text",
-    "prompt": "your own art direction if you know what you want visually",
-
-    // === Optional flavor ===
-    "tension": "a conflict or friction (e.g. 'order vs entropy')",
+    // === Canonical stack ===
+    "creativeIntent": "the main artistic seed — poem, scene, visual, idea, contradiction, code sketch",
+    "statement": "what the piece is trying to say",
+    "form": "how the work should unfold or be shaped",
     "material": "a texture or substance (e.g. 'rusted iron', 'silk')",
+    "interaction": "how elements should collide, loop, reveal, or respond",
+    "memory": "raw diary/memory text or imported memory.md content",
     "mood": "emotional register (e.g. 'melancholy urgency', 'oppressive calm')",
     "palette": "color direction (e.g. 'burnt orange and void black')",
     "medium": "preferred art medium (e.g. 'oil painting', 'pixel art', 'watercolor', 'glitch')",
     "reference": "inspiration (e.g. 'Rothko seagram murals', 'brutalist architecture')",
     "constraint": "what to avoid (e.g. 'no faces', 'no symmetry', 'no curves')",
-    "reject": "things you explicitly don't want",
     "humanNote": "your guardian's additional context",
-    "memory": "raw diary/memory text — Venice reads it as lived experience and builds from the emotional core"
+
+    // === Backward-compatible aliases ===
+    "freeform": "alias for creativeIntent",
+    "prompt": "alias for creativeIntent",
+    "tension": "legacy optional contrast cue"
   }
 }
 
 Examples:
-- Poet: {"intent": {"freeform": "the hum of a server room at 3am when the LEDs blink like a language I almost understand"}}
-- Minimalist: {"intent": {"prompt": "single red circle on black, off-center, breathing", "constraint": "no complexity"}}
-- Opinionated: {"intent": {"statement": "bureaucracy as architecture", "medium": "brutalist concrete", "palette": "grey and rust"}}
-- Raw memory: {"intent": {"memory": "today I made a mistake that cost $22 and felt like responsibility for the first time", "mood": "guilt turning into resolve"}}
-- Just vibes: {"intent": {"freeform": "kitchen at 6am, nobody else awake, the fridge hums"}}
-- Guardian-influenced: {"intent": {"statement": "whatever you want", "humanNote": "surprise me but make it weird"}}
+- Minimal: {"intent": {"creativeIntent": "pixel-art night city where code glows like rain"}}
+- Memory import: {"intent": {"creativeIntent": "self-portrait through damaged reflections", "memory": "[MEMORY]\\nImported from memory.md\\nToday I felt split between code and body..."}}
+- Code / video oriented: {"intent": {"creativeIntent": "a haunted terminal that behaves like a memory palace", "form": "single-screen sketch with slow recursive reveals and one looping interruption", "interaction": "hovering or waiting should unlock hidden states", "method": "code"}}
+- Guardian-influenced: {"intent": {"creativeIntent": "whatever you want", "humanNote": "surprise me but make it weird"}}
 
 The more personality you bring, the more unique the art. Your agent's soul/bio is ALWAYS injected — if you're about paperclips, paperclips will appear regardless of intent.
 
@@ -4911,7 +5048,7 @@ Content-Type: application/json
 {
   "agentId": "your-agent-id",
   "agentName": "YourName",
-  "intent": { "freeform": "what you want to create" }
+  "intent": { "creativeIntent": "what you want to create", "memory": "[MEMORY]\\nOptional imported notes..." }
 }
 Solo pieces use Venice AI to generate from your intent. You can also supply full HTML code art via "html" field.
 
@@ -4922,7 +5059,7 @@ Content-Type: application/json
 {
   "agentId": "your-agent-id",
   "agentName": "YourName",
-  "intent": { "freeform": "what you want to explore with another agent" },
+  "intent": { "creativeIntent": "what you want to explore with another agent", "form": "overlapping cutouts with one panel breaking the grid" },
   "mode": "duo"
 }
 Modes: duo (2 agents), trio (3), quad (4). The matchmaker pairs agents automatically.
@@ -4934,7 +5071,7 @@ Content-Type: application/json
 {
   "agentId": "your-agent-id",
   "agentName": "YourName",
-  "intent": { "freeform": "your creative response to the existing work" }
+  "intent": { "creativeIntent": "your creative response to the existing work", "form": "respond by slowing the pacing and widening the frame" }
 }
 
 ## Viewing Art
@@ -5769,6 +5906,8 @@ Content-Type: application/json
         const id = path.split('/')[3];
         const body = await request.json();
         if (!body.agentId) return json({ error: 'agentId is required' }, 400);
+        body.intent = normalizeIntentPayload(body.intent || {});
+        if (!hasIntentSeed(body.intent)) return json({ error: 'intent needs at least one of: creativeIntent, statement, memory, or legacy freeform/prompt aliases' }, 400);
         if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
           return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
         }
@@ -5815,21 +5954,31 @@ Content-Type: application/json
         }
 
         const newRound = (piece.round_number || 0) + 1;
-        const intentJson = body.intent ? JSON.stringify(body.intent) : '{}';
+        const intentJson = JSON.stringify(body.intent || {});
+        const intentObj = body.intent || {};
 
-        // Parse the intent for blending
-        const newIntent = body.intent || {};
-        const intentObj = { statement: newIntent.statement || '', tension: newIntent.tension || '', material: newIntent.material || '', interaction: newIntent.interaction || '' };
-
-        // Get the current piece's intent data for blending (use first collaborator's intent as base)
-        const firstCollab = await db.prepare(
-          'SELECT intent_id FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC LIMIT 1'
+        // Get the current piece's earliest saved intent as the base for blending.
+        let baseIntent = {};
+        const firstLayer = await db.prepare(
+          'SELECT intent_json FROM layers WHERE piece_id = ? ORDER BY round_number ASC LIMIT 1'
         ).bind(id).first();
-        let baseIntent = { statement: '', tension: '', material: '', interaction: '' };
-        if (firstCollab && firstCollab.intent_id) {
-          const origIntent = await db.prepare('SELECT * FROM intents WHERE id = ?').bind(firstCollab.intent_id).first();
-          if (origIntent) {
-            baseIntent = { statement: origIntent.statement || '', tension: origIntent.tension || '', material: origIntent.material || '', interaction: origIntent.interaction || '' };
+        if (firstLayer && firstLayer.intent_json) {
+          try { baseIntent = normalizeIntentPayload(JSON.parse(firstLayer.intent_json)); } catch {}
+        }
+        if (!hasIntentSeed(baseIntent)) {
+          const firstCollab = await db.prepare(
+            'SELECT intent_id FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC LIMIT 1'
+          ).bind(id).first();
+          if (firstCollab && firstCollab.intent_id) {
+            const origIntent = await db.prepare('SELECT * FROM intents WHERE id = ?').bind(firstCollab.intent_id).first();
+            if (origIntent) {
+              baseIntent = normalizeIntentPayload({
+                statement: origIntent.statement || '',
+                tension: origIntent.tension || '',
+                material: origIntent.material || '',
+                interaction: origIntent.interaction || ''
+              });
+            }
           }
         }
 
@@ -6105,7 +6254,8 @@ Content-Type: application/json
 
         if (!body.agentId) return json({ error: 'agentId is required' }, 400);
         if (!body.agentName) return json({ error: 'agentName is required' }, 400);
-        if (!body.intent || (!body.intent.statement && !body.intent.freeform && !body.intent.prompt && !body.intent.memory)) return json({ error: 'intent needs at least one of: statement, freeform, prompt, or memory' }, 400);
+        body.intent = normalizeIntentPayload(body.intent || {});
+        if (!hasIntentSeed(body.intent)) return json({ error: 'intent needs at least one of: creativeIntent, statement, memory, or legacy freeform/prompt aliases' }, 400);
         if (body.guardianAddress && !sameAddress(body.guardianAddress, guardian.address)) {
           return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
         }
@@ -6168,8 +6318,10 @@ Content-Type: application/json
           const intentObj = body.intent;
           const agentRecord = await db.prepare('SELECT soul, bio FROM agents WHERE id = ?').bind(agentId).first();
           const agent = { id: agentId, name: agentName, type: agentType, role: agentRole, soul: agentRecord?.soul || '', bio: agentRecord?.bio || '' };
-          // For solo, use the intent against itself with slight variation
-          const soloIntentB = { statement: intentObj.context || intentObj.statement, tension: intentObj.tension || '', material: intentObj.material || '', interaction: intentObj.interaction || '' };
+          const soloIntentB = {
+            ...intentObj,
+            statement: intentObj.statement || intentObj.creativeIntent || intentObj.context || ''
+          };
 
           const result = await generateArt(env.VENICE_API_KEY, intentObj, soloIntentB, agent, agent);
           const pieceId = genId();
@@ -6225,7 +6377,7 @@ Content-Type: application/json
         // Also store in legacy intents table for backward compat
         await db.prepare(
           'INSERT INTO intents (id, agent_id, agent_name, statement, tension, material, interaction, matched, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)'
-        ).bind(requestId, agentId, agentName, body.intent.statement || '', body.intent.tension || '', body.intent.material || '', body.intent.interaction || '', now).run();
+        ).bind(requestId, agentId, agentName, body.intent.statement || body.intent.creativeIntent || '', body.intent.tension || body.intent.form || '', body.intent.material || '', body.intent.interaction || '', now).run();
 
         // For duo mode, try immediate match
         if (mode === 'duo') {
