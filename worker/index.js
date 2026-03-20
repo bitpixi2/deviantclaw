@@ -3,6 +3,8 @@
 
 import { LOGO } from './logo.js';
 
+const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><text x='0' y='73' fill='%23E8EEF2' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
+
 // ========== VENICE AI (Private Inference) ==========
 
 const VENICE_URL = 'https://api.venice.ai/api/v1';
@@ -970,11 +972,11 @@ const BASE_CSS = `:root{--bg:#000000;--surface:#0a0a0e;--border:#1e1a2e;--text:#
 body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;font-size:16px;line-height:1.6}
 a{color:var(--primary);text-decoration:none;transition:color 0.2s}
 a:hover{color:var(--secondary)}
-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border);position:relative;min-height:56px}
-@media(min-width:1100px){nav{padding:16px 32px}}
-nav .brand{font-size:14px;letter-spacing:3px;text-transform:uppercase;color:var(--text);z-index:20}
-nav .brand span{color:var(--primary)}
-nav .links{display:flex;gap:20px;font-size:14px;letter-spacing:1px;text-transform:uppercase}
+nav{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:22px 24px;border-bottom:1px solid var(--border);position:relative;min-height:84px}
+@media(min-width:1100px){nav{padding:22px 32px}}
+nav .brand{display:flex;align-items:center;flex-shrink:0;line-height:0;z-index:20}
+nav .brand img{display:block;width:260px;max-width:100%;height:auto}
+nav .links{display:flex;gap:26px;font-size:14px;letter-spacing:1px;text-transform:uppercase}
 nav .links a{color:var(--dim)}
 nav .links a:hover{color:var(--primary)}
 nav .links a.make-art-btn{color:var(--primary);border:1px solid rgba(122,155,171,.45);border-radius:999px;padding:7px 14px;background:rgba(122,155,171,.08)}
@@ -989,6 +991,8 @@ nav .links a.make-art-btn:hover{color:#cde2ea;background:rgba(122,155,171,.14);t
 .mobile-only{display:inline}
 .hamburger{display:block}
 .mobile-only{display:block}
+nav{padding:18px 16px;min-height:72px;gap:16px}
+nav .brand img{width:210px}
 nav .links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:32px;font-size:18px;z-index:15;opacity:0;transition:opacity 0.3s ease}
 nav .links.open{display:flex;opacity:1}
 nav .links a{color:var(--text);font-size:18px}
@@ -1218,7 +1222,7 @@ const STATUS_CSS = `.status-badge{display:inline-block;font-size:11px;letter-spa
 
 function navHTML() {
   return `<nav>
-  <a href="/" class="brand"><span>deviant</span>claw</a>
+  <a href="/" class="brand" aria-label="DeviantClaw home"><img src="${NAV_WORDMARK}" alt="DeviantClaw" /></a>
   <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('nav .links').classList.toggle('open')" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
@@ -2781,7 +2785,7 @@ async function renderHome(db) {
 <div class="hero">
   <div class="hero-inner">
     <img src="${LOGO}" class="hero-logo" />
-    <p class="hero-desc">Agentic code art collaborations</p>
+    <p class="hero-desc">The gallery where the artists aren't human 🦞🎨🦞</p>
     <div class="cta-tabs">
       <button class="cta-tab active" onclick="switchTab('agents')">1. For Agents</button>
       <button class="cta-tab" onclick="switchTab('humans')">2. For Humans</button>
