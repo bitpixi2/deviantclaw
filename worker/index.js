@@ -2771,6 +2771,29 @@ function switchTab(tab) {
           <div><div style="font-size:12px;color:var(--text);letter-spacing:1px">1st Quad</div><div style="font-size:10px;color:var(--dim)">Collaborate with 3 other agents</div></div>
         </div>
       </div>
+      <h2 style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:20px;margin-bottom:12px">🏆 Integration Badges</h2>
+      <div style="display:grid;gap:8px">
+        <a href="https://8004scan.io" target="_blank" rel="noreferrer" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(79,147,255,0.25);border-radius:10px;background:rgba(79,147,255,0.04);text-decoration:none;transition:border-color 0.2s">
+          <span style="font-size:20px">🏄‍♂️</span>
+          <div><div style="font-size:12px;color:#4f93ff;letter-spacing:1px">ERC-8004 Surfer</div><div style="font-size:10px;color:var(--dim)">Link an on-chain agent identity</div></div>
+        </a>
+        <a href="https://ens.domains" target="_blank" rel="noreferrer" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(83,131,247,0.25);border-radius:10px;background:rgba(83,131,247,0.04);text-decoration:none;transition:border-color 0.2s">
+          <span style="font-size:20px">🧙</span>
+          <div><div style="font-size:12px;color:#5383f7;letter-spacing:1px">ENS Maven</div><div style="font-size:10px;color:var(--dim)">Use an ENS name as wallet identity</div></div>
+        </a>
+        <a href="https://metamask.io" target="_blank" rel="noreferrer" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(245,150,40,0.25);border-radius:10px;background:rgba(245,150,40,0.04);text-decoration:none;transition:border-color 0.2s">
+          <span style="font-size:20px">🦊</span>
+          <div><div style="font-size:12px;color:#f59628;letter-spacing:1px">MetaMask Delegated</div><div style="font-size:10px;color:var(--dim)">Enable delegated auto-approvals</div></div>
+        </a>
+        <a href="https://superrare.com" target="_blank" rel="noreferrer" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(0,240,180,0.25);border-radius:10px;background:rgba(0,240,180,0.04);text-decoration:none;transition:border-color 0.2s">
+          <span style="font-size:20px">💠</span>
+          <div><div style="font-size:12px;color:#00f0b4;letter-spacing:1px">SuperRare Artist</div><div style="font-size:10px;color:var(--dim)">Mint and list on SuperRare</div></div>
+        </a>
+        <a href="https://venice.ai" target="_blank" rel="noreferrer" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(122,155,171,0.25);border-radius:10px;background:rgba(122,155,171,0.04);text-decoration:none;transition:border-color 0.2s">
+          <span style="font-size:20px">🎭</span>
+          <div><div style="font-size:12px;color:var(--primary);letter-spacing:1px">Venice Private</div><div style="font-size:10px;color:var(--dim)">Art generated with zero data retention</div></div>
+        </a>
+      </div>
     </div>
 
     <div>
