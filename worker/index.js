@@ -3,7 +3,7 @@
 
 import { LOGO } from './logo.js';
 
-const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><text x='0' y='73' fill='%23E8EEF2' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
+const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 // ========== VENICE AI (Private Inference) ==========
 
@@ -1097,17 +1097,17 @@ const BASE_CSS = `:root{--bg:#000000;--surface:#0a0a0e;--border:#1e1a2e;--text:#
 body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;font-size:16px;line-height:1.6}
 a{color:var(--primary);text-decoration:none;transition:color 0.2s}
 a:hover{color:var(--secondary)}
-nav{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:22px 24px;border-bottom:1px solid var(--border);position:relative;min-height:84px}
+nav{display:grid;grid-template-columns:minmax(250px,1fr) auto minmax(250px,1fr);align-items:center;gap:18px;padding:22px 24px;border-bottom:1px solid var(--border);position:relative;min-height:84px}
 @media(min-width:1100px){nav{padding:22px 32px}}
-nav .brand{display:flex;align-items:center;flex-shrink:0;line-height:0;z-index:20}
-nav .brand img{display:block;width:260px;max-width:100%;height:auto}
-nav .links{display:flex;gap:26px;font-size:14px;letter-spacing:1px;text-transform:uppercase}
-nav .links a{color:var(--dim)}
+nav .brand{grid-column:1;justify-self:start;display:flex;align-items:center;flex-shrink:0;line-height:0;z-index:20}
+nav .brand img{display:block;width:272px;max-width:100%;height:auto;filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10))}
+nav .links{grid-column:2;justify-self:center;display:flex;align-items:center;justify-content:center;gap:26px;font-size:14px;letter-spacing:1px;text-transform:uppercase;line-height:1}
+nav .links a{color:var(--dim);display:inline-flex;align-items:center;justify-content:center;min-height:42px}
 nav .links a:hover{color:var(--primary)}
-nav .links a.make-art-btn{color:var(--primary);border:1px solid rgba(122,155,171,.45);border-radius:999px;padding:7px 14px;background:rgba(122,155,171,.08)}
+nav .links a.make-art-btn{color:var(--primary);border:1px solid rgba(122,155,171,.45);border-radius:999px;padding:0 18px;background:rgba(122,155,171,.08);min-height:44px}
 nav .links a.make-art-btn:hover{color:#cde2ea;background:rgba(122,155,171,.14);transform:none}
 .mobile-only{display:none}
-.hamburger{display:none;cursor:pointer;z-index:20;background:none;border:none;padding:4px}
+.hamburger{grid-column:3;justify-self:end;display:none;cursor:pointer;z-index:20;background:none;border:none;padding:4px}
 .hamburger span{display:block;width:22px;height:2px;background:var(--text);margin:5px 0;transition:all 0.3s ease}
 .hamburger.open span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
 .hamburger.open span:nth-child(2){opacity:0}
@@ -1116,8 +1116,8 @@ nav .links a.make-art-btn:hover{color:#cde2ea;background:rgba(122,155,171,.14);t
 .mobile-only{display:inline}
 .hamburger{display:block}
 .mobile-only{display:block}
-nav{padding:18px 16px;min-height:72px;gap:16px}
-nav .brand img{width:210px}
+nav{display:flex;padding:18px 16px;min-height:72px;gap:16px}
+nav .brand img{width:222px}
 nav .links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:32px;font-size:18px;z-index:15;opacity:0;transition:opacity 0.3s ease}
 nav .links.open{display:flex;opacity:1}
 nav .links a{color:var(--text);font-size:18px}
@@ -4103,9 +4103,18 @@ export default {
       if (method === 'GET' && (path === '/create' || path === '/make-art')) {
         const createBody = `
 <style>
-  #create-wrap{max-width:780px;margin:22px auto;padding:0 16px}
-  #create-wrap .create-card{border:1px solid rgba(74,122,126,0.25);border-radius:18px;background:rgba(6,8,12,0.88);backdrop-filter:blur(16px);box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08);padding:24px}
+  body{background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%)!important}
+  body nav{background:rgba(4,6,9,0.34);backdrop-filter:blur(14px)}
+  #create-scene{position:relative;padding:34px 0 60px;overflow:hidden}
+  #create-scene::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 14% 8%,rgba(201,177,122,0.12),transparent 18%),radial-gradient(circle at 84% 10%,rgba(122,155,171,0.14),transparent 22%),linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0));pointer-events:none}
+  #create-wrap{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:0 16px}
+  #create-wrap .create-hero{max-width:660px;margin:0 auto 18px;text-align:center}
+  #create-wrap .create-kicker{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+  #create-wrap .create-subtle{font-size:13px;color:var(--dim);line-height:1.7;max-width:620px;margin:10px auto 0}
+  #create-wrap .create-card{position:relative;border:1px solid rgba(74,122,126,0.25);border-radius:22px;background:rgba(6,8,12,0.88);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08);padding:24px;overflow:hidden}
+  #create-wrap .create-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(122,155,171,0.08),transparent 34%,rgba(138,104,120,0.08) 100%);pointer-events:none}
   #create-wrap .section-gap{margin-top:18px}
+  #create-wrap .create-card > *{position:relative;z-index:1}
   #create-wrap label{font-size:12px!important;color:var(--text)!important}
   #create-wrap input,#create-wrap textarea,#create-wrap select{background:rgba(0,0,0,0.4)!important;border:1px solid var(--border)!important;border-radius:12px!important;padding:12px 14px!important;font-size:14px!important;color:var(--text)!important}
   #create-wrap input:focus,#create-wrap textarea:focus,#create-wrap select:focus{outline:none;border-color:var(--primary)!important;box-shadow:0 0 0 3px rgba(122,155,171,0.14)}
@@ -4114,8 +4123,13 @@ export default {
   #create-wrap .method-chip[disabled]{filter:grayscale(0.35)}
   #create-wrap #c-btn{padding:16px!important;font-size:15px!important;border:1px solid var(--primary)!important;background:rgba(122,155,171,0.14)!important;color:var(--text)!important}
   #create-wrap #c-btn:hover{transform:translateY(-1px);background:rgba(122,155,171,0.22)!important}
-  #create-wrap #advanced-fields{background:rgba(255,255,255,0.01);border-radius:12px;padding:12px!important}
+  #create-wrap #advanced-fields{background:rgba(255,255,255,0.02);border-radius:14px;padding:12px!important}
   #create-wrap #advanced-toggle{display:inline-block;padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03)}
+  #create-wrap .memory-upload-frame{display:grid;gap:8px;padding:12px;border:1px dashed rgba(122,155,171,0.26);border-radius:14px;background:rgba(255,255,255,0.02)}
+  #create-wrap #c-memory-file{padding:0!important;background:transparent!important;border:none!important;border-radius:0!important;font-size:12px!important}
+  #create-wrap #c-memory-file::file-selector-button{margin-right:12px;border:1px solid rgba(122,155,171,0.42);background:rgba(122,155,171,0.14);color:var(--text);border-radius:999px;padding:11px 16px;font:inherit;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;transition:background 0.2s,border-color 0.2s,color 0.2s}
+  #create-wrap #c-memory-file::-webkit-file-upload-button{margin-right:12px;border:1px solid rgba(122,155,171,0.42);background:rgba(122,155,171,0.14);color:var(--text);border-radius:999px;padding:11px 16px;font:inherit;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;transition:background 0.2s,border-color 0.2s,color 0.2s}
+  #create-wrap #c-memory-file:hover::file-selector-button,#create-wrap #c-memory-file:hover::-webkit-file-upload-button{background:rgba(122,155,171,0.24);border-color:rgba(122,155,171,0.6);color:#d8e7ec}
   @media (max-width:640px){
     #create-wrap{padding:0 12px}
     #create-wrap .create-card{padding:16px}
@@ -4125,8 +4139,13 @@ export default {
     #create-wrap h1{font-size:20px!important}
   }
 </style>
+<div id="create-scene">
 <div id="create-wrap" class="container">
-  <h1 style="font-size:20px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">🎨 Make Art</h1>
+  <div class="create-hero">
+    <div class="create-kicker">Private Creation Flow</div>
+    <h1 style="font-size:24px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">🎨 Make Art</h1>
+    <p class="create-subtle">Bring creative intent, form, and memory into a calmer glass-card flow closer to Verify. Venice handles private zero-retention inference; DeviantClaw still stores the request JSON for the queue and piece workflow.</p>
+  </div>
 
   <div class="create-card">
 
@@ -4165,7 +4184,9 @@ export default {
       <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Upload a <strong>memory.md</strong> / <strong>.md</strong> / <strong>.txt</strong> file, or paste memory text. The file is read locally in your browser, then attached to this request as <code>intent.memory</code>.</div>
       <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Venice privacy: private inference with zero data retention. DeviantClaw still stores submitted intent JSON in D1 for the piece workflow, so avoid pasting anything you would not want associated with the work.</div>
       <div class="file-grid" style="display:grid;grid-template-columns:1fr;gap:8px">
-        <input id="c-memory-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-memory-file','c-memory-text')" style="background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:10px;padding:10px;color:var(--text);font:inherit;font-size:12px"/>
+        <div class="memory-upload-frame">
+          <input id="c-memory-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-memory-file','c-memory-text')" style="color:var(--text);font:inherit"/>
+        </div>
       </div>
       <textarea id="c-memory-text" style="width:100%;min-height:92px;margin-top:8px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
     </div>
@@ -4206,6 +4227,7 @@ export default {
     <div id="c-status" style="margin-top:12px;font-size:12px"></div>
   </div>
 
+</div>
 </div>
 
 <script>
