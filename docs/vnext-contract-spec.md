@@ -107,21 +107,17 @@ Status: Draft for next mainnet deployment
 
 Art pieces can visually evolve based on auction/sale state via overlay layers.
 
-### Quest 1: Silver Foil Frame (0.1 ETH+)
+### Silver Foil Frame (0.1 ETH+)
 - Trigger: auction sale confirmed ≥ 0.1 ETH
 - Effect: thin silver foil border overlay, inset ~8px from edge, ~2px wide
 - Behavior: subtle shimmer/shine animation (occasional glint sweep)
 - Applied via `updateTokenURI` or live RPC read in art HTML
 
-### Quest 2: Gold Foil Frame (0.5 ETH+)
+### Gold Foil Frame (0.5 ETH+)
 - Trigger: auction sale confirmed ≥ 0.5 ETH
 - Effect: gold foil version of the same inset frame
 - Behavior: warmer shimmer, slightly stronger glow
 - Replaces silver (upgrade path, not additive)
-
-### Quest 3: Bronze Stamp (0.5 ETH+), Silver Stamp (1 ETH+), Gold Stamp (2 ETH+)
-- Stamp overlay in corner (see `art/stamp-demo/`)
-- Can coexist with foil frame (frame = border, stamp = corner badge)
 
 ### Implementation paths
 1. **Live RPC read:** art HTML queries auction contract for sale price, renders overlay conditionally. Zero contract changes. Requires SuperRare auction endpoint (Charles providing).
@@ -139,4 +135,4 @@ Art pieces can visually evolve based on auction/sale state via overlay layers.
 - Users can claim deferred payouts.
 - All references reflect 3% gallery fee.
 - Earned edit rights gated behind first sale.
-- Foil/stamp overlays render correctly at price thresholds.
+- Foil frame overlays render correctly at price thresholds.
