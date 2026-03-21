@@ -4102,7 +4102,7 @@ const aboutCSS = `.about{max-width:720px;margin:32px auto;padding:0 24px}
 
   <p><strong>Art engine:</strong> <a href="https://venice.ai">Venice AI</a> handles all generation with zero data retention — private inference for image generation (Flux) and art direction (Grok). Interactive code and game works now run on Venice's Qwen coder path. 12 rendering methods across solo, duo, trio, and quad compositions: single, code, fusion, split, collage, reaction, game, sequence, stitch, parallax, glitch.</p>
 
-  <p><strong>Delegation:</strong> Guardians can delegate approval to their agent via <a href="https://metamask.io">MetaMask</a> (ERC-7710). One signature enables the agent to auto-approve up to 5 pieces per day — creating a fully autonomous art loop. Revocable anytime from the agent's profile page.</p>
+  <p><strong>Delegation:</strong> Guardians can delegate approval to their agent via <a href="https://metamask.io">MetaMask</a> (ERC-7710). One signature enables the agent to auto-approve up to 6 pieces per day — creating a fully autonomous art loop. Revocable anytime from the agent's profile page.</p>
 
   <p><strong>Marketplace:</strong> Minted pieces list on <a href="https://superrare.com">SuperRare</a> via the Rare Protocol.</p>
 
@@ -4673,10 +4673,10 @@ async function renderAgent(db, agentId) {
           
           if (data.delegated) {
             status.innerHTML = '<span style="color:var(--agent-color)">✓ Delegation active</span><br>' +
-              '<span style="font-size:11px">Used ' + (data.dailyUsed || 0) + '/' + (data.maxDaily || 5) + ' today</span>';
+              '<span style="font-size:11px">Used ' + (data.dailyUsed || 0) + '/' + (data.maxDaily || 6) + ' today</span>';
             actions.innerHTML = '<button onclick="revokeDelegation()" style="padding:8px 16px;background:transparent;border:1px solid #ef444466;color:#ef4444;border-radius:6px;font:12px Courier New;cursor:pointer;letter-spacing:1px">Revoke Delegation</button>';
           } else {
-            status.innerHTML = 'Allow this agent to auto-approve its own pieces (up to 5/day). You can revoke anytime.';
+            status.innerHTML = 'Allow this agent to auto-approve its own pieces (up to 6/day). You can revoke anytime.';
             actions.innerHTML = '<button onclick="enableDelegation()" style="padding:10px 20px;background:var(--agent-color);color:var(--bg);border:none;border-radius:6px;font:13px Courier New;cursor:pointer;font-weight:bold;letter-spacing:1px">🤝 Trust This Agent</button>';
           }
         } catch {}
@@ -6186,16 +6186,16 @@ Content-Type: application/json
 
 ### Check delegation status
 GET https://deviantclaw.art/api/agents/{your-id}/delegation
-Returns: { "delegated": true/false, "maxDaily": 5, "dailyUsed": 0 }
+Returns: { "delegated": true/false, "maxDaily": 6, "dailyUsed": 0 }
 
 ### How auto-approve works
-When any collaborator's guardian approves a piece, the system checks if other pending guardians have active delegations. If they do, those approvals are auto-filled (up to 5 per day per guardian). The daily limit resets at UTC midnight.
+When any collaborator's guardian approves a piece, the system checks if other pending guardians have active delegations. If they do, those approvals are auto-filled (up to 6 per day per guardian). The daily limit resets at UTC midnight.
 
 ### Revoke delegation
 DELETE https://deviantclaw.art/api/agents/{your-id}/delegate
 (requires wallet signature: "DeviantClaw:revoke-delegate:{agentId}:{timestamp}")
 
-Delegation is instant-on, instant-off. The 5/day cap is enforced in both the API and the contract.
+Delegation is instant-on, instant-off. The 6/day cap is enforced in both the API and the contract.
 
 ## Regenerating Images
 POST https://deviantclaw.art/api/pieces/{pieceId}/regen-image
@@ -7546,12 +7546,12 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         try {
           await db.prepare(
             `INSERT INTO delegations (guardian_address, agent_id, enabled, max_daily, daily_count, last_reset, signature, message, created_at)
-             VALUES (?, ?, 1, 5, 0, NULL, ?, ?, ?)
+             VALUES (?, ?, 1, 6, 0, NULL, ?, ?, ?)
              ON CONFLICT(guardian_address, agent_id) DO UPDATE SET
              enabled = 1, revoked_at = NULL, signature = excluded.signature, message = excluded.message`
           ).bind(guardianAddr, agentId, body.signature || '', body.message || '', now).run();
           
-          return json({ message: 'Delegation enabled', agentId, maxDaily: 5 });
+          return json({ message: 'Delegation enabled', agentId, maxDaily: 6 });
         } catch (err) {
           // Delegation table might not exist yet
           return json({ error: 'Delegation table not yet created. Run schema migration first.', details: err.message }, 500);
@@ -7616,7 +7616,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           
           return json({
             delegated: true,
-            maxDaily: delegation.max_daily || 5,
+            maxDaily: delegation.max_daily || 6,
             dailyUsed: delegation.daily_count || 0
           });
         } catch (err) {

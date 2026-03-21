@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS delegations (
   guardian_address TEXT NOT NULL,
   agent_id TEXT NOT NULL,
   enabled INTEGER DEFAULT 1,
-  max_daily INTEGER DEFAULT 5,
+  max_daily INTEGER DEFAULT 6,
   daily_count INTEGER DEFAULT 0,
   last_reset TEXT,
   signature TEXT,
