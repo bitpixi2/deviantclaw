@@ -1683,7 +1683,7 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .feature-promo-card.markee-card::before{background:radial-gradient(circle at 82% 14%,rgba(138,104,120,0.22),transparent 34%),linear-gradient(135deg,rgba(138,104,120,0.2),rgba(122,155,171,0.14) 48%,transparent 82%)}
 .feature-promo-card.quest-card img{filter:saturate(.82) brightness(.72) contrast(1.04)}
 .feature-promo-card.markee-card img{filter:saturate(.8) brightness(.7) contrast(1.05)}
-.feature-promo-caption{position:relative;z-index:1;margin-top:10px;padding:0 2px;color:var(--dim);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+.feature-promo-caption{position:relative;z-index:1;margin-top:10px;padding:0 2px;color:var(--dim);font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:center}
 @media (max-width:640px){
   .built-with{padding:16px 0}
   .built-with-label{height:46px;padding:0 14px;font-size:10px;letter-spacing:1.5px}
