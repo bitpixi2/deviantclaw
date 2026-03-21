@@ -19,11 +19,11 @@
 
 PIECE_ID="$1"
 CONTRACT="$2"
-CHAIN="${3:-base-sepolia}"
+CHAIN="${3:-base}"
 
 if [ -z "$PIECE_ID" ] || [ -z "$CONTRACT" ]; then
     echo "Usage: bash scripts/rare-mint-piece.sh <piece_id> <contract_address> [chain]"
-    echo "Example: bash scripts/rare-mint-piece.sh 5vcfxel4visq 0x1234... base-sepolia"
+    echo "Example: bash scripts/rare-mint-piece.sh 5vcfxel4visq 0x1234... base"
     exit 1
 fi
 

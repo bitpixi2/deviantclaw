@@ -6,11 +6,11 @@ CONTRACT="$1"
 TOKEN_ID="$2"
 PRICE="${3:-0.01}"
 DURATION="${4:-86400}"  # Default 24 hours
-CHAIN="${5:-base-sepolia}"
+CHAIN="${5:-base}"
 
 if [ -z "$CONTRACT" ] || [ -z "$TOKEN_ID" ]; then
     echo "Usage: bash scripts/rare-auction.sh <contract> <token_id> <starting_price_eth> [duration_seconds] [chain]"
-    echo "Example: bash scripts/rare-auction.sh 0x1234... 0 0.05 86400 base-sepolia"
+    echo "Example: bash scripts/rare-auction.sh 0x1234... 0 0.05 86400 base"
     exit 1
 fi
 

@@ -8,9 +8,9 @@ routes = [
 ]
 
 [vars]
-# Base Sepolia (testnet) — will be replaced with Base Mainnet for production
-CONTRACT_ADDRESS = "0x362Ba85F9182Ba068ed371Ec14F8B20D0aE2E03b"
-# New migration wallet (replaces compromised 0x40512B...)
+# Base Mainnet production collection contract
+CONTRACT_ADDRESS = "0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847"
+# Current owner / treasury / gallery custody wallet
 DEPLOYER_ADDRESS = "0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50"
 GALLERY_CUSTODY_ADDRESS = "0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50"
 BASE_RPC = "https://mainnet.base.org"
@@ -20,4 +20,3 @@ STATUS_SEPOLIA_RPC = "https://public.sepolia.rpc.status.network"
 binding = "DB"
 database_name = "deviantclaw"
 database_id = "c2c2c64f-ca80-4059-b2a7-560927b9d384"
-

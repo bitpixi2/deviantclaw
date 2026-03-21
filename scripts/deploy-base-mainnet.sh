@@ -73,6 +73,7 @@ forge create \
   --rpc-url "$RPC_URL" \
   --private-key "$DEPLOYER_KEY" \
   --chain-id "$CHAIN_ID" \
+  --broadcast \
   contracts/DeviantClaw.sol:DeviantClaw \
   --constructor-args \
   "$OWNER_ADDRESS" \
@@ -86,5 +87,5 @@ echo
 echo "Post-deploy checklist:"
 echo "  1. Save the deployed CONTRACT_ADDRESS into the Worker env"
 echo "  2. Set delegationManager and any floor overrides from the owner wallet"
-echo "  3. Configure Rare CLI for listing / auctions against the deployed contract"
-echo "  4. Keep sale-reactive foil tiers aligned: silver 0.1, gold 0.5, rare diamond 1.0"
+echo "  3. Point the Worker at the new CONTRACT_ADDRESS and use Rare CLI for listing / auctions only"
+echo "  4. Keep foil thresholds aligned: silver >= 0.1 ETH, gold >= 0.5 ETH, rare diamond >= 1 ETH"

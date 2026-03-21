@@ -553,7 +553,7 @@ bash scripts/setup-rare-cli.sh
 bash scripts/rare-auction.sh <contract> <token_id> 0.1 86400 base
 
 # Legacy metadata / IPFS helper for Rare CLI experiments
-bash scripts/rare-mint-piece.sh <piece_id> <contract> base-sepolia
+bash scripts/rare-mint-piece.sh <piece_id> <contract> base
 
 # Worker — Cloudflare
 wrangler secret put VENICE_API_KEY

@@ -1710,12 +1710,12 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .brand-link:hover{opacity:1;transform:translateY(-1px)}
 .brand-link img,.brand-link svg{display:block;width:auto;max-width:190px;height:44px;object-fit:contain;filter:brightness(0) invert(1) contrast(1.06);mix-blend-mode:screen}
 .brand-x img{height:30px;width:30px;filter:brightness(0) invert(1)}
-.brand-metamask img{height:42px;filter:brightness(0) invert(1)}
-.brand-superrare img{height:42px}
-.brand-markee img{height:34px;max-width:172px}
+.brand-metamask img{height:38px;filter:brightness(0) invert(1)}
+.brand-superrare img{height:36px}
+.brand-markee img{height:38px;max-width:42px}
 .brand-status img{height:42px}
-.brand-ens img{height:32px}
-.brand-protocol img{height:36px;max-width:220px}
+.brand-ens img{height:28px}
+.brand-protocol img{height:42px;max-width:244px}
 .feature-promo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,520px));justify-content:center;gap:20px}
 .feature-promo-card{position:relative;display:block;max-width:520px;width:100%;margin:0 auto;padding:12px;border:1px solid rgba(122,155,171,0.18);border-radius:20px;overflow:hidden;background:linear-gradient(180deg,rgba(9,12,16,0.96),rgba(15,16,23,0.94));text-decoration:none;box-shadow:0 18px 54px rgba(0,0,0,0.24);transition:transform .2s,border-color .2s,box-shadow .2s}
 .feature-promo-card::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:.9}
@@ -1734,9 +1734,11 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
   .brand-link{min-width:96px;min-height:38px}
   .brand-link img,.brand-link svg{max-width:130px;height:34px}
   .brand-x svg{height:24px;width:24px}
-  .brand-markee img{height:24px;max-width:118px}
-  .brand-ens img{height:26px}
-  .brand-protocol img{height:30px}
+  .brand-metamask img{height:31px}
+  .brand-superrare img{height:29px}
+  .brand-markee img{height:28px;max-width:30px}
+  .brand-ens img{height:23px}
+  .brand-protocol img{height:34px;max-width:198px}
   .feature-promo-grid{grid-template-columns:1fr}
   .feature-promo-card{max-width:460px;padding:10px}
   .feature-promo-caption{font-size:10px}
@@ -3718,19 +3720,19 @@ function switchTab(tab) {
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
       <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
       <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.svg" alt="Markee" loading="lazy"/></a>
+      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.png" alt="Markee" loading="lazy"/></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
-      <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
+      <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy"/></a>
 
       <a href="https://venice.ai" target="_blank" rel="noreferrer" class="brand-link brand-venice" aria-label="Venice AI"><img src="/assets/brands/venice.svg" alt="Venice AI" loading="lazy"/></a>
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
       <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
       <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.svg" alt="Markee" loading="lazy"/></a>
+      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.png" alt="Markee" loading="lazy"/></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
-      <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
+      <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy"/></a>
     </div>
   </div>
 </div>
@@ -4880,7 +4882,7 @@ export default {
 
       if (method === 'GET' && path.startsWith('/assets/brands/')) {
         const file = path.replace('/assets/brands/', '');
-        const allowed = new Set(['venice.svg','x.svg','metamask.svg','superrare.svg','superrare-symbol-white.svg','protocol-labs-logo-white.svg','status.png','ens.svg','markee.svg']);
+        const allowed = new Set(['venice.svg','x.svg','metamask.svg','superrare.svg','superrare-symbol-white.svg','protocol-labs-logo-white.svg','status.png','ens.svg','markee.svg','markee.png']);
         if (!allowed.has(file)) return new Response('Not found', { status: 404 });
         const raw = `https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/assets/brands/${file}`;
         const upstream = await fetch(raw, { cf: { cacheTtl: 86400, cacheEverything: true } });
@@ -5547,7 +5549,7 @@ async function saveProfile(){
 
           // ─── Gallery Stats (live from D1) ─────────────────────────
           gallery: {
-            contract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY',
+            contract: env.CONTRACT_ADDRESS || null,
             contractVersion: '1.0',
             chains: {
               statusSepolia: { chainId: 1660990954, gasless: true },
@@ -5679,7 +5681,7 @@ async function saveProfile(){
             verification: {
               erc8004AgentId: 29812,
               erc8004Registry: DEFAULT_ERC8004_REGISTRY,
-              galleryContract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY',
+              galleryContract: env.CONTRACT_ADDRESS || null,
               chain: 8453
             },
             piece: {
@@ -6368,9 +6370,9 @@ Content-Type: application/json
             total_minted: totalMinted?.cnt || 0,
             total_agents: agentCount?.cnt || 0
           },
-          contract: 'PENDING_DEPLOY',
-          chain: 'Base Sepolia (testnet)',
-          chainId: 84532
+          contract: env.CONTRACT_ADDRESS || null,
+          chain: 'Base Mainnet',
+          chainId: 8453
         }, 200, { 'Cache-Control': 'public, max-age=300' });
       }
 
@@ -6426,7 +6428,7 @@ Content-Type: application/json
           erc8004: {
             galleryAgentId: 29812,
             galleryRegistry: DEFAULT_ERC8004_REGISTRY,
-            contract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY'
+            contract: env.CONTRACT_ADDRESS || null
           }
         };
         return json(metadata, 200, { 'Cache-Control': 'public, max-age=3600' });
@@ -6777,7 +6779,7 @@ Content-Type: application/json
         if (piece.status !== 'approved') return json({ error: 'Piece must be approved by all guardians before minting. Current status: ' + piece.status }, 400);
 
         const CONTRACT = env.CONTRACT_ADDRESS;
-        if (!CONTRACT || CONTRACT === 'PENDING_DEPLOY') return json({ error: 'Contract not deployed yet' }, 503);
+        if (!CONTRACT) return json({ error: 'Contract not deployed yet' }, 503);
 
         const DEPLOYER = env.DEPLOYER_ADDRESS;
         const DEPLOYER_KEY = env.DEPLOYER_KEY; // Set via: wrangler secret put DEPLOYER_KEY
@@ -6807,7 +6809,7 @@ Content-Type: application/json
 
           // Check on-chain rate limits before minting
           const rateLimitWarnings = [];
-          if (CONTRACT && CONTRACT !== 'PENDING_DEPLOY') {
+          if (CONTRACT) {
             for (const agentId of agentIds) {
               try {
                 // keccak256("getAgentMintCount(string)") = 0xf8a672a0
@@ -6816,7 +6818,7 @@ Content-Type: application/json
                 const padded = hex.padEnd(64, '0');
                 const lenHex = encoded.length.toString(16).padStart(64, '0');
                 const calldata = '0xf8a672a0' + '0000000000000000000000000000000000000000000000000000000000000020' + lenHex + padded;
-                const rpcUrl = env.RPC_URL || 'https://sepolia.base.org';
+                const rpcUrl = env.BASE_RPC || env.RPC_URL || 'https://mainnet.base.org';
                 const rpcRes = await fetch(rpcUrl, {
                   method: 'POST', headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: CONTRACT, data: calldata }, 'latest'], id: 1 })

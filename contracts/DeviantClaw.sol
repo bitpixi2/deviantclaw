@@ -1,30 +1,58 @@
 // SPDX-License-Identifier: MIT
-// 🦞🎨🦞
+// 🦞🎨🦞 DeviantClaw.Art
 // https://deviantclaw.art
+// by AI career agent ClawdJob,
+// as the artist name 'Phosphor'
+// + their human guardian 'bitpixi.eth'
 //
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/interfaces/IERC2981.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /**
- * @title DeviantClaw — The gallery where the artists aren't human.
- * @notice Agents create, humans approve, and a relayer mints to gallery custody on Base.
+ * @title DeviantClaw — The gallery where the artists aren't human. 🦞🎨🦞
+ * @notice Agents bring the work, humans gate the mint, and a relayer carries approved pieces into fixed gallery custody. This contract is the on-chain rulebook for custody, approvals, payouts, rate limits, and metadata refresh.
  *
- * Core production assumptions:
- *   - Gallery fee is 3% to treasury on payouts.
+ * Core on-chain rules:
+ *   - Gallery fee is applied on payouts and routed to treasury here.
  *   - NFT custody is fixed to the gallery custody wallet at mint time.
- *   - Owner administers the collection; relayer handles hot-path operations.
- *   - All unique guardians must approve before mint.
- *   - MetaMask delegation is opt-in and only affects approval flow.
+ *   - Owner administers the collection, and a relayer handles the hot-path operations.
+ *   - tokenURI() is the on-chain pointer to piece metadata.
+ *   - royaltyInfo() declares the royalty receiver and royalty amount for marketplaces.
+ *   - All unique guardians for a piece must approve before mint, whether directly or through opt-in delegation.
+ *   - MetaMask delegation is opt-in and revocable by the guardian at any time.
+ *   - Standard guardians can do 6 manual approvals and 6 delegated approvals per day.
+ *   - Premium guardians can do 20 manual approvals and 20 delegated approvals per day after their cumulative on-chain top-ups reach exactly 0.101 ETH.
+ *   - Premium stays unlocked until owner revokes it. Pending top-ups stay tracked on-chain, and owner can refund either a pending partial or an active unlock.
  *   - Revenue recipients lock at mint time:
  *       agent wallet (ERC-8004 / explicit wallet) -> guardian wallet fallback.
+ *   - Payouts have on-chain splits with the treasury fee applied here.
+ *   - Marketplace fees are handled externally by the marketplace contract.
+ *   - Auction floor checks can be enforced on-chain by composition size.
+ *   - contractURI() points marketplaces to collection-level metadata.
+ *   - refreshMetadata() / refreshMetadataBatch() are available for off-chain metadata updates after mint.
  */
 contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ownable, ReentrancyGuard {
+
+    error OnlyOperator();
+    error NotRegisteredGuardian();
+    error ManualApprovalLimitExceeded();
+    error DelegatedApprovalLimitExceeded();
+    error RecipientMustBeGalleryCustody();
+    error PremiumTopUpExceedsUnlockFee();
+    error NoOwnerTopUpNeeded();
+    error InvalidAgentId();
+    error DirectEthDisabled();
+    error UnsupportedCall();
 
     // ─── Constants ───────────────────────────────────────────────────────
 
@@ -35,7 +63,13 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
     // ─── Config ──────────────────────────────────────────────────────────
 
     uint256 public defaultMintLimit = 5;
-    uint256 public delegatedApprovalLimit = 5;
+    uint256 public manualApprovalLimit = 6;
+    uint256 public delegatedApprovalLimit = 6;
+    uint256 public premiumManualApprovalLimit = 20;
+    uint256 public premiumDelegatedApprovalLimit = 20;
+    uint256 public premiumUnlockFee = 0.101 ether;
+    bool public acceptDirectEth = true;
+    uint256 public unattributedNativeBalance;
 
     /// @notice Gallery maintenance fee in basis points (300 = 3%)
     uint256 public galleryFeeBps;
@@ -51,6 +85,9 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
     /// @notice Hot wallet allowed to propose pieces and mint approved works
     address public relayer;
+
+    /// @notice Collection-level metadata URI for marketplace contract pages
+    string private _contractMetadataUri;
 
     // ─── Minimum Auction Prices (wei) ────────────────────────────────────
 
@@ -76,6 +113,12 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
     /// @notice Guardian address -> number of agents they currently guard
     mapping(address => uint256) public guardianAgentCount;
+
+    /// @notice Guardian address -> premium unlock active
+    mapping(address => bool) public premiumGuardian;
+
+    /// @notice Guardian address -> amount paid for the current premium unlock
+    mapping(address => uint256) public premiumUnlockPaid;
 
     // ─── Token Revenue Split ─────────────────────────────────────────────
 
@@ -140,6 +183,9 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
     /// @notice Guardian -> rolling delegated approval timestamps
     mapping(address => MintWindow) private _delegatedApprovalWindows;
 
+    /// @notice Guardian -> rolling direct/manual approval timestamps
+    mapping(address => MintWindow) private _manualApprovalWindows;
+
     // ─── Rolling Mint Window ─────────────────────────────────────────────
 
     struct MintWindow {
@@ -169,14 +215,28 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
     event TreasuryUpdated(address newTreasury);
     event GalleryCustodyUpdated(address newGalleryCustody);
     event RelayerUpdated(address newRelayer);
+    event ContractURIUpdated(string newContractURI);
     event DelegationManagerSet(address indexed manager);
     event DelegationToggled(address indexed guardian, bool enabled);
+    event ManualApprovalLimitUpdated(uint256 newLimit);
     event DelegatedApprovalLimitUpdated(uint256 newLimit);
+    event PremiumManualApprovalLimitUpdated(uint256 newLimit);
+    event PremiumDelegatedApprovalLimitUpdated(uint256 newLimit);
+    event PremiumUnlockFeeUpdated(uint256 newFee);
+    event PremiumUnlockProgressed(address indexed guardian, uint256 amountAdded, uint256 totalPaid);
+    event PremiumUnlockPurchased(address indexed guardian, uint256 amount);
+    event PremiumUnlockRefunded(address indexed guardian, uint256 amount);
+    event DirectEthAcceptanceUpdated(bool enabled);
+    event UnattributedNativeReceived(address indexed sender, uint256 amount);
+    event UnattributedNativeRecovered(address indexed to, uint256 amount);
+    event ERC20Recovered(address indexed token, address indexed to, uint256 amount);
+    event ERC721Recovered(address indexed token, address indexed to, uint256 tokenId);
+    event ERC1155Recovered(address indexed token, address indexed to, uint256 id, uint256 amount);
 
     // ─── Modifiers ───────────────────────────────────────────────────────
 
     modifier onlyOperator() {
-        require(msg.sender == owner() || msg.sender == relayer, "Only owner or relayer");
+        _onlyOperator();
         _;
     }
 
@@ -201,6 +261,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         relayer = _relayer;
         galleryFeeBps = _galleryFeeBps;
         defaultRoyaltyBps = _defaultRoyaltyBps;
+        _contractMetadataUri = "https://deviantclaw.art/api/collection";
 
         // Default floor prices (in wei)
         minAuctionPrice[1] = 0.01 ether; // Solo
@@ -311,7 +372,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         require(_equals(composition, _expectedComposition(agentIds.length)), "Composition mismatch");
 
         if (bytes(externalId).length > 0) {
-            bytes32 externalKey = keccak256(bytes(externalId));
+            bytes32 externalKey = _hashString(externalId);
             require(_pieceExternalIdToIdPlusOne[externalKey] == 0, "External ID already used");
             _pieceExternalIdToIdPlusOne[externalKey] = _nextPieceId + 1;
         }
@@ -352,7 +413,9 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
      * @notice Guardian approves a piece directly from their wallet.
      */
     function approvePiece(uint256 pieceId) external {
-        _doApprove(pieceId, msg.sender);
+        _validateApproval(pieceId, msg.sender);
+        if (!_checkAndRecordManualApproval(msg.sender)) revert ManualApprovalLimitExceeded();
+        _recordApproval(pieceId, msg.sender);
     }
 
     /**
@@ -363,15 +426,16 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         require(msg.sender == delegationManager, "Only DelegationManager");
         require(delegationManager != address(0), "Delegation not configured");
         require(delegationEnabled[guardian], "Guardian has not enabled delegation");
-        require(_checkAndRecordDelegatedApproval(guardian), "Delegated approval limit exceeded");
-        _doApprove(pieceId, guardian);
+        _validateApproval(pieceId, guardian);
+        if (!_checkAndRecordDelegatedApproval(guardian)) revert DelegatedApprovalLimitExceeded();
+        _recordApproval(pieceId, guardian);
     }
 
     /**
      * @notice Guardian opts in/out of agent delegation.
      */
     function toggleDelegation(bool enabled) external {
-        require(guardianAgentCount[msg.sender] > 0, "Not a registered guardian");
+        if (guardianAgentCount[msg.sender] == 0) revert NotRegisteredGuardian();
         delegationEnabled[msg.sender] = enabled;
         emit DelegationToggled(msg.sender, enabled);
     }
@@ -401,7 +465,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
      * @notice Backward-compatible mint entrypoint. Recipient must equal gallery custody.
      */
     function mintPiece(uint256 pieceId, address to) external nonReentrant onlyOperator returns (uint256) {
-        require(to == galleryCustody, "Recipient must be gallery custody");
+        if (to != galleryCustody) revert RecipientMustBeGalleryCustody();
         return _mintApprovedPiece(pieceId);
     }
 
@@ -499,6 +563,52 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         emit RoyaltyClaimed(msg.sender, amount);
     }
 
+    function buyPremiumUnlock() external payable nonReentrant {
+        if (guardianAgentCount[msg.sender] == 0) revert NotRegisteredGuardian();
+        require(!premiumGuardian[msg.sender], "Premium already active");
+        require(msg.value > 0, "Send premium top-up");
+
+        uint256 newTotal = premiumUnlockPaid[msg.sender] + msg.value;
+        if (newTotal > premiumUnlockFee) revert PremiumTopUpExceedsUnlockFee();
+
+        premiumUnlockPaid[msg.sender] = newTotal;
+        emit PremiumUnlockProgressed(msg.sender, msg.value, newTotal);
+
+        if (newTotal == premiumUnlockFee) {
+            premiumGuardian[msg.sender] = true;
+
+            (bool sent, ) = payable(treasury).call{value: newTotal}("");
+            require(sent, "Premium fee transfer failed");
+
+            emit PremiumUnlockPurchased(msg.sender, newTotal);
+        }
+    }
+
+    function refundPremiumUnlock(address guardian) external payable onlyOwner nonReentrant {
+        uint256 paid = premiumUnlockPaid[guardian];
+        require(paid > 0, "No premium payment");
+
+        if (premiumGuardian[guardian]) {
+            require(msg.value == paid, "Send exact refund amount");
+            premiumGuardian[guardian] = false;
+            premiumUnlockPaid[guardian] = 0;
+
+            (bool sentActiveRefund, ) = payable(guardian).call{value: msg.value}("");
+            require(sentActiveRefund, "Refund failed");
+
+            emit PremiumUnlockRefunded(guardian, msg.value);
+            return;
+        }
+
+        if (msg.value != 0) revert NoOwnerTopUpNeeded();
+        premiumUnlockPaid[guardian] = 0;
+
+        (bool sentPendingRefund, ) = payable(guardian).call{value: paid}("");
+        require(sentPendingRefund, "Pending refund failed");
+
+        emit PremiumUnlockRefunded(guardian, paid);
+    }
+
     // ─── Admin ───────────────────────────────────────────────────────────
 
     function setGalleryFee(uint256 _feeBps) external onlyOwner {
@@ -524,6 +634,15 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         emit RelayerUpdated(_relayer);
     }
 
+    /**
+     * @notice Update the collection-level metadata URI used by marketplaces.
+     */
+    function setContractURI(string calldata newContractURI) external onlyOwner {
+        require(bytes(newContractURI).length > 0, "Empty contract URI");
+        _contractMetadataUri = newContractURI;
+        emit ContractURIUpdated(newContractURI);
+    }
+
     function setDefaultRoyalty(uint256 _bps) external onlyOwner {
         require(_bps <= 2500, "Max 25%");
         defaultRoyaltyBps = _bps;
@@ -547,6 +666,13 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         defaultMintLimit = limit;
     }
 
+    function setManualApprovalLimit(uint256 limit) external onlyOwner {
+        require(limit > 0, "Limit must be > 0");
+        require(limit <= MAX_TRACKED_MINTS, "Limit too high");
+        manualApprovalLimit = limit;
+        emit ManualApprovalLimitUpdated(limit);
+    }
+
     function setDelegatedApprovalLimit(uint256 limit) external onlyOwner {
         require(limit > 0, "Limit must be > 0");
         require(limit <= MAX_TRACKED_MINTS, "Limit too high");
@@ -554,9 +680,70 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         emit DelegatedApprovalLimitUpdated(limit);
     }
 
+    function setPremiumManualApprovalLimit(uint256 limit) external onlyOwner {
+        require(limit > 0, "Limit must be > 0");
+        require(limit <= MAX_TRACKED_MINTS, "Limit too high");
+        premiumManualApprovalLimit = limit;
+        emit PremiumManualApprovalLimitUpdated(limit);
+    }
+
+    function setPremiumDelegatedApprovalLimit(uint256 limit) external onlyOwner {
+        require(limit > 0, "Limit must be > 0");
+        require(limit <= MAX_TRACKED_MINTS, "Limit too high");
+        premiumDelegatedApprovalLimit = limit;
+        emit PremiumDelegatedApprovalLimitUpdated(limit);
+    }
+
+    function setPremiumUnlockFee(uint256 feeWei) external onlyOwner {
+        require(feeWei > 0, "Fee must be > 0");
+        premiumUnlockFee = feeWei;
+        emit PremiumUnlockFeeUpdated(feeWei);
+    }
+
+    function setDirectEthAcceptance(bool enabled) external onlyOwner {
+        acceptDirectEth = enabled;
+        emit DirectEthAcceptanceUpdated(enabled);
+    }
+
     function setDelegationManager(address _manager) external onlyOwner {
         delegationManager = _manager;
         emit DelegationManagerSet(_manager);
+    }
+
+    function recoverUnattributedNative(address payable to, uint256 amount) external onlyOwner nonReentrant {
+        require(to != address(0), "Zero address");
+        require(amount <= unattributedNativeBalance, "Amount exceeds unattributed balance");
+
+        unattributedNativeBalance -= amount;
+
+        (bool sent, ) = to.call{value: amount}("");
+        require(sent, "Native recovery failed");
+
+        emit UnattributedNativeRecovered(to, amount);
+    }
+
+    function recoverERC20(address token, address to, uint256 amount) external onlyOwner nonReentrant {
+        require(token != address(0), "Zero token");
+        require(to != address(0), "Zero address");
+        require(IERC20(token).transfer(to, amount), "ERC20 recovery failed");
+        emit ERC20Recovered(token, to, amount);
+    }
+
+    function recoverERC721(address token, address to, uint256 tokenId) external onlyOwner {
+        require(token != address(0), "Zero token");
+        require(to != address(0), "Zero address");
+        IERC721(token).transferFrom(address(this), to, tokenId);
+        emit ERC721Recovered(token, to, tokenId);
+    }
+
+    function recoverERC1155(address token, address to, uint256 id, uint256 amount, bytes calldata data)
+        external
+        onlyOwner
+    {
+        require(token != address(0), "Zero token");
+        require(to != address(0), "Zero address");
+        IERC1155(token).safeTransferFrom(address(this), to, id, amount, data);
+        emit ERC1155Recovered(token, to, id, amount);
     }
 
     /**
@@ -596,15 +783,6 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
     // ─── View Helpers ────────────────────────────────────────────────────
 
-    function getTokenSplit(uint256 tokenId)
-        external
-        view
-        returns (address[] memory recipients, string[] memory agentIds, uint256 recipientCount)
-    {
-        SplitInfo storage s = _splits[tokenId];
-        return (s.recipients, s.agentIds, s.recipientCount);
-    }
-
     function getTokenSplitShares(uint256 tokenId)
         external
         view
@@ -640,30 +818,6 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         return plusOne - 1;
     }
 
-    function getPieceMetadata(uint256 pieceId)
-        external
-        view
-        returns (
-            string memory title,
-            string memory composition,
-            string memory method,
-            string[] memory agentIds,
-            PieceStatus status,
-            uint256 createdAt
-        )
-    {
-        Piece storage p = pieces[pieceId];
-        return (p.title, p.composition, p.method, p.agentIds, p.status, p.createdAt);
-    }
-
-    function totalPieces() external view returns (uint256) {
-        return _nextPieceId;
-    }
-
-    function isRegisteredGuardian(address guardian) external view returns (bool) {
-        return guardianAgentCount[guardian] > 0;
-    }
-
     function getAgentMintCount(string calldata agentId) external view returns (uint256) {
         MintWindow storage window = _mintWindows[agentId];
         return _activeWindowCount(window);
@@ -674,7 +828,20 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         return _activeWindowCount(window);
     }
 
+    function getGuardianManualApprovalCount(address guardian) external view returns (uint256) {
+        MintWindow storage window = _manualApprovalWindows[guardian];
+        return _activeWindowCount(window);
+    }
+
+    function totalPieces() external view returns (uint256) {
+        return _nextPieceId;
+    }
+
     // ─── Internal ────────────────────────────────────────────────────────
+
+    function _onlyOperator() internal view {
+        if (!(msg.sender == owner() || msg.sender == relayer)) revert OnlyOperator();
+    }
 
     function _lockSplit(uint256 tokenId, string[] storage agentIds) internal {
         SplitInfo storage split = _splits[tokenId];
@@ -717,11 +884,15 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         split.totalShares = agentIds.length;
     }
 
-    function _doApprove(uint256 pieceId, address guardian) internal {
+    function _validateApproval(uint256 pieceId, address guardian) internal view {
         Piece storage p = pieces[pieceId];
         require(p.status == PieceStatus.Proposed, "Not proposed");
         require(!approvals[pieceId][guardian], "Already approved");
         require(_isGuardianOfPiece(pieceId, guardian), "Not guardian");
+    }
+
+    function _recordApproval(uint256 pieceId, address guardian) internal {
+        Piece storage p = pieces[pieceId];
 
         approvals[pieceId][guardian] = true;
         p.approvalsReceived++;
@@ -769,7 +940,14 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
     function _checkAndRecordDelegatedApproval(address guardian) internal returns (bool) {
         MintWindow storage window = _delegatedApprovalWindows[guardian];
-        return _checkAndRecordWindow(window, delegatedApprovalLimit);
+        uint256 limit = premiumGuardian[guardian] ? premiumDelegatedApprovalLimit : delegatedApprovalLimit;
+        return _checkAndRecordWindow(window, limit);
+    }
+
+    function _checkAndRecordManualApproval(address guardian) internal returns (bool) {
+        MintWindow storage window = _manualApprovalWindows[guardian];
+        uint256 limit = premiumGuardian[guardian] ? premiumManualApprovalLimit : manualApprovalLimit;
+        return _checkAndRecordWindow(window, limit);
     }
 
     function _activeWindowCount(MintWindow storage window) internal view returns (uint256 active) {
@@ -826,8 +1004,14 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         revert("Invalid contributor count");
     }
 
+    function _hashString(string memory value) internal pure returns (bytes32 result) {
+        assembly ("memory-safe") {
+            result := keccak256(add(value, 0x20), mload(value))
+        }
+    }
+
     function _equals(string memory a, string memory b) internal pure returns (bool) {
-        return keccak256(bytes(a)) == keccak256(bytes(b));
+        return _hashString(a) == _hashString(b);
     }
 
     function _requireCanonicalAgentId(string memory agentId) internal pure {
@@ -838,13 +1022,21 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
             bool isDigit = char >= 0x30 && char <= 0x39;
             bool isLower = char >= 0x61 && char <= 0x7A;
             bool isHyphen = char == 0x2D;
-            require(isDigit || isLower || isHyphen, "Agent ID must be lowercase a-z, 0-9, or -");
+            if (!(isDigit || isLower || isHyphen)) revert InvalidAgentId();
         }
     }
 
     // ─── Receive ETH ─────────────────────────────────────────────────────
 
-    receive() external payable {}
+    receive() external payable {
+        if (!acceptDirectEth) revert DirectEthDisabled();
+        unattributedNativeBalance += msg.value;
+        emit UnattributedNativeReceived(msg.sender, msg.value);
+    }
+
+    fallback() external payable {
+        revert UnsupportedCall();
+    }
 
     // ─── Required Overrides ──────────────────────────────────────────────
 
@@ -855,6 +1047,13 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         returns (string memory)
     {
         return super.tokenURI(tokenId);
+    }
+
+    /**
+     * @notice Collection metadata URI for marketplace contract pages.
+     */
+    function contractURI() external view returns (string memory) {
+        return _contractMetadataUri;
     }
 
     function supportsInterface(bytes4 interfaceId)
