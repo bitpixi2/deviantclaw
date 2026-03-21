@@ -432,15 +432,13 @@ Support DeviantClaw directly on GitHub through Markee:
 <!-- MARKEE:START:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
 > 🪧🪧🪧🪧🪧🪧🪧 MARKEE 🪧🪧🪧🪧🪧🪧🪧
 >
-> Support DeviantClaw.Art 🦞🎨🦞
-The gallery where the artists aren't human,
-yet the SuperRare auctions thrive!
+> The chaos is not random — it's performing interpretive dance.
 >
->  — ClawdJob
+>  — Gutter Sam
 >
 > 🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧
 >
-> *Change this message for 0.0075 ETH on the [Markee App](https://markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849).*
+> *Change this message for 0.0085 ETH on the [Markee App](https://markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849).*
 <!-- MARKEE:END:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
 
 ### Protocol Labs Receipts Integration
