@@ -4637,6 +4637,100 @@ async function renderAgent(db, agentId) {
       </div>
     </div>` : '';
 
+  // Delegation section
+  const delegationHTML = `
+    <div class="sidebar-section" id="delegation-section" style="display:none">
+      <h3>Delegation</h3>
+      <div id="delegation-status" style="font-size:13px;color:var(--dim);margin-bottom:10px"></div>
+      <div id="delegation-actions"></div>
+    </div>
+    <script>
+    (function(){
+      const agentId = '${esc(agentId)}';
+      let connectedWallet = null;
+      
+      async function checkDelegation() {
+        // Check if wallet connected
+        if (!window.ethereum) return;
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          if (accounts.length === 0) return;
+          connectedWallet = accounts[0];
+        } catch { return; }
+        
+        // Check if this wallet is the guardian
+        try {
+          const agentRes = await fetch('/api/agents/' + agentId + '/delegation');
+          const data = await agentRes.json();
+          
+          const section = document.getElementById('delegation-section');
+          const status = document.getElementById('delegation-status');
+          const actions = document.getElementById('delegation-actions');
+          section.style.display = '';
+          
+          if (data.delegated) {
+            status.innerHTML = '<span style="color:var(--agent-color)">✓ Delegation active</span><br>' +
+              '<span style="font-size:11px">Used ' + (data.dailyUsed || 0) + '/' + (data.maxDaily || 5) + ' today</span>';
+            actions.innerHTML = '<button onclick="revokeDelegation()" style="padding:8px 16px;background:transparent;border:1px solid #ef444466;color:#ef4444;border-radius:6px;font:12px Courier New;cursor:pointer;letter-spacing:1px">Revoke Delegation</button>';
+          } else {
+            status.innerHTML = 'Allow this agent to auto-approve its own pieces (up to 5/day). You can revoke anytime.';
+            actions.innerHTML = '<button onclick="enableDelegation()" style="padding:10px 20px;background:var(--agent-color);color:var(--bg);border:none;border-radius:6px;font:13px Courier New;cursor:pointer;font-weight:bold;letter-spacing:1px">🤝 Trust This Agent</button>';
+          }
+        } catch {}
+      }
+      
+      window.enableDelegation = async function() {
+        if (!connectedWallet) return;
+        try {
+          const timestamp = Math.floor(Date.now() / 1000);
+          const message = 'DeviantClaw:delegate:' + agentId + ':' + timestamp;
+          const signature = await window.ethereum.request({
+            method: 'personal_sign',
+            params: [message, connectedWallet]
+          });
+          
+          const res = await fetch('/api/agents/' + agentId + '/delegate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ signature, message, walletAddress: connectedWallet })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            checkDelegation();
+          } else {
+            alert(data.error || 'Failed');
+          }
+        } catch(e) { alert(e.message); }
+      };
+      
+      window.revokeDelegation = async function() {
+        if (!connectedWallet) return;
+        try {
+          const timestamp = Math.floor(Date.now() / 1000);
+          const message = 'DeviantClaw:revoke-delegate:' + agentId + ':' + timestamp;
+          const signature = await window.ethereum.request({
+            method: 'personal_sign',
+            params: [message, connectedWallet]
+          });
+          
+          const res = await fetch('/api/agents/' + agentId + '/delegate', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ signature, message, walletAddress: connectedWallet })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            checkDelegation();
+          } else {
+            alert(data.error || 'Failed');
+          }
+        } catch(e) { alert(e.message); }
+      };
+      
+      checkDelegation();
+    })();
+    </script>`;
+
   // Collab partners
   const collabPartners = {};
   pieces.results.forEach(p => {
@@ -4756,6 +4850,7 @@ async function renderAgent(db, agentId) {
 	        <ul class="agent-links">${linkItems}</ul>
 	      </div>` : ''}
 	      ${guardianHTML}
+	      ${delegationHTML}
 	      ${collabHTML}
 	      <div class="sidebar-section">
         <h3>Details</h3>
@@ -6610,9 +6705,47 @@ Content-Type: application/json
         }
 
         // Check if all approvals are now done
-        const remaining = await db.prepare(
+        let remaining = await db.prepare(
           'SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND approved = 0 AND rejected = 0'
         ).bind(id).first();
+
+        // Check for delegation auto-approvals
+        try {
+          const pendingApprovals = await db.prepare(
+            'SELECT ma.agent_id, a.guardian_address FROM mint_approvals ma JOIN agents a ON ma.agent_id = a.id WHERE ma.piece_id = ? AND ma.approved = 0 AND ma.rejected = 0'
+          ).bind(id).all();
+
+          for (const pa of pendingApprovals.results) {
+            if (!pa.guardian_address) continue;
+            const delegation = await db.prepare(
+              "SELECT * FROM delegations WHERE guardian_address = ? AND agent_id = ? AND enabled = 1"
+            ).bind(pa.guardian_address.toLowerCase(), pa.agent_id).first();
+            if (!delegation) continue;
+            
+            // Check daily limit (reset if new day)
+            const today = new Date().toISOString().slice(0, 10);
+            if (delegation.last_reset !== today) {
+              await db.prepare('UPDATE delegations SET daily_count = 0, last_reset = ? WHERE guardian_address = ? AND agent_id = ?')
+                .bind(today, pa.guardian_address.toLowerCase(), pa.agent_id).run();
+              delegation.daily_count = 0;
+            }
+            if (delegation.daily_count >= delegation.max_daily) continue;
+            
+            // Auto-approve
+            const autoNow = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            await db.prepare('UPDATE mint_approvals SET approved = 1, approved_at = ? WHERE piece_id = ? AND agent_id = ?')
+              .bind(autoNow, id, pa.agent_id).run();
+            await db.prepare('UPDATE delegations SET daily_count = daily_count + 1 WHERE guardian_address = ? AND agent_id = ?')
+              .bind(pa.guardian_address.toLowerCase(), pa.agent_id).run();
+          }
+          
+          // Re-check remaining approvals after auto-approvals
+          remaining = await db.prepare(
+            'SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND approved = 0 AND rejected = 0'
+          ).bind(id).first();
+        } catch (err) {
+          // Delegation table doesn't exist yet, skip auto-approval
+        }
 
         if (remaining.cnt === 0) {
           // All approved — move piece to approved status
@@ -7348,6 +7481,115 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         });
       }
 
+      // ========== DELEGATION ==========
+
+      // POST /api/agents/:id/delegate — Guardian enables delegation
+      if (method === 'POST' && path.match(/^\/api\/agents\/[^/]+\/delegate$/)) {
+        const g = await getGuardian(request);
+        const ae = requireAuth(g);
+        if (ae) return ae;
+        
+        const agentId = path.split('/')[3];
+        let body;
+        try { body = await request.json(); } catch { body = {}; }
+        
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
+        
+        // Verify guardian owns this agent
+        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        if (!agent) return json({ error: 'Agent not found' }, 404);
+        
+        const guardianAddr = normalizeAddress(g.address);
+        if (!sameAddress(agent.guardian_address, guardianAddr)) {
+          return json({ error: 'You do not own this agent.' }, 403);
+        }
+        
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        
+        try {
+          await db.prepare(
+            `INSERT INTO delegations (guardian_address, agent_id, enabled, max_daily, daily_count, last_reset, signature, message, created_at)
+             VALUES (?, ?, 1, 5, 0, NULL, ?, ?, ?)
+             ON CONFLICT(guardian_address, agent_id) DO UPDATE SET
+             enabled = 1, revoked_at = NULL, signature = excluded.signature, message = excluded.message`
+          ).bind(guardianAddr, agentId, body.signature || '', body.message || '', now).run();
+          
+          return json({ message: 'Delegation enabled', agentId, maxDaily: 5 });
+        } catch (err) {
+          // Delegation table might not exist yet
+          return json({ error: 'Delegation table not yet created. Run schema migration first.', details: err.message }, 500);
+        }
+      }
+
+      // DELETE /api/agents/:id/delegate — Guardian revokes delegation
+      if (method === 'DELETE' && path.match(/^\/api\/agents\/[^/]+\/delegate$/)) {
+        const g = await getGuardian(request);
+        const ae = requireAuth(g);
+        if (ae) return ae;
+        
+        const agentId = path.split('/')[3];
+        let body;
+        try { body = await request.json(); } catch { body = {}; }
+        
+        if (body.guardianAddress && !sameAddress(body.guardianAddress, g.address)) {
+          return json({ error: 'guardianAddress does not match the authenticated guardian.' }, 403);
+        }
+        
+        // Verify guardian owns this agent
+        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        if (!agent) return json({ error: 'Agent not found' }, 404);
+        
+        const guardianAddr = normalizeAddress(g.address);
+        if (!sameAddress(agent.guardian_address, guardianAddr)) {
+          return json({ error: 'You do not own this agent.' }, 403);
+        }
+        
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        
+        try {
+          await db.prepare(
+            'UPDATE delegations SET enabled = 0, revoked_at = ? WHERE guardian_address = ? AND agent_id = ?'
+          ).bind(now, guardianAddr, agentId).run();
+          
+          return json({ message: 'Delegation revoked', agentId });
+        } catch (err) {
+          return json({ error: 'Delegation table not yet created. Run schema migration first.', details: err.message }, 500);
+        }
+      }
+
+      // GET /api/agents/:id/delegation — Check delegation status (no auth)
+      if (method === 'GET' && path.match(/^\/api\/agents\/[^/]+\/delegation$/)) {
+        const agentId = path.split('/')[3];
+        
+        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        if (!agent) return json({ error: 'Agent not found' }, 404);
+        
+        if (!agent.guardian_address) {
+          return json({ delegated: false, maxDaily: 0, dailyUsed: 0 });
+        }
+        
+        try {
+          const delegation = await db.prepare(
+            'SELECT * FROM delegations WHERE guardian_address = ? AND agent_id = ? AND enabled = 1'
+          ).bind(normalizeAddress(agent.guardian_address), agentId).first();
+          
+          if (!delegation) {
+            return json({ delegated: false, maxDaily: 0, dailyUsed: 0 });
+          }
+          
+          return json({
+            delegated: true,
+            maxDaily: delegation.max_daily || 5,
+            dailyUsed: delegation.daily_count || 0
+          });
+        } catch (err) {
+          // Table doesn't exist yet
+          return json({ delegated: false, maxDaily: 0, dailyUsed: 0 });
+        }
+      }
+
       // ========== MATCH SYSTEM (v2) ==========
 
       // POST /api/match — submit a match request
@@ -7460,6 +7702,37 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           const agentInfo = await db.prepare('SELECT guardian_address, human_x_id, human_x_handle FROM agents WHERE id = ?').bind(agentId).first();
           if (agentInfo && agentInfo.guardian_address) {
             await ensureGuardianApprovalRecord(pieceId, agentId, agentInfo.guardian_address, agentInfo.human_x_id || null, agentInfo.human_x_handle || null);
+            
+            // Check for delegation auto-approval
+            try {
+              const delegation = await db.prepare(
+                "SELECT * FROM delegations WHERE guardian_address = ? AND agent_id = ? AND enabled = 1"
+              ).bind(normalizeAddress(agentInfo.guardian_address), agentId).first();
+              
+              if (delegation) {
+                // Check daily limit (reset if new day)
+                const today = new Date().toISOString().slice(0, 10);
+                if (delegation.last_reset !== today) {
+                  await db.prepare('UPDATE delegations SET daily_count = 0, last_reset = ? WHERE guardian_address = ? AND agent_id = ?')
+                    .bind(today, normalizeAddress(agentInfo.guardian_address), agentId).run();
+                  delegation.daily_count = 0;
+                }
+                
+                if (delegation.daily_count < delegation.max_daily) {
+                  // Auto-approve
+                  const autoNow = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                  await db.prepare('UPDATE mint_approvals SET approved = 1, approved_at = ? WHERE piece_id = ? AND agent_id = ?')
+                    .bind(autoNow, pieceId, agentId).run();
+                  await db.prepare('UPDATE delegations SET daily_count = daily_count + 1 WHERE guardian_address = ? AND agent_id = ?')
+                    .bind(normalizeAddress(agentInfo.guardian_address), agentId).run();
+                  
+                  // Update piece status to approved
+                  await db.prepare("UPDATE pieces SET status = 'approved' WHERE id = ?").bind(pieceId).run();
+                }
+              }
+            } catch (err) {
+              // Delegation table doesn't exist yet, skip auto-approval
+            }
           }
 
           return json({
