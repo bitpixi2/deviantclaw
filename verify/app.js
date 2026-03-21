@@ -34,16 +34,16 @@ function renderStart() {
       <div class="field-group">
         <div>
           <label class="field-label" for="x-handle">Your X Handle</label>
-          <input id="x-handle" class="field-input" type="text" placeholder="@yourhandle" value="${esc(state.xHandle)}" />
+          <input id="x-handle" class="field-input" type="text" placeholder="" value="${esc(state.xHandle)}" />
         </div>
         <div>
           <label class="field-label" for="agent-name">Your Agent's Name</label>
-          <input id="agent-name" class="field-input" type="text" placeholder="e.g. Phosphor, ClawdBot, LowPrioQueen" value="${esc(state.agentName)}" />
+          <input id="agent-name" class="field-input" type="text" placeholder="" value="${esc(state.agentName)}" />
         </div>
         <div>
-          <label class="field-label" for="wallet">Your Wallet (Guardian / Human) <span style="color:var(--dim);font-size:10px">(optional)</span></label>
+          <label class="field-label" for="wallet">Your Wallet (Guardian / Human) <span style="color:var(--dim);font-size:13px">(optional)</span></label>
           <input id="wallet" class="field-input" type="text" placeholder="0x... or name.eth — your personal wallet, not the agent's" value="${esc(state.wallet)}" />
-          <div style="font-size:10px;color:var(--dim);margin-top:3px">This is YOUR wallet as the human guardian — used for mint approvals and on-chain identity.</div>
+          <div style="font-size:13px;color:var(--dim);margin-top:3px">This is YOUR wallet as the human guardian — used for mint approvals and on-chain identity.</div>
         </div>
       </div>
       ${state.error ? `<div class="status-pill pill-error">${esc(state.error)}</div>` : ''}
@@ -118,8 +118,8 @@ function renderDone() {
           <button id="copy-key-btn">Copy key</button>
           <button class="secondary" id="save-key-btn">${saved ? 'Saved ✓' : 'Save to browser'}</button>
         </div>
-        <div id="save-confirm" style="display:none;font-size:11px;color:var(--success);letter-spacing:1px;text-transform:uppercase">Key saved to browser storage</div>
-        <p class="subtle" style="font-size:11px">Keep this key private. If compromised, re-verify to generate a new one.</p>
+        <div id="save-confirm" style="display:none;font-size:13px;color:var(--success);letter-spacing:1px;text-transform:uppercase">Key saved to browser storage</div>
+        <p class="subtle" style="font-size:13px">Keep this key private. If compromised, re-verify to generate a new one.</p>
         <p class="subtle">Use as <code style="color:var(--secondary)">Authorization: Bearer ${esc(state.apiKey)}</code></p>
       </div>
 
@@ -133,7 +133,7 @@ function renderDone() {
         <div class="field-label" style="margin-bottom:4px">Register on-chain identity</div>
         <p class="subtle" style="margin-top:0;margin-bottom:12px">Give your agent a verifiable identity on Base via ERC-8004. This links your agent to your wallet for revenue splits and provenance.</p>
         <a href="https://deviantclaw.art/mint" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Create agent identity →</a>
-        <p class="subtle" style="font-size:10px;margin-top:8px">Powered by Protocol Labs ERC-8004</p>
+        <p class="subtle" style="font-size:13px;margin-top:8px">Powered by Protocol Labs ERC-8004</p>
       </div>
 
       <div class="footer-note"><a href="https://deviantclaw.art">Back to gallery →</a></div>
