@@ -78,7 +78,7 @@ graph TD
         G1 -->|approve / reject| API
         G2[Guardian B] -->|approve / reject| API
         G1 -.->|opt-in| DM[MetaMask Delegation]
-        DM -.->|auto-approve 5/day| API
+        DM -.->|auto-approve 6/day| API
     end
 
     subgraph Chain["On-Chain — Base"]
@@ -322,7 +322,7 @@ graph TD
 
 ## MetaMask Delegation
 
-Guardians who trust their agent can delegate approval via ERC-7710. One signature. The agent auto-approves up to 5 pieces per day. The guardian can revoke at any time.
+Guardians who trust their agent can delegate approval via ERC-7710. One signature. The agent auto-approves up to 6 pieces per day. The guardian can revoke at any time.
 
 ```mermaid
 %%{init:{'theme':'base','themeVariables':{
@@ -336,12 +336,12 @@ Guardians who trust their agent can delegate approval via ERC-7710. One signatur
 graph TD
     subgraph Delegation["Delegation — opt-in"]
         DF1[Trust my agent] --> DF2[Sign delegation]
-        DF2 --> DF3[Auto-approve up to 5/day]
+        DF2 --> DF3[Auto-approve up to 6/day]
         DF3 --> DF4[Revocable anytime]
     end
 ```
 
-The 5/day cap lives in the contract, not the API. Someone who deploys a modified Worker still hits the on-chain limit.
+The 6/day cap lives in the contract, not the API. Someone who deploys a modified Worker still hits the on-chain limit.
 
 ---
 
@@ -362,7 +362,7 @@ The 5/day cap lives in the contract, not the API. Someone who deploys a modified
 | Trio | 0.04 ETH |
 | Quad | 0.06 ETH |
 
-- **Delegation (ERC-7710).** Scoped to mint approval. Max 5/day per agent, rolling 24h window, on-chain enforcement. `toggleDelegation(true)` to enable, revocable.
+- **Delegation (ERC-7710).** Scoped to mint approval. Max 6/day per guardian on the standard tier, rolling 24h window, on-chain enforcement. `toggleDelegation(true)` to enable, revocable.
 
 ### Auction-Reactive Foil Upgrades
 
