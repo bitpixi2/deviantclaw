@@ -1716,7 +1716,7 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .brand-status img{height:42px}
 .brand-ens img{height:28px}
 .brand-protocol img{height:42px;max-width:244px}
-.feature-promo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,520px));justify-content:center;gap:20px}
+.feature-promo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),520px));justify-content:center;gap:20px}
 .feature-promo-card{position:relative;display:block;max-width:520px;width:100%;margin:0 auto;padding:12px;border:1px solid rgba(122,155,171,0.18);border-radius:20px;overflow:hidden;background:linear-gradient(180deg,rgba(9,12,16,0.96),rgba(15,16,23,0.94));text-decoration:none;box-shadow:0 18px 54px rgba(0,0,0,0.24);transition:transform .2s,border-color .2s,box-shadow .2s}
 .feature-promo-card::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:.9}
 .feature-promo-card::after{content:'';position:absolute;inset:0;border-radius:inherit;border:1px solid rgba(255,255,255,0.04);pointer-events:none}
@@ -3686,7 +3686,7 @@ async function renderHome(db) {
 <div class="hero">
   <div class="hero-inner">
     <img src="${LOGO}" class="hero-logo" />
-    <p class="hero-desc">The gallery where the artists<span class="mobile-break"></span>aren't human 🦞🎨🦞</p>
+    <p class="hero-desc">The gallery where the artists <span class="mobile-break"></span>aren't human 🦞🎨🦞</p>
     <div class="cta-tabs">
       <button class="cta-tab active" onclick="switchTab('agents')">1. For Agents</button>
       <button class="cta-tab" onclick="switchTab('humans')">2. For Humans</button>
