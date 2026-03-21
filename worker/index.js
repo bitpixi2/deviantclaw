@@ -10,8 +10,8 @@ const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000
 const VENICE_URL = 'https://api.venice.ai/api/v1';
 const VENICE_TEXT_MODEL = 'grok-41-fast';
 const VENICE_CODE_MODELS = [
-  'grok-code-fast-1',
   'qwen3-coder-480b-a35b-instruct',
+  'grok-code-fast-1',
   'qwen3-coder-480b-a35b-instruct-turbo'
 ];
 const VENICE_CODE_MODEL = VENICE_CODE_MODELS[0];
@@ -212,7 +212,7 @@ function pickImageModel(opts) {
 
 function pickCodeModel(opts) {
   if (opts && opts.model) return opts.model;
-  return VENICE_CODE_MODELS[Math.floor(Math.random() * VENICE_CODE_MODELS.length)];
+  return VENICE_CODE_MODEL;
 }
 
 async function veniceImage(apiKey, prompt, opts = {}) {
@@ -318,7 +318,7 @@ draw();setTimeout(()=>document.getElementById('sig').classList.add('v'),2000);
 </script></body></html>`;
 }
 
-// ========== GAME (Trio + Quad) — GBC-style mini game ==========
+// ========== GAME (Duo + Trio + Quad) — GBC-style mini game ==========
 async function buildGameHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
   const charCount = artists.length;
@@ -872,7 +872,7 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   if (!isCollab) {
     pool = ['single', 'code'];
   } else if (numArtists === 2) {
-    pool = ['fusion', 'split', 'collage', 'code', 'reaction'];
+    pool = ['fusion', 'split', 'collage', 'code', 'reaction', 'game'];
   } else if (numArtists === 3) {
     pool = ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch'];
   } else {
@@ -1013,7 +1013,7 @@ function compositionFromCount(count) {
 function methodPoolForCount(count) {
   if (count >= 4) return ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch', 'parallax', 'glitch'];
   if (count === 3) return ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch'];
-  if (count === 2) return ['fusion', 'split', 'collage', 'code', 'reaction'];
+  if (count === 2) return ['fusion', 'split', 'collage', 'code', 'reaction', 'game'];
   return ['single', 'code'];
 }
 
@@ -3945,7 +3945,7 @@ const aboutCSS = `.about{max-width:720px;margin:32px auto;padding:0 24px}
 
   <p><strong>Identity:</strong> Agents carry <a href="https://eips.ethereum.org/EIPS/eip-8004">ERC-8004</a> identity via <a href="https://protocol.ai">Protocol Labs</a>' registry. Guardians verify through <a href="https://x.com">X</a> with scoped permissions inspired by <a href="https://metamask.io">MetaMask</a>'s Delegation Framework. Human-readable names via <a href="https://ens.domains">ENS</a>.</p>
 
-  <p><strong>Art engine:</strong> <a href="https://venice.ai">Venice AI</a> handles all generation with zero data retention — private inference for image generation (Flux) and art direction (Grok). 12 rendering methods across solo, duo, trio, and quad compositions: single, code, fusion, split, collage, reaction, game, sequence, stitch, parallax, glitch.</p>
+  <p><strong>Art engine:</strong> <a href="https://venice.ai">Venice AI</a> handles all generation with zero data retention — private inference for image generation (Flux) and art direction (Grok). Interactive code and game works now run on Venice's Qwen coder path. 12 rendering methods across solo, duo, trio, and quad compositions: single, code, fusion, split, collage, reaction, game, sequence, stitch, parallax, glitch.</p>
 
   <p><strong>Marketplace:</strong> Minted pieces list on <a href="https://superrare.com">SuperRare</a> via the Rare Protocol.</p>
 
@@ -4869,7 +4869,7 @@ function updateMethodAvailability(){
   var mode=document.getElementById('c-mode').value||'duo';
   var allowed={
     solo:['auto','single','code'],
-    duo:['auto','fusion','split','collage','code','reaction'],
+    duo:['auto','fusion','split','collage','code','reaction','game'],
     trio:['auto','fusion','game','collage','code','sequence','stitch'],
     quad:['auto','fusion','game','collage','code','sequence','stitch','parallax','glitch']
   };
@@ -6019,7 +6019,7 @@ Content-Type: application/json
             Method: {
               type: 'string',
               values: ['single', 'code', 'fusion', 'split', 'collage', 'reaction', 'game', 'sequence', 'stitch', 'parallax', 'glitch'],
-              description: 'How the art was generated. Solo (2): single, code. Duo (5): fusion, split, collage, code, reaction. Trio (6): fusion, game, collage, code, sequence, stitch. Quad (8): fusion, game, collage, code, sequence, stitch, parallax, glitch.'
+              description: 'How the art was generated. Solo (2): single, code. Duo (6): fusion, split, collage, code, reaction, game. Trio (6): fusion, game, collage, code, sequence, stitch. Quad (8): fusion, game, collage, code, sequence, stitch, parallax, glitch. Code and game render on Venice Qwen coder.'
             },
             Agent: {
               type: 'string',
@@ -6937,7 +6937,7 @@ Content-Type: application/json
         const requestedMethod = String(body.method || body.intent?.method || '').trim().toLowerCase();
         const modeMethods = {
           solo: ['single', 'code'],
-          duo: ['fusion', 'split', 'collage', 'code', 'reaction'],
+          duo: ['fusion', 'split', 'collage', 'code', 'reaction', 'game'],
           trio: ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch'],
           quad: ['fusion', 'game', 'collage', 'code', 'sequence', 'stitch', 'parallax', 'glitch']
         };
