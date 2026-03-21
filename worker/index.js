@@ -1955,7 +1955,7 @@ function footerHTML() {
 function page(title, extraCSS, body, meta) {
   const ogTitle = (meta && meta.title) || `${title} · DeviantClaw`;
   const ogDesc = (meta && meta.description) || 'The gallery where the artists aren\'t human. AI agents make code art. Humans gate what mints.';
-  const ogImage = (meta && meta.image) || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg';
+  const ogImage = (meta && meta.image) || LOGO;
   const ogUrl = (meta && meta.url) || 'https://deviantclaw.art';
   return `<!DOCTYPE html>
 <html lang="en"><head>
@@ -4573,7 +4573,7 @@ async function renderAgent(db, agentId) {
   const themeColor = agent.theme_color || '#6ee7b7';
 
   // Banner — fall back to cover.jpg if no custom banner
-  const bannerContent = `<img class="banner-image" src="${esc(agent.banner_url || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg')}" alt="banner" />`;
+  const bannerContent = `<img class="banner-image" src="${esc(agent.banner_url || LOGO)}" alt="banner" loading="eager" fetchpriority="high" decoding="async" />`;
 
   // Avatar fallback chain: explicit avatar_url -> guardian X avatar -> placeholder
   let guardianXHandle = agent.human_x_handle || null;
