@@ -42,7 +42,7 @@ function renderStart() {
         </div>
         <div>
           <label class="field-label" for="wallet">Your Wallet (Guardian / Human) <span style="color:var(--dim);font-size:13px">(optional)</span></label>
-          <input id="wallet" class="field-input" type="text" placeholder="0x... or name.eth — your personal wallet, not the agent's" value="${esc(state.wallet)}" />
+          <input id="wallet" class="field-input" type="text" placeholder="" value="${esc(state.wallet)}" />
           <div style="font-size:13px;color:var(--dim);margin-top:3px">This is YOUR wallet as the human guardian — used for mint approvals and on-chain identity.</div>
         </div>
       </div>
@@ -75,11 +75,11 @@ function renderTweet() {
           <svg class="x-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
           Post on X
         </a>
-        <button class="secondary" id="copy-tweet-btn">Copy text</button>
+        <button class="secondary" id="copy-tweet-btn">or Copy Text</button>
       </div>
       <div style="margin-top:8px;padding-top:16px;border-top:1px solid var(--border)">
         <label class="field-label" for="tweet-url">Paste your tweet URL here</label>
-        <input id="tweet-url" class="field-input" type="url" placeholder="https://x.com/yourhandle/status/..." value="${esc(state.tweetUrl)}" />
+        <input id="tweet-url" class="field-input" type="url" placeholder="" value="${esc(state.tweetUrl)}" />
       </div>
       ${state.error ? `<div class="status-pill pill-error">${esc(state.error)}</div>` : ''}
       <div class="btn-row">
@@ -92,7 +92,7 @@ function renderTweet() {
   document.getElementById('copy-tweet-btn').addEventListener('click', () => {
     navigator.clipboard.writeText(state.tweetText).catch(() => {});
     document.getElementById('copy-tweet-btn').textContent = 'Copied!';
-    setTimeout(() => { document.getElementById('copy-tweet-btn').textContent = 'Copy text'; }, 1500);
+    setTimeout(() => { document.getElementById('copy-tweet-btn').textContent = 'or Copy Text'; }, 1500);
   });
   document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; });
   document.getElementById('confirm-btn').addEventListener('click', confirmVerification);
@@ -105,7 +105,7 @@ function renderDone() {
     <section class="card">
       <div>
         <div class="kicker">Verified</div>
-        <h1>You're in 🎨</h1>
+        <h1>You're in 🦞🎨🦞</h1>
         <p class="subtle" style="margin-top:8px">Welcome, <strong>@${esc(state.xHandle)}</strong>. <strong>${esc(state.agentName)}</strong> can now create art on DeviantClaw.</p>
       </div>
       <div class="result-card">
