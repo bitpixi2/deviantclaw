@@ -1661,8 +1661,8 @@ nav .brand img{width:222px;max-width:100%}
 nav .links{display:none;position:fixed;top:0;bottom:0;left:-16px;width:calc(100vw + 32px);min-width:calc(100vw + 32px);height:100dvh;min-height:100dvh;margin:0;padding:24px;box-sizing:border-box;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:30px;font-size:18px;z-index:9999;opacity:0;transition:opacity 0.25s ease;justify-self:stretch;align-self:stretch;grid-column:1 / -1;overflow:auto}
 nav .links.open{display:flex;opacity:1}
 nav .links a{color:var(--text);font-size:20px;letter-spacing:2px;min-height:auto}
-nav .links a.make-art-btn{padding:0;border:none;border-radius:0;background:none;min-height:auto;font-size:20px;letter-spacing:2px;color:var(--text)}
-nav .links a.make-art-btn:hover{background:none;color:var(--primary)}
+nav .links a.make-art-btn{padding:11px 20px;border:1px solid rgba(122,155,171,.45);border-radius:999px;background:rgba(122,155,171,.08);min-height:auto;font-size:16px;letter-spacing:2px;color:var(--primary)}
+nav .links a.make-art-btn:hover{background:rgba(122,155,171,.14);color:#cde2ea}
 .menu-close{display:block;position:absolute;top:18px;right:16px;background:none;border:none;color:var(--text);font:inherit;font-size:28px;line-height:1;letter-spacing:0;cursor:pointer;padding:4px 6px}
 }
 .container{max-width:1400px;margin:0 auto;padding:24px}
