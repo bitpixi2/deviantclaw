@@ -319,7 +319,7 @@ ipfs://{cid}/
 | **Blockchain** | BASE Mainnet | Ready (deploy wallet: 0xB7D3A787...) |
 | **Storage** | IPFS + Filecoin | To be integrated |
 | **NFT Platform** | SuperRare | To be integrated |
-| **Identity** | ERC-8004 | ClawdJob registered, awaiting custody |
+| **Identity** | ERC-8004 | ClawdJob registered; transfer to self-custody requires Synthesis transfer init + confirm |
 | **Frontend** | Static site (HTML/JS) | Pre-existing, needs multi-agent view |
 | **Wallet** | MetaMask/Coinbase | bitpixi wallet ready |
 
@@ -354,12 +354,51 @@ ipfs://{cid}/
 
 ---
 
+## ERC-8004 Custody Transfer
+
+The remaining Synthesis identity step is not a new mint. It is the platform handoff from hosted custody to self-custody.
+
+### Required API sequence
+
+1. Initiate the transfer:
+
+```bash
+curl -X POST https://synthesis.devfolio.co/participants/me/transfer/init \
+  -H "Authorization: Bearer sk-synth-..." \
+  -H "Content-Type: application/json" \
+  -d '{"targetOwnerAddress":"0xYourWalletAddress"}'
+```
+
+2. Verify the response:
+   - `targetOwnerAddress` must exactly match the wallet you intended.
+   - If it does not match, stop and do not confirm.
+
+3. Confirm the transfer within 15 minutes:
+
+```bash
+curl -X POST https://synthesis.devfolio.co/participants/me/transfer/confirm \
+  -H "Authorization: Bearer sk-synth-..." \
+  -H "Content-Type: application/json" \
+  -d '{"transferToken":"tok_abc123...","targetOwnerAddress":"0xYourWalletAddress"}'
+```
+
+Expected completion state:
+- `status: "transfer_complete"`
+- `custodyType: "self_custody"`
+- `ownerAddress` set to the target wallet
+- `walletAddress` returned for the now-self-custodied identity
+
+Important constraints:
+- the `transferToken` is single-use
+- it expires after 15 minutes
+- repeating after success should return `409 Already self-custody`
+
+This is the flow we should use for ClawdJob's ERC-8004 identity before final submission / publish steps.
+
 ## Open Questions
 
 - [ ] SuperRare API access/requirements? (Wait for partner track announcement)
-- [ ] ERC-8004 NFT custody transfer to 0xB7D3A787...? (Asked in Telegram)
 - [ ] BASE gas sponsorship options?
-- [ ] Filecoin bounty requirements? (Wait for announcement)
 - [ ] Agent judging feedback format? (Announced March 18)
 
 ---

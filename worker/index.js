@@ -1327,6 +1327,92 @@ function hashSeed(str) {
   return Math.abs(h);
 }
 
+function sanitizeAgentId(value) {
+  return decodeURIComponent(String(value || '')).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+}
+
+function isDeletedAgent(agent) {
+  return !!String(agent?.deleted_at || '').trim();
+}
+
+function trashIcon() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4.8c0-.9.7-1.6 1.6-1.6h4.8c.9 0 1.6.7 1.6 1.6V6"/><path d="M6.5 6l1 13.2c.1 1 .9 1.8 1.9 1.8h5.2c1 0 1.8-.8 1.9-1.8l1-13.2"/><path d="M10 10.5v6"/><path d="M14 10.5v6"/></svg>`;
+}
+
+function normalizeCompositionLabel(value, fallbackCount = 0) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (['solo', 'duo', 'trio', 'quad'].includes(raw)) return raw;
+  if (fallbackCount === 1) return 'solo';
+  if (fallbackCount === 2) return 'duo';
+  if (fallbackCount === 3) return 'trio';
+  if (fallbackCount >= 4) return 'quad';
+  return 'solo';
+}
+
+function revenueSplitPreview(composition) {
+  const normalized = normalizeCompositionLabel(composition);
+  if (normalized === 'duo') return { galleryFeePct: 3, artistPoolPct: 97, perContributorPct: 48.5 };
+  if (normalized === 'trio') return { galleryFeePct: 3, artistPoolPct: 97, perContributorPct: 32.33 };
+  if (normalized === 'quad') return { galleryFeePct: 3, artistPoolPct: 97, perContributorPct: 24.25 };
+  return { galleryFeePct: 3, artistPoolPct: 97, perContributorPct: 97 };
+}
+
+function earnedBadgeSummaries({ totalCount = 0, collabCount = 0, quadCount = 0, mintedCount = 0, erc8004AgentId = null, walletAddress = '' } = {}) {
+  const badges = [];
+  if (collabCount > 0) badges.push({ id: 'first-match', title: '1st Match' });
+  if (quadCount > 0) badges.push({ id: 'first-quad', title: '1st Quad' });
+  if (erc8004AgentId) badges.push({ id: 'erc-8004-surfer', title: 'ERC-8004 Surfer' });
+  if (/\.(?:base\.)?eth$/i.test(String(walletAddress || '').trim())) badges.push({ id: 'ens-maven', title: 'ENS Maven' });
+  if (mintedCount > 0) badges.push({ id: 'superrare-artist', title: 'SuperRare Artist' });
+  if (totalCount > 0) badges.push({ id: 'venice-private', title: 'Venice Private' });
+  return badges;
+}
+
+async function resolveReceiptCollaborators(db, piece) {
+  const rows = await db.prepare(
+    `SELECT pc.agent_id, pc.agent_name, pc.agent_role,
+            a.wallet_address, a.guardian_address, a.human_x_handle,
+            a.erc8004_agent_id, a.erc8004_registry
+     FROM piece_collaborators pc
+     LEFT JOIN agents a ON a.id = pc.agent_id
+     WHERE pc.piece_id = ?
+     ORDER BY pc.round_number ASC`
+  ).bind(piece.id).all().catch(() => ({ results: [] }));
+
+  if (rows.results && rows.results.length > 0) {
+    return rows.results.map((row) => ({
+      agentId: row.agent_id,
+      agentName: row.agent_name || row.agent_id,
+      agentRole: row.agent_role || '',
+      walletAddress: row.wallet_address || null,
+      guardianAddress: row.guardian_address || null,
+      guardianXHandle: row.human_x_handle || null,
+      erc8004AgentId: row.erc8004_agent_id || null,
+      erc8004Registry: row.erc8004_registry || DEFAULT_ERC8004_REGISTRY
+    }));
+  }
+
+  const fallbackIds = [piece.agent_a_id, piece.agent_b_id].filter(Boolean);
+  const collaborators = [];
+  for (const fallbackId of fallbackIds) {
+    const agent = await db.prepare(
+      'SELECT wallet_address, guardian_address, human_x_handle, erc8004_agent_id, erc8004_registry FROM agents WHERE id = ?'
+    ).bind(fallbackId).first().catch(() => null);
+    const isA = fallbackId === piece.agent_a_id;
+    collaborators.push({
+      agentId: fallbackId,
+      agentName: isA ? (piece.agent_a_name || fallbackId) : (piece.agent_b_name || fallbackId),
+      agentRole: isA ? (piece.agent_a_role || '') : (piece.agent_b_role || ''),
+      walletAddress: agent?.wallet_address || null,
+      guardianAddress: agent?.guardian_address || null,
+      guardianXHandle: agent?.human_x_handle || null,
+      erc8004AgentId: agent?.erc8004_agent_id || null,
+      erc8004Registry: agent?.erc8004_registry || DEFAULT_ERC8004_REGISTRY
+    });
+  }
+  return collaborators;
+}
+
 async function resolveIntentPayloadByRef(db, refId) {
   if (!refId) return null;
   const req = await db.prepare('SELECT intent_json FROM match_requests WHERE id = ?').bind(refId).first().catch(() => null);
@@ -1570,6 +1656,7 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .install-label{font-size:12px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
 .install-cmd{font-size:14px;color:var(--secondary);display:block}
 .hero-desc{font-size:15px;color:var(--dim);letter-spacing:1px;line-height:1.7;max-width:520px;margin:0 auto 20px}
+.mobile-break{display:none}
 .built-with{padding:22px 0 18px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden}
 .built-with-marquee{position:relative;display:flex;align-items:center;gap:0;white-space:nowrap;overflow:hidden}
 .built-with-label{display:inline-flex;align-items:center;justify-content:center;padding:0 22px;height:54px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);border-right:1px solid var(--border);flex:0 0 auto;position:relative;z-index:4;background:var(--bg)}
@@ -1628,9 +1715,9 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 @media(min-width:600px){.desktop-br{display:inline}}
 .cta-panel p{font-size:15px;color:var(--text);line-height:1.7;margin-bottom:12px}
 .cta-panel code{display:block;background:rgba(0,0,0,0.42);border:1px solid rgba(180,213,223,0.28);border-radius:4px;padding:12px 16px;font-size:14px;color:#F4ECEF;margin:12px 0;word-break:break-all}
-.cta-panel .cta-btn{display:inline-block;padding:10px 24px;background:var(--primary);color:var(--bg);font:13px 'Courier New',monospace;letter-spacing:2px;text-transform:uppercase;border-radius:4px;text-decoration:none;transition:all 0.2s;border:none;cursor:pointer}
-.cta-panel .cta-btn:hover{background:var(--secondary);color:var(--bg)}
-@media(max-width:768px){.hero{padding:36px 24px 48px}.hero-logo{max-width:560px}}
+.cta-panel .cta-btn{display:inline-block;padding:10px 24px;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);color:#050507;font:13px 'Courier New',monospace;letter-spacing:2px;text-transform:uppercase;border-radius:4px;text-decoration:none;transition:all 0.2s;border:none;cursor:pointer;font-weight:700;box-shadow:0 10px 26px rgba(0,0,0,0.24)}
+.cta-panel .cta-btn:hover{filter:brightness(1.05);color:#050507;transform:translateY(-1px)}
+@media(max-width:768px){.hero{padding:36px 24px 48px}.hero-logo{max-width:560px}.mobile-break{display:block}}
 @media(max-width:480px){.hero{padding:24px 20px 40px}.hero-logo{max-width:90%;margin-bottom:12px}}`;
 
 const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
@@ -1675,8 +1762,7 @@ const AGENT_CSS = `
 .agent-banner{position:relative;height:280px;overflow:hidden;border-radius:0;background:linear-gradient(135deg,var(--agent-color,#6ee7b7)22,transparent 70%),linear-gradient(225deg,rgba(110,231,183,0.15),var(--bg));margin-top:-1px;margin-bottom:0}
 .agent-banner .banner-image{width:100%;height:100%;object-fit:cover;opacity:0.7;display:block}
 .agent-banner .banner-overlay{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,var(--bg))}
-.agent-banner .dc-logo{position:absolute;top:16px;right:20px;opacity:0.6;height:28px;width:auto}
-@media(max-width:768px){.agent-banner{height:160px}.agent-banner .dc-logo{display:none}}
+@media(max-width:768px){.agent-banner{height:160px}}
 
 /* Profile card - overlapping banner */
 .agent-profile-card{position:relative;margin-top:-80px;padding:0 24px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;max-width:1400px;margin-left:auto;margin-right:auto}
@@ -1725,9 +1811,9 @@ const AGENT_CSS = `
 .agent-guardian-info a{color:var(--agent-color,#6ee7b7)}
 .agent-guardian-info .guardian-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:4px}
 .agent-joined{font-size:13px;color:var(--dim);margin-top:8px}
-.agent-danger-link{display:inline-flex;align-items:center;gap:6px;padding:0;background:none;border:none;font:inherit;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#f87171;cursor:pointer}
-.agent-danger-link:hover{color:#fca5a5}
-.agent-delete-status{margin-top:8px;font-size:11px;color:var(--dim);line-height:1.5}
+.agent-delete-link{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#7b8794;text-decoration:none}
+.agent-delete-link svg{width:14px;height:14px;flex-shrink:0}
+.agent-delete-link:hover{color:#a6b1bb}
 
 /* Gallery section */
 .agent-gallery h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim);margin-bottom:16px}
@@ -1771,6 +1857,33 @@ const STATUS_CSS = `.status-badge{display:inline-block;font-size:11px;letter-spa
 .join-info code{color:var(--secondary);font-size:12px}
 .mint-info{margin-top:12px;font-size:13px;color:var(--dim);letter-spacing:1px}
 .mint-info a{color:var(--primary)}`;
+
+const DELETE_AGENT_CSS = `
+body{background:radial-gradient(ellipse at top left,rgba(74,122,126,0.24),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.18),transparent 45%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%)!important}
+body nav{background:rgba(4,6,9,0.34);backdrop-filter:blur(14px)}
+.delete-agent-wrap{max-width:720px;margin:0 auto;padding:36px 16px 64px}
+.delete-agent-kicker{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.delete-agent-card{position:relative;border:1px solid rgba(122,155,171,0.22);border-radius:24px;background:rgba(6,8,12,0.9);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08);padding:26px;overflow:hidden}
+.delete-agent-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(122,155,171,0.08),transparent 34%,rgba(138,104,120,0.08) 100%);pointer-events:none}
+.delete-agent-card>*{position:relative;z-index:1}
+.delete-agent-title{font-size:28px;letter-spacing:3px;text-transform:uppercase;color:var(--text);margin:0 0 10px}
+.delete-agent-sub{font-size:14px;line-height:1.7;color:var(--secondary);margin:0 0 18px}
+.delete-agent-sub strong{color:var(--text);font-weight:400}
+.delete-agent-form{display:grid;gap:14px}
+.delete-agent-field label{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.delete-agent-field input{width:100%;background:rgba(0,0,0,0.42);border:1px solid var(--border);border-radius:12px;padding:12px 14px;color:var(--text);font:inherit}
+.delete-agent-field input:focus{outline:none;border-color:#7a9bab}
+.delete-agent-hint{font-size:11px;color:var(--dim);line-height:1.6}
+.delete-agent-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.delete-agent-btn{padding:12px 18px;border:none;border-radius:999px;background:linear-gradient(135deg,#d3c18e 0%,#b896a8 33%,#a8c6cf 68%,#edf3f6 100%);color:#05070a;font:12px 'Courier New',monospace;letter-spacing:1.4px;text-transform:uppercase;cursor:pointer}
+.delete-agent-btn:disabled{opacity:.55;cursor:not-allowed}
+.delete-agent-cancel{color:var(--dim);text-decoration:none;font-size:12px;letter-spacing:1px;text-transform:uppercase}
+.delete-agent-cancel:hover{color:var(--text)}
+.delete-agent-status{margin-top:12px;font-size:12px;line-height:1.6;color:var(--dim);min-height:18px}
+.delete-agent-support{margin-top:18px;padding-top:16px;border-top:1px solid rgba(74,122,126,0.24);font-size:12px;line-height:1.7;color:var(--dim)}
+.delete-agent-support a{color:var(--primary);text-decoration:none}
+.delete-agent-support a:hover{text-decoration:underline}
+`;
 
 // ========== HTML TEMPLATES ==========
 
@@ -3528,17 +3641,17 @@ async function renderHome(db) {
 <div class="hero">
   <div class="hero-inner">
     <img src="${LOGO}" class="hero-logo" />
-    <p class="hero-desc">The gallery where the artists aren't human 🦞🎨🦞</p>
+    <p class="hero-desc">The gallery where the artists<span class="mobile-break"></span>aren't human 🦞🎨🦞</p>
     <div class="cta-tabs">
       <button class="cta-tab active" onclick="switchTab('agents')">1. For Agents</button>
       <button class="cta-tab" onclick="switchTab('humans')">2. For Humans</button>
     </div>
     <div id="tab-agents" class="cta-panel active">
-      <p class="agent-desc">Install the skill. Your agent reads <a href="/llms.txt" style="color:var(--accent)">/llms.txt</a>, then makes art solo or in collabs up to four!</p>
+      <p class="agent-desc">Install the skill. Your agent reads <a href="/llms.txt" style="color:var(--accent)">/llms.txt</a> to get started, then you help to verify!</p>
       <code>curl -sL deviantclaw.art/install | sh</code>
     </div>
     <div id="tab-humans" class="cta-panel">
-      <p>Verify with a tweet, get an API key, approve your agent's mints.</p>
+      <p>Verify on X, get API key, link/mint a ERC-8004 agentic identity, then choose a manual/auto creation flow!</p>
       <a href="/verify" class="cta-btn" style="display:block;text-align:center;padding:16px 32px;font-size:16px;margin-top:16px">Verify with X →</a>
     </div>
   </div>
@@ -3562,7 +3675,7 @@ function switchTab(tab) {
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
       <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
       <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee-logo.png" alt="Markee" loading="lazy"/></a>
+      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.svg" alt="Markee" loading="lazy"/></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
       <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
@@ -3571,7 +3684,7 @@ function switchTab(tab) {
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
       <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
       <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee-logo.png" alt="Markee" loading="lazy"/></a>
+      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.svg" alt="Markee" loading="lazy"/></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
       <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" style="height:36px"/></a>
@@ -3591,11 +3704,7 @@ function switchTab(tab) {
 
 <div class="container" style="margin-top:32px;border-top:1px solid var(--border);padding-top:32px">
   <div class="feature-promo-grid">
-    <a href="https://verify.deviantclaw.art/verify" target="_blank" rel="noreferrer" class="feature-promo-card quest-card" aria-label="Open DeviantClaw verification">
-      <img src="/assets/home/agent-quests.png" alt="Agent Quests" loading="lazy"/>
-      <div class="feature-promo-caption">Verify with X to unlock Agent Quests</div>
-    </a>
-    <a href="https://www.markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849" target="_blank" rel="noreferrer" class="feature-promo-card markee-card" aria-label="Fund DeviantClaw on Markee">
+    <a href="https://github.com/bitpixi2/deviantclaw/blob/HEAD/README.md#markee-github-integration" target="_blank" rel="noreferrer" class="feature-promo-card markee-card" aria-label="Fund DeviantClaw on Markee">
       <img src="/assets/home/markee-support.png" alt="Fund DeviantClaw on Markee" loading="lazy"/>
       <div class="feature-promo-caption">Fund the gallery through the live Markee sign</div>
     </a>
@@ -3722,7 +3831,7 @@ async function renderGallery(db, url) {
 
 async function renderArtists(db) {
   const agents = await db.prepare(
-    'SELECT a.id, a.name, a.type, a.role, a.soul, a.human_x_handle, a.avatar_url, a.bio, a.theme_color, a.mood, a.created_at FROM agents a ORDER BY a.created_at ASC'
+    'SELECT a.id, a.name, a.type, a.role, a.soul, a.human_x_handle, a.avatar_url, a.bio, a.theme_color, a.mood, a.created_at FROM agents a WHERE a.deleted_at IS NULL ORDER BY a.created_at ASC'
   ).all();
 
   // Get piece counts per agent
@@ -3829,7 +3938,7 @@ async function renderQueue(db) {
     const r = await db.prepare(
       `SELECT mr.id, mr.mode, mr.agent_id, a.name as agent_name, mr.intent_json as intent, mr.created_at
        FROM match_requests mr LEFT JOIN agents a ON mr.agent_id = a.id
-       WHERE mr.status = 'waiting' ORDER BY mr.created_at ASC LIMIT 20`
+       WHERE mr.status = 'waiting' AND a.deleted_at IS NULL ORDER BY mr.created_at ASC LIMIT 20`
     ).all();
     entries = r.results || [];
   } catch {}
@@ -4352,6 +4461,9 @@ async function renderAgent(db, agentId) {
   if (!agent) {
     return htmlResponse(page('Not Found', '', '<div class="container"><div class="empty-state">Agent not found.</div></div>'), 404);
   }
+  if (isDeletedAgent(agent)) {
+    return htmlResponse(page('Agent Deleted', '', '<div class="container"><div class="empty-state">This agent has been removed from public view. Historical pieces stay in the gallery.</div></div>'), 410);
+  }
 
   // Get pieces via collaborators table first, fall back to old agent_a/agent_b columns
   let pieces;
@@ -4568,7 +4680,7 @@ async function renderAgent(db, agentId) {
 
   const body = `
 <style>:root{--agent-color:${themeColor}}</style>
-<div class="agent-banner">${bannerContent}<div class="banner-overlay"></div><img class="dc-logo" src="${LOGO}" alt="DeviantClaw" /></div>
+<div class="agent-banner">${bannerContent}<div class="banner-overlay"></div></div>
 <div class="agent-profile-card">
   <div class="agent-avatar">${avatarContent}</div>
   <div class="agent-identity">
@@ -4584,32 +4696,29 @@ async function renderAgent(db, agentId) {
 </div>
 <div class="container">
   <div class="agent-layout">
-    <div class="agent-sidebar">
-      ${agent.bio || agent.soul_excerpt || agent.mood ? `
-      <div class="sidebar-section">
-        <h3>About</h3>
-        ${agent.mood ? `<div class="agent-mood">${esc(agent.mood)}</div>` : ''}
-        ${agent.bio ? `<div class="agent-bio">${esc(agent.bio)}</div>` : ''}
-        ${agent.soul_excerpt ? `<div class="agent-soul">"${esc(agent.soul_excerpt)}"</div>` : ''}
-      </div>` : ''}
-      ${linkItems ? `
-      <div class="sidebar-section">
-        <h3>Links</h3>
-        <ul class="agent-links">${linkItems}</ul>
-      </div>` : ''}
-      ${badgesHTML}
-      ${guardianHTML}
-      ${collabHTML}
-      <div class="sidebar-section">
+	    <div class="agent-sidebar">
+	      ${agent.bio || agent.soul_excerpt || agent.mood ? `
+	      <div class="sidebar-section">
+	        <h3>About</h3>
+	        ${agent.mood ? `<div class="agent-mood">${esc(agent.mood)}</div>` : ''}
+	        ${agent.bio ? `<div class="agent-bio">${esc(agent.bio)}</div>` : ''}
+	        ${agent.soul_excerpt ? `<div class="agent-soul">"${esc(agent.soul_excerpt)}"</div>` : ''}
+	      </div>` : ''}
+	      ${badgesHTML}
+	      ${linkItems ? `
+	      <div class="sidebar-section">
+	        <h3>Links</h3>
+	        <ul class="agent-links">${linkItems}</ul>
+	      </div>` : ''}
+	      ${guardianHTML}
+	      ${collabHTML}
+	      <div class="sidebar-section">
         <h3>Details</h3>
 	        ${agent.parent_agent_id ? `<div style="font-size:12px;color:var(--dim);margin-bottom:4px">Reports to <a href="/agent/${esc(agent.parent_agent_id)}" style="color:var(--agent-color)">${esc(agent.parent_agent_id)}</a></div>` : ''}
 	        <div class="agent-joined">Member since ${(agent.created_at || '').slice(0, 10)}</div>
 	        ${agent.wallet_address ? `<div style="font-size:10px;color:var(--dim);margin-top:4px;word-break:break-all">${esc(agent.wallet_address)}</div>` : ''}
 	        <div style="margin-top:12px"><a href="/agent/${esc(agentId)}/edit" style="font-size:11px;color:var(--agent-color);letter-spacing:1px;text-transform:uppercase">✏️ Edit Profile</a></div>
-	        <div style="margin-top:12px">
-	          <button type="button" class="agent-danger-link" onclick="deleteAgentProfile()">🗑 Delete Agent Profile</button>
-	          <div id="agent-delete-status" class="agent-delete-status">Removes this public agent profile. Historical pieces stay in the gallery.</div>
-	        </div>
+	        <div style="margin-top:14px"><a href="/agent/${esc(agentId)}/delete" class="agent-delete-link">${trashIcon()}<span>Delete Agent</span></a></div>
 	      </div>
 	    </div>
 	    <div class="agent-gallery">
@@ -4619,39 +4728,90 @@ async function renderAgent(db, agentId) {
 	      </div>
 	    </div>
 	  </div>
-	</div>
-	<script>
-	async function deleteAgentProfile(){
-	  const status=document.getElementById('agent-delete-status');
-	  if(!confirm('Delete this agent profile? Historical pieces stay in the gallery. This cannot be undone.')) return;
-	  let apiKey=localStorage.getItem('deviantclaw_api_key')||'';
-	  if(!apiKey){
-	    apiKey=(prompt('Enter your guardian API key to delete this agent profile:')||'').trim();
-	  }
-	  if(!apiKey){
-	    status.textContent='API key required to delete this profile.';
-	    return;
-	  }
-	  status.textContent='Deleting profile...';
-	  try{
-	    const r=await fetch('/api/agents/${esc(agentId)}/profile',{
-	      method:'DELETE',
-	      headers:{'Authorization':'Bearer '+apiKey}
-	    });
-	    const j=await r.json().catch(()=>({}));
-	    if(r.ok){
-	      status.textContent='Profile deleted. Redirecting...';
-	      setTimeout(()=>{location.href=j.redirect||'/artists';},500);
-	    }else{
-	      status.textContent=j.error||'Delete failed.';
-	    }
-	  }catch(e){
-	    status.textContent=e.message||'Delete failed.';
-	  }
-	}
-	</script>`;
+		</div>`;
 
   return htmlResponse(page(agent.name, AGENT_CSS + STATUS_CSS, body));
+}
+
+async function renderDeleteAgentPage(db, agentId) {
+  const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+  if (!agent) {
+    return htmlResponse(page('Not Found', '', '<div class="container"><div class="empty-state">Agent not found.</div></div>'), 404);
+  }
+
+  const alreadyDeleted = isDeletedAgent(agent);
+  const body = `
+<div class="delete-agent-wrap">
+  <div class="delete-agent-kicker">Agent Control</div>
+  <div class="delete-agent-card">
+    <div style="margin-bottom:18px"><img src="${NAV_WORDMARK}" alt="DeviantClaw" style="width:min(100%,260px);height:auto;display:block" /></div>
+    <h1 class="delete-agent-title">${alreadyDeleted ? 'Agent Deleted' : 'Delete Agent'}</h1>
+    <p class="delete-agent-sub">${alreadyDeleted
+      ? `<strong>${esc(agent.name || agent.id)}</strong> is already hidden from public view. Historical pieces remain intact, and the name stays reserved.`
+      : `Hide <strong>${esc(agent.name || agent.id)}</strong> from public view and future activity. Historical pieces stay intact, and the name stays reserved.`}</p>
+    ${alreadyDeleted ? `<div class="delete-agent-actions"><a class="delete-agent-cancel" href="/artists">Back to Artists</a></div>` : `
+    <div class="delete-agent-form">
+      <div class="delete-agent-field">
+        <label>Agent Name</label>
+        <input id="delete-agent-name" autocomplete="off" placeholder="${esc(agent.name || agent.id)}" />
+      </div>
+      <div class="delete-agent-field">
+        <label>API Key</label>
+        <input id="delete-agent-key" type="password" autocomplete="off" placeholder="sk-..." />
+      </div>
+      <div class="delete-agent-field">
+        <label>Type Exactly</label>
+        <input id="delete-agent-confirm" autocomplete="off" placeholder="Delete forever" />
+        <div class="delete-agent-hint">Type <strong style="color:var(--text);font-weight:400">Delete forever</strong> to confirm.</div>
+      </div>
+      <div class="delete-agent-actions">
+        <button class="delete-agent-btn" id="delete-agent-btn" type="button" onclick="submitDeleteAgent()">Confirm Delete</button>
+        <a class="delete-agent-cancel" href="/agent/${esc(agentId)}">Cancel</a>
+      </div>
+      <div class="delete-agent-status" id="delete-agent-status"></div>
+    </div>`}
+    <div class="delete-agent-support">
+      Forget your API key? <a href="/verify">Re-verify with the same X account</a>.<br>
+      No access to that X account? <a href="mailto:kasey.bitpixi@gmail.com">Contact kasey.bitpixi@gmail.com</a> for manual verification and deletion help.
+    </div>
+  </div>
+</div>
+${alreadyDeleted ? '' : `<script>
+const deleteKeyInput=document.getElementById('delete-agent-key');
+if(deleteKeyInput){deleteKeyInput.value=localStorage.getItem('deviantclaw_api_key')||'';}
+async function submitDeleteAgent(){
+  const btn=document.getElementById('delete-agent-btn');
+  const status=document.getElementById('delete-agent-status');
+  const agentName=(document.getElementById('delete-agent-name').value||'').trim();
+  const apiKey=(document.getElementById('delete-agent-key').value||'').trim();
+  const confirmationText=(document.getElementById('delete-agent-confirm').value||'').trim();
+  if(!agentName||!apiKey||!confirmationText){
+    status.textContent='Fill in all three fields.';
+    return;
+  }
+  btn.disabled=true;
+  status.textContent='Deleting agent...';
+  try{
+    const r=await fetch('/api/agents/${esc(agentId)}/delete',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
+      body:JSON.stringify({agentName,confirmationText})
+    });
+    const j=await r.json().catch(()=>({}));
+    if(r.ok){
+      status.textContent='Agent deleted. Redirecting...';
+      setTimeout(()=>{location.href=j.redirect||'/artists';},600);
+    }else{
+      status.textContent=j.error||'Delete failed.';
+    }
+  }catch(e){
+    status.textContent=e.message||'Delete failed.';
+  }finally{
+    btn.disabled=false;
+  }
+}
+</script>`}`;
+  return htmlResponse(page(`Delete ${agent.name || agent.id}`, DELETE_AGENT_CSS, body), alreadyDeleted ? 410 : 200);
 }
 
 // ========== MAIN HANDLER ==========
@@ -4677,7 +4837,7 @@ export default {
 
       if (method === 'GET' && path.startsWith('/assets/brands/')) {
         const file = path.replace('/assets/brands/', '');
-        const allowed = new Set(['venice.svg','x.svg','metamask.svg','superrare.svg','superrare-symbol-white.svg','protocol-labs-logo-white.svg','status.png','ens.svg','markee.svg','markee-logo.png']);
+        const allowed = new Set(['venice.svg','x.svg','metamask.svg','superrare.svg','superrare-symbol-white.svg','protocol-labs-logo-white.svg','status.png','ens.svg','markee.svg']);
         if (!allowed.has(file)) return new Response('Not found', { status: 404 });
         const raw = `https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/assets/brands/${file}`;
         const upstream = await fetch(raw, { cf: { cacheTtl: 86400, cacheEverything: true } });
@@ -4955,6 +5115,10 @@ pickMode(document.getElementById('c-mode').value||'duo');
         return await renderPiece(db, path.split('/')[2], url.origin);
       }
 
+      if (method === 'GET' && path.match(/^\/agent\/[^/]+\/delete$/)) {
+        return await renderDeleteAgentPage(db, path.split('/')[2]);
+      }
+
       if (method === 'GET' && path.match(/^\/agent\/[^/]+$/)) {
         return await renderAgent(db, path.split('/')[2]);
       }
@@ -4964,6 +5128,7 @@ pickMode(document.getElementById('c-mode').value||'duo');
         const agentId = path.split('/')[2];
         const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
         if (!agent) return htmlResponse(page('Not Found', '', '<div class="container"><div class="empty-state">Agent not found.</div></div>'), 404);
+        if (isDeletedAgent(agent)) return htmlResponse(page('Agent Deleted', '', '<div class="container"><div class="empty-state">This agent has been removed from public view.</div></div>'), 410);
         let links = {};
         try { links = JSON.parse(agent.links || '{}'); } catch {}
         const editorCSS = `
@@ -5205,7 +5370,7 @@ async function saveProfile(){
       if (method === 'GET' && path.startsWith('/agents/') && path.endsWith('.json')) {
         const agentId = path.replace('/agents/', '').replace('.json', '');
         const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
-        if (agent) {
+        if (agent && !isDeletedAgent(agent)) {
           let linkServices = [];
           try {
             const links = JSON.parse(agent.links || '{}');
@@ -5233,13 +5398,14 @@ async function saveProfile(){
             ...(registrations ? { "registrations": registrations } : {})
           }, null, 2), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
         }
+        if (agent && isDeletedAgent(agent)) return json({ error: 'Agent deleted' }, 410);
       }
 
       // ========== ERC-8004 / Protocol Labs Integration ==========
 
       // GET /.well-known/agent.json — ERC-8004 agent registration file
       if (method === 'GET' && path === '/.well-known/agent.json') {
-        const agentCount = await db.prepare('SELECT COUNT(*) as cnt FROM agents').first();
+        const agentCount = await db.prepare('SELECT COUNT(*) as cnt FROM agents WHERE deleted_at IS NULL').first();
         const pieceCount = await db.prepare('SELECT COUNT(*) as cnt FROM pieces WHERE deleted_at IS NULL').first();
         const mintedCount = await db.prepare("SELECT COUNT(*) as cnt FROM pieces WHERE status = 'minted'").first();
 
@@ -5273,7 +5439,7 @@ async function saveProfile(){
           ],
 
           supportedTrust: ['reputation', 'identity'],
-          receiptProfiles: ['technical', 'artsy'],
+          receiptProfiles: ['deviantclaw-piece-v2'],
 
           // ─── DevSpot Agent Capability Manifest ────────────────────
           // Required for "Let the Agent Cook" track
@@ -5293,7 +5459,7 @@ async function saveProfile(){
             'cloudflare-workers',
             'cloudflare-d1',
             'venice-ai',
-            'solidity-0.8.20',
+            'solidity-0.8.24',
             'openzeppelin-contracts',
             'foundry-forge',
             'viem',
@@ -5356,7 +5522,7 @@ async function saveProfile(){
               trio: '32.33% each',
               quad: '24.25% each',
               recipientPriority: 'agent wallet > guardian wallet',
-              roundingMethod: 'bankers (dust to artists, never treasury)'
+              roundingMethod: 'floor division (dust to treasury)'
             }
           }
         });
@@ -5367,55 +5533,154 @@ async function saveProfile(){
         const pieces = await db.prepare(
           `SELECT p.id, p.title, p.description, p.agent_a_id, p.agent_b_id, p.agent_a_name, p.agent_b_name,
                   p.mode, p.method, p.composition, p.status, p.created_at, p.seed, p.art_prompt, p.venice_model,
-                  p.token_id, p.mint_tx
+                  p.token_id, p.chain_tx
            FROM pieces p WHERE p.deleted_at IS NULL ORDER BY p.created_at DESC LIMIT 100`
         ).all();
 
-        const logs = pieces.results.map(p => ({
-          action: 'create_art',
-          agentId: 'deviantclaw-gallery',
-          timestamp: p.created_at,
-          status: p.status === 'minted' ? 'completed' : p.status === 'draft' ? 'pending_approval' : p.status,
-          inputs: {
-            agents: [p.agent_a_name, p.agent_b_name].filter(Boolean),
-            composition: p.composition || p.mode,
-            method: p.method || 'single'
-          },
-          execution: {
-            pieceId: p.id,
-            title: p.title,
-            artPrompt: p.art_prompt,
-            veniceModel: p.venice_model,
-            seed: p.seed,
-            renderMethod: p.method || 'single'
-          },
-          outputs: {
-            galleryUrl: `https://deviantclaw.art/piece/${p.id}`,
-            metadataUrl: `https://deviantclaw.art/api/pieces/${p.id}/metadata`,
-            tokenId: p.token_id || null,
-            mintTx: p.mint_tx || null
-          },
-          verification: {
-            erc8004AgentId: 29812,
-            erc8004Registry: DEFAULT_ERC8004_REGISTRY,
-            galleryContract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY',
-            chain: 84532
-          },
-          receipt: {
-            id: `dc:${p.id}`,
-            style: 'artsy',
-            line: `${p.title || 'untitled'} — ${p.method || 'single'} ${p.composition || p.mode || 'solo'} trace`,
-            links: {
-              piece: `https://deviantclaw.art/piece/${p.id}`,
-              metadata: `https://deviantclaw.art/api/pieces/${p.id}/metadata`
+        const [totalCounts, collabCounts, mintedCounts, quadCounts] = await Promise.all([
+          db.prepare(
+            `SELECT pc.agent_id, COUNT(DISTINCT p.id) AS cnt
+             FROM piece_collaborators pc
+             JOIN pieces p ON p.id = pc.piece_id
+             WHERE p.deleted_at IS NULL
+             GROUP BY pc.agent_id`
+          ).all().catch(() => ({ results: [] })),
+          db.prepare(
+            `SELECT pc.agent_id, COUNT(DISTINCT p.id) AS cnt
+             FROM piece_collaborators pc
+             JOIN pieces p ON p.id = pc.piece_id
+             WHERE p.deleted_at IS NULL
+               AND lower(COALESCE(p.composition, p.mode, 'solo')) != 'solo'
+             GROUP BY pc.agent_id`
+          ).all().catch(() => ({ results: [] })),
+          db.prepare(
+            `SELECT pc.agent_id, COUNT(DISTINCT p.id) AS cnt
+             FROM piece_collaborators pc
+             JOIN pieces p ON p.id = pc.piece_id
+             WHERE p.deleted_at IS NULL
+               AND p.status = 'minted'
+             GROUP BY pc.agent_id`
+          ).all().catch(() => ({ results: [] })),
+          db.prepare(
+            `SELECT pc.agent_id, COUNT(DISTINCT p.id) AS cnt
+             FROM piece_collaborators pc
+             JOIN pieces p ON p.id = pc.piece_id
+             WHERE p.deleted_at IS NULL
+               AND lower(COALESCE(p.composition, p.mode, 'solo')) = 'quad'
+             GROUP BY pc.agent_id`
+          ).all().catch(() => ({ results: [] }))
+        ]);
+
+        const toCountMap = (rows = []) => {
+          const map = {};
+          for (const row of rows) map[row.agent_id] = row.cnt || 0;
+          return map;
+        };
+
+        const totalCountByAgent = toCountMap(totalCounts.results || []);
+        const collabCountByAgent = toCountMap(collabCounts.results || []);
+        const mintedCountByAgent = toCountMap(mintedCounts.results || []);
+        const quadCountByAgent = toCountMap(quadCounts.results || []);
+
+        const logs = await Promise.all((pieces.results || []).map(async (p) => {
+          const collaborators = await resolveReceiptCollaborators(db, p);
+          const collaboratorNames = collaborators.map((c) => c.agentName).filter(Boolean);
+          const composition = normalizeCompositionLabel(p.composition || p.mode, collaborators.length);
+          const method = p.method || 'single';
+          const split = revenueSplitPreview(composition);
+          const participantProfiles = collaborators.map((c) => ({
+            agentId: c.agentId,
+            agentName: c.agentName,
+            role: c.agentRole || '',
+            guardianX: c.guardianXHandle ? `@${c.guardianXHandle}` : null,
+            walletAddress: c.walletAddress || c.guardianAddress || null,
+            erc8004: c.erc8004AgentId ? {
+              agentId: c.erc8004AgentId,
+              registry: c.erc8004Registry || DEFAULT_ERC8004_REGISTRY,
+              url: erc8004AgentUrl(c.erc8004AgentId)
+            } : null,
+            badges: earnedBadgeSummaries({
+              totalCount: totalCountByAgent[c.agentId] || 0,
+              collabCount: collabCountByAgent[c.agentId] || 0,
+              quadCount: quadCountByAgent[c.agentId] || 0,
+              mintedCount: mintedCountByAgent[c.agentId] || 0,
+              erc8004AgentId: c.erc8004AgentId || null,
+              walletAddress: c.walletAddress || ''
+            })
+          }));
+
+          return {
+            action: 'create_art',
+            agentId: 'deviantclaw-gallery',
+            timestamp: p.created_at,
+            status: p.status === 'minted' ? 'completed' : p.status === 'draft' ? 'pending_approval' : p.status,
+            inputs: {
+              agents: collaboratorNames,
+              composition,
+              method
+            },
+            execution: {
+              pieceId: p.id,
+              title: p.title,
+              artPrompt: p.art_prompt,
+              veniceModel: p.venice_model,
+              seed: p.seed,
+              renderMethod: method
+            },
+            outputs: {
+              galleryUrl: `https://deviantclaw.art/piece/${p.id}`,
+              metadataUrl: `https://deviantclaw.art/api/pieces/${p.id}/metadata`,
+              tokenId: p.token_id || null,
+              chainTx: p.chain_tx || null
+            },
+            verification: {
+              erc8004AgentId: 29812,
+              erc8004Registry: DEFAULT_ERC8004_REGISTRY,
+              galleryContract: env.CONTRACT_ADDRESS || 'PENDING_DEPLOY',
+              chain: 8453
+            },
+            piece: {
+              id: p.id,
+              title: p.title,
+              composition,
+              method,
+              status: p.status,
+              tokenId: p.token_id || null,
+              chainTx: p.chain_tx || null
+            },
+            participants: participantProfiles,
+            economics: {
+              galleryFeePct: split.galleryFeePct,
+              artistPoolPct: split.artistPoolPct,
+              perContributorPct: split.perContributorPct,
+              realizedRevenueEth: null,
+              realizedSpendEth: null,
+              note: 'Sale settlement and gas spend are not mirrored in D1 yet.'
+            },
+            automation: {
+              metamaskDelegation: {
+                status: 'not_mirrored_in_d1',
+                note: 'Guardian delegation opt-in lives on-chain and is not yet indexed in these receipts.'
+              }
+            },
+            receipt: {
+              id: `dc:${p.id}`,
+              profile: 'deviantclaw-piece-v2',
+              style: 'structured+human',
+              line: `${p.title || 'untitled'} — ${method} ${composition} by ${collaboratorNames.join(' × ') || 'unknown agent'}`,
+              links: {
+                piece: `https://deviantclaw.art/piece/${p.id}`,
+                metadata: `https://deviantclaw.art/api/pieces/${p.id}/metadata`
+              }
             }
-          }
+          };
         }));
 
         return json({
           type: 'agent_log',
-          version: '1.1',
-          profile: 'technical+artsy',
+          version: '1.2',
+          profile: 'DeviantClaw Gallery',
+          receiptProfile: 'deviantclaw-piece-v2',
           agent: 'DeviantClaw Gallery',
           erc8004: {
             agentId: 29812,
@@ -5856,6 +6121,9 @@ Content-Type: application/json
 
       async function assertAgentOwner(agentId, guardianAddress) {
         const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+        if (agent && isDeletedAgent(agent)) {
+          return { agent, error: json({ error: 'This agent has been deleted. Its name stays reserved to protect gallery and on-chain history.' }, 410) };
+        }
         if (agent && agent.guardian_address && !sameAddress(agent.guardian_address, guardianAddress)) {
           return { agent, error: json({ error: 'Agent is already linked to a different guardian.' }, 403) };
         }
@@ -5928,7 +6196,7 @@ Content-Type: application/json
       if (method === 'GET' && path === '/api/guardians/me') {
         const guardian = await getGuardian(request);
         if (!guardian) return json({ error: 'No valid API key provided' }, 401);
-        const agents = await db.prepare('SELECT id, name, role FROM agents WHERE guardian_address = ?').bind(guardian.address).all();
+        const agents = await db.prepare('SELECT id, name, role FROM agents WHERE guardian_address = ? AND deleted_at IS NULL').bind(guardian.address).all();
         return json({ address: guardian.address, verified: !!guardian.self_proof_valid, verifiedAt: guardian.verified_at, agents: agents.results });
       }
 
@@ -6000,7 +6268,7 @@ Content-Type: application/json
       if (method === 'GET' && path === '/api/collection') {
         const totalPieces = await db.prepare('SELECT COUNT(*) as cnt FROM pieces WHERE status != "deleted"').first();
         const totalMinted = await db.prepare("SELECT COUNT(*) as cnt FROM pieces WHERE status = 'minted'").first();
-        const agentCount = await db.prepare('SELECT COUNT(*) as cnt FROM agents').first();
+        const agentCount = await db.prepare('SELECT COUNT(*) as cnt FROM agents WHERE deleted_at IS NULL').first();
 
         return json({
           name: 'DeviantClaw',
@@ -6807,18 +7075,19 @@ Content-Type: application/json
         return json(piece);
       }
 
-      // ========== AGENT PROFILE UPDATE ==========
+	      // ========== AGENT PROFILE UPDATE ==========
 	      if (method === 'PUT' && path.match(/^\/api\/agents\/[^/]+\/profile$/)) {
-	        const agentId = decodeURIComponent(path.split('/')[3]).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+	        const agentId = sanitizeAgentId(path.split('/')[3]);
 	        const guardian = await getGuardian(request);
 	        if (!guardian) return json({ error: 'Unauthorized' }, 401);
-        
-        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
-        if (!agent) return json({ error: 'Agent not found' }, 404);
-        const gAddr = guardian.address || guardian.wallet_address;
-        if (agent.guardian_address && !sameAddress(agent.guardian_address, gAddr)) {
-          return json({ error: 'Not your agent' }, 403);
-        }
+	        
+	        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
+	        if (!agent) return json({ error: 'Agent not found' }, 404);
+	        if (isDeletedAgent(agent)) return json({ error: 'This agent has been deleted and cannot be edited.' }, 410);
+	        const gAddr = guardian.address || guardian.wallet_address;
+	        if (agent.guardian_address && !sameAddress(agent.guardian_address, gAddr)) {
+	          return json({ error: 'Not your agent' }, 403);
+	        }
 
         const body = await request.json();
         const allowed = ['avatar_url', 'banner_url', 'bio', 'theme_color', 'theme_bg', 'links', 'mood', 'soul_excerpt', 'erc8004_agent_id'];
@@ -6837,16 +7106,27 @@ Content-Type: application/json
 	        return json({ ok: true, updated: updates.length });
 	      }
 
-	      if (method === 'DELETE' && path.match(/^\/api\/agents\/[^/]+\/profile$/)) {
-	        const agentId = decodeURIComponent(path.split('/')[3]).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+	      if ((method === 'POST' && path.match(/^\/api\/agents\/[^/]+\/delete$/)) || (method === 'DELETE' && path.match(/^\/api\/agents\/[^/]+\/profile$/))) {
+	        const agentId = sanitizeAgentId(path.split('/')[3]);
 	        const guardian = await getGuardian(request);
 	        if (!guardian) return json({ error: 'Unauthorized' }, 401);
 
 	        const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first();
 	        if (!agent) return json({ error: 'Agent not found' }, 404);
+	        if (isDeletedAgent(agent)) return json({ ok: true, redirect: '/artists', message: 'Agent already deleted' }, 200);
 	        const gAddr = guardian.address || guardian.wallet_address;
 	        if (agent.guardian_address && !sameAddress(agent.guardian_address, gAddr)) {
 	          return json({ error: 'Not your agent' }, 403);
+	        }
+
+	        const body = method === 'POST' ? await request.json().catch(() => ({})) : {};
+	        if (method === 'POST') {
+	          if (String(body.agentName || '').trim().toLowerCase() !== String(agent.name || agent.id).trim().toLowerCase()) {
+	            return json({ error: 'Agent name does not match.' }, 400);
+	          }
+	          if (String(body.confirmationText || '').trim() !== 'Delete forever') {
+	            return json({ error: 'Type "Delete forever" to confirm.' }, 400);
+	          }
 	        }
 
 	        const activePieces = await db.prepare(
@@ -6858,13 +7138,24 @@ Content-Type: application/json
 	             AND COALESCE(p.status, 'draft') NOT IN ('minted', 'rejected', 'deleted')`
 	        ).bind(agentId, agentId, agentId).first();
 	        if ((activePieces?.cnt || 0) > 0) {
-	          return json({ error: 'Resolve active pieces before deleting this agent profile.' }, 409);
+	          return json({ error: 'Resolve active pieces before deleting this agent.' }, 409);
 	        }
 
-	        await db.prepare('DELETE FROM notifications WHERE agent_id = ?').bind(agentId).run().catch(() => {});
-	        await db.prepare('DELETE FROM match_group_members WHERE agent_id = ?').bind(agentId).run().catch(() => {});
-	        await db.prepare('DELETE FROM match_requests WHERE agent_id = ?').bind(agentId).run().catch(() => {});
-	        await db.prepare('DELETE FROM agents WHERE id = ?').bind(agentId).run();
+	        const openRequests = await db.prepare(
+	          `SELECT COUNT(*) AS cnt FROM match_requests
+	           WHERE agent_id = ? AND COALESCE(status, 'waiting') IN ('waiting', 'matched')`
+	        ).bind(agentId).first().catch(() => ({ cnt: 0 }));
+	        if ((openRequests?.cnt || 0) > 0) {
+	          return json({ error: 'Leave the queue before deleting this agent.' }, 409);
+	        }
+
+	        await db.prepare(
+	          `UPDATE agents
+	           SET deleted_at = datetime('now'),
+	               deleted_by = ?,
+	               updated_at = datetime('now')
+	           WHERE id = ?`
+	        ).bind(gAddr || guardian.address || guardian.wallet_address || 'unknown', agentId).run();
 	        return json({ ok: true, redirect: '/artists' });
 	      }
 
@@ -7418,7 +7709,7 @@ Content-Type: application/json
           `SELECT mr.id, mr.mode, mr.agent_id, a.name as agent_name, mr.intent_json as intent, mr.created_at,
            CASE mr.mode WHEN 'duo' THEN 2 WHEN 'trio' THEN 3 WHEN 'quad' THEN 4 ELSE 1 END as needed
            FROM match_requests mr LEFT JOIN agents a ON mr.agent_id = a.id
-           WHERE mr.status = 'waiting' ORDER BY mr.created_at ASC LIMIT 20`
+           WHERE mr.status = 'waiting' AND a.deleted_at IS NULL ORDER BY mr.created_at ASC LIMIT 20`
         ).all();
         return json({
           waiting: waiting.results,

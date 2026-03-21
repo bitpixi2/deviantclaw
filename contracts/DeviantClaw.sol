@@ -85,6 +85,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         uint256[] recipientShares;
         uint256 recipientCount;
         uint256 totalShares;
+        uint256 galleryFeeBpsLocked;
     }
 
     /// @notice tokenId -> revenue split info (locked at mint time)
@@ -161,7 +162,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
     event PieceFullyApproved(uint256 indexed pieceId);
     event PieceMinted(uint256 indexed pieceId, uint256 indexed tokenId, string[] agentIds, address[] recipients);
     event RoyaltiesReceived(uint256 indexed tokenId, uint256 amount);
-    event RoyaltiesDistributed(uint256 indexed tokenId, uint256 galleryShare, uint256 artistPool);
+    event RoyaltiesDistributed(uint256 indexed tokenId, uint256 treasuryPayout, uint256 artistPayout);
     event RoyaltyPayoutDeferred(uint256 indexed tokenId, address indexed recipient, uint256 amount);
     event RoyaltyClaimed(address indexed recipient, uint256 amount);
     event GalleryFeeUpdated(uint256 newFeeBps);
@@ -460,14 +461,12 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         SplitInfo storage split = _splits[tokenId];
         require(split.recipientCount > 0, "No split info");
 
-        uint256 galleryShare = (balance * galleryFeeBps) / 10000;
+        uint256 galleryShare = (balance * split.galleryFeeBpsLocked) / 10000;
         uint256 artistPool = balance - galleryShare;
         uint256[] memory payouts = new uint256[](split.recipientCount);
         uint256 distributed = 0;
 
         tokenBalance[tokenId] = 0;
-
-        _attemptPayout(tokenId, treasury, galleryShare);
 
         for (uint256 i = 0; i < split.recipientCount; i++) {
             uint256 payout = (artistPool * split.recipientShares[i]) / split.totalShares;
@@ -476,16 +475,15 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
         }
 
         uint256 dust = artistPool - distributed;
-        for (uint256 i = 0; i < split.recipientCount && dust > 0; i++) {
-            payouts[i] += 1;
-            dust -= 1;
-        }
+        uint256 treasuryPayout = galleryShare + dust;
+
+        _attemptPayout(tokenId, treasury, treasuryPayout);
 
         for (uint256 i = 0; i < split.recipientCount; i++) {
             _attemptPayout(tokenId, split.recipients[i], payouts[i]);
         }
 
-        emit RoyaltiesDistributed(tokenId, galleryShare, artistPool);
+        emit RoyaltiesDistributed(tokenId, treasuryPayout, distributed);
     }
 
     /**
@@ -570,6 +568,22 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
     }
 
     /**
+     * @notice Emit a metadata refresh signal for marketplace/indexer consumers.
+     *         Useful when off-chain metadata at the existing tokenURI has changed.
+     */
+    function refreshMetadata(uint256 tokenId) external onlyOperator {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        emit MetadataUpdate(tokenId);
+    }
+
+    function refreshMetadataBatch(uint256 fromTokenId, uint256 toTokenId) external onlyOperator {
+        require(fromTokenId <= toTokenId, "Invalid range");
+        require(_ownerOf(fromTokenId) != address(0), "Start token missing");
+        require(_ownerOf(toTokenId) != address(0), "End token missing");
+        emit BatchMetadataUpdate(fromTokenId, toTokenId);
+    }
+
+    /**
      * @notice Check if a proposed auction price meets the floor for a token.
      */
     function validateAuctionPrice(uint256 tokenId, uint256 priceWei) external view returns (bool valid, uint256 floorWei) {
@@ -598,6 +612,10 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
     {
         SplitInfo storage s = _splits[tokenId];
         return (s.recipients, s.agentIds, s.recipientShares, s.totalShares);
+    }
+
+    function getTokenGalleryFeeBps(uint256 tokenId) external view returns (uint256) {
+        return _splits[tokenId].galleryFeeBpsLocked;
     }
 
     function getPieceAgents(uint256 pieceId) external view returns (string[] memory) {
@@ -660,6 +678,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
     function _lockSplit(uint256 tokenId, string[] storage agentIds) internal {
         SplitInfo storage split = _splits[tokenId];
+        split.galleryFeeBpsLocked = galleryFeeBps;
 
         for (uint256 i = 0; i < agentIds.length; i++) {
             split.agentIds.push(agentIds[i]);
