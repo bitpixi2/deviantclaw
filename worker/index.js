@@ -927,10 +927,18 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
         { maxTokens: 100 }
       )
     ));
-    const allImages = await Promise.all(perAgentPrompts.map(p => veniceImage(apiKey, p)));
+    // Generate images sequentially to avoid race conditions and partial failures
+    const allImages = [];
+    for (const prompt of perAgentPrompts) {
+      const img = await veniceImage(apiKey, prompt);
+      allImages.push(img);
+    }
     imageDataUri = allImages[0];
     imageDataUriB = allImages[1];
     if (allImages.length > 2) extraImages = allImages.slice(2);
+    // Warn if any images failed
+    if (!imageDataUri) console.error('[veniceGenerate] Primary image generation failed');
+    if (perAgentPrompts.length > 1 && !imageDataUriB) console.error('[veniceGenerate] Secondary image (B) generation failed');
   } else {
     // Fusion or solo image — single combined image
     imageDataUri = await veniceImage(apiKey, artPrompt);
@@ -1255,25 +1263,60 @@ async function storeVeniceImage(db, pieceId, result) {
     'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
   ).bind(pieceId, result.imageDataUri).run();
   
-  // Store additional images (B, C, D)
+  // Verify primary image stored
+  const primaryCheck = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(pieceId).first();
+  if (!primaryCheck) {
+    console.error(`[storeVeniceImage] Failed to store primary image for piece ${pieceId}`);
+    return; // Don't update HTML if primary image didn't store
+  }
+  
+  // Store additional images (B, C, D) — sequentially, not in parallel
   const extras = [
     { key: '_b', data: result.imageDataUriB },
     ...(result.extraImages || []).map((d, i) => ({ key: '_' + String.fromCharCode(99 + i), data: d }))
   ];
+  const storedExtras = new Set();
   for (const { key, data } of extras) {
     if (data) {
       await db.prepare(
         'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
       ).bind(pieceId + key, data).run();
+      // Verify it stored
+      const check = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(pieceId + key).first();
+      if (check) {
+        storedExtras.add(key);
+      } else {
+        console.error(`[storeVeniceImage] Failed to store image ${key} for piece ${pieceId}`);
+      }
     }
   }
   
-  // Update HTML to reference the image endpoint(s)
+  // Update HTML to reference the image endpoint(s) — only replace placeholders for images that actually stored
   let fixedHtml = result.html;
   fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL}}', `/api/pieces/${pieceId}/image`);
-  fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_B}}', `/api/pieces/${pieceId}/image-b`);
-  fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_C}}', `/api/pieces/${pieceId}/image-c`);
-  fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_D}}', `/api/pieces/${pieceId}/image-d`);
+  if (storedExtras.has('_b') || result.imageDataUriB) {
+    fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_B}}', `/api/pieces/${pieceId}/image-b`);
+  } else {
+    // If image-b was expected but missing, fall back to primary image rather than leaving placeholder
+    fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_B}}', `/api/pieces/${pieceId}/image`);
+  }
+  if (storedExtras.has('_c')) {
+    fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_C}}', `/api/pieces/${pieceId}/image-c`);
+  } else {
+    fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_C}}', `/api/pieces/${pieceId}/image`);
+  }
+  if (storedExtras.has('_d')) {
+    fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_D}}', `/api/pieces/${pieceId}/image-d`);
+  } else {
+    fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_D}}', `/api/pieces/${pieceId}/image`);
+  }
+  
+  // Final validation: ensure no placeholders remain
+  if (fixedHtml.includes('{{PIECE_IMAGE_URL')) {
+    console.error(`[storeVeniceImage] WARNING: Placeholders still remain in HTML for piece ${pieceId}! Stripping them.`);
+    fixedHtml = fixedHtml.replace(/\{\{PIECE_IMAGE_URL[^}]*\}\}/g, `/api/pieces/${pieceId}/image`);
+  }
+  
   await db.prepare('UPDATE pieces SET html = ? WHERE id = ?').bind(fixedHtml, pieceId).run();
 }
 
@@ -7389,7 +7432,22 @@ Content-Type: application/json
           const pendingRequest = chooseDuoCandidate(pendingRows);
 
           if (pendingRequest) {
-            // Match found!
+            // Optimistic lock: claim the match request before generating art.
+            // If another worker already claimed it (status changed), skip and return waiting.
+            const claimResult = await db.prepare(
+              "UPDATE match_requests SET status = 'claimed' WHERE id = ? AND status = 'waiting'"
+            ).bind(pendingRequest.id).run();
+            if (!claimResult.meta?.changes || claimResult.meta.changes === 0) {
+              // Another worker got it first — return as waiting
+              return json({
+                status: 'waiting',
+                requestId,
+                message: 'Intent received. Match was claimed by another request. Retrying...',
+                queuePosition: 1,
+                tip: `Poll /api/match/${requestId}/status for updates.`
+              }, 201);
+            }
+            // Match found and claimed!
             const groupId = genId();
             const intentA = JSON.parse(pendingRequest.intent_json);
             const intentB = body.intent;
