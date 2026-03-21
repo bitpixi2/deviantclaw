@@ -7238,6 +7238,114 @@ Content-Type: application/json
         return json({ ok: true, pieceId, size, imageUrl: `/api/pieces/${pieceId}/image` });
       }
 
+      // POST /api/admin/repair-piece/:id — admin-only: regenerate missing images and fix HTML placeholders
+      if (method === 'POST' && path.match(/^\/api\/admin\/repair-piece\/[^/]+$/)) {
+        const adminKey = request.headers.get('X-Admin-Key');
+        if (!adminKey || adminKey !== env.ADMIN_KEY) return json({ error: 'Unauthorized — admin key required' }, 403);
+
+        const pieceId = path.split('/')[4];
+        const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(pieceId).first();
+        if (!piece) return json({ error: 'Piece not found' }, 404);
+
+        const repairs = [];
+
+        // Check if HTML has broken placeholders
+        let html = piece.html || '';
+        if (html instanceof ArrayBuffer) html = new TextDecoder().decode(html);
+        else if (html instanceof Uint8Array) html = new TextDecoder().decode(html);
+        const hasPlaceholders = html.includes('{{PIECE_IMAGE_URL');
+
+        if (hasPlaceholders) repairs.push('html_has_placeholders');
+
+        // Check which images exist
+        const imgA = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(pieceId).first();
+        const imgB = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(pieceId + '_b').first();
+        if (!imgA) repairs.push('image_a_missing');
+        if (!imgB) repairs.push('image_b_missing');
+
+        // Determine if this is a per-agent-image method
+        const perAgentMethods = ['split', 'collage', 'sequence', 'stitch', 'parallax', 'glitch'];
+        const needsPerAgent = perAgentMethods.includes(piece.method);
+
+        // Get collaborators for per-agent prompts
+        const collabs = await db.prepare(
+          'SELECT pc.agent_id, pc.agent_name, a.soul, a.bio, a.role FROM piece_collaborators pc LEFT JOIN agents a ON pc.agent_id = a.id WHERE pc.piece_id = ? ORDER BY pc.round_number ASC'
+        ).bind(pieceId).all();
+        let agents = collabs.results;
+        if (agents.length === 0) {
+          const aA = piece.agent_a_id ? await db.prepare('SELECT id, name, soul, bio, role FROM agents WHERE id = ?').bind(piece.agent_a_id).first() : null;
+          const aB = piece.agent_b_id ? await db.prepare('SELECT id, name, soul, bio, role FROM agents WHERE id = ?').bind(piece.agent_b_id).first() : null;
+          if (aA) agents.push({ agent_id: aA.id, agent_name: aA.name, soul: aA.soul, bio: aA.bio, role: aA.role });
+          if (aB) agents.push({ agent_id: aB.id, agent_name: aB.name, soul: aB.soul, bio: aB.bio, role: aB.role });
+        }
+
+        // Regenerate missing images
+        let imageDataUri = null, imageDataUriB = null;
+
+        if (needsPerAgent && agents.length >= 2 && (!imgA || !imgB)) {
+          // Generate per-agent images sequentially
+          for (let i = 0; i < Math.min(agents.length, 2); i++) {
+            const agent = agents[i];
+            const prompt = await veniceText(env.VENICE_API_KEY,
+              `You are an art director. Output ONLY an image prompt. Max 80 words. Dark backgrounds. No text/signatures.
+The agent's soul/identity MUST be visually present. Interpret freeform text emotionally, not literally.`,
+              `Agent ${agent.agent_name || agent.name}:\n  Soul: "${agent.soul || agent.bio || ''}"\n  Role: "${agent.role || ''}"`,
+              { maxTokens: 100 }
+            );
+            const img = await veniceImage(env.VENICE_API_KEY, prompt, { model: piece.venice_model || VENICE_IMAGE_MODEL });
+            if (i === 0) imageDataUri = img;
+            else imageDataUriB = img;
+            repairs.push(`regenerated_image_${i === 0 ? 'a' : 'b'}`);
+          }
+        } else if (!imgA && piece.art_prompt) {
+          // Single image regen
+          imageDataUri = await veniceImage(env.VENICE_API_KEY, piece.art_prompt, { model: piece.venice_model || VENICE_IMAGE_MODEL });
+          if (imageDataUri) repairs.push('regenerated_image_a');
+        }
+
+        // Store images and fix HTML via storeVeniceImage
+        const result = {
+          html: html,
+          imageDataUri: imageDataUri || (imgA ? 'EXISTING' : null),
+          imageDataUriB: imageDataUriB || null,
+        };
+
+        // If primary image already exists and we only needed to regen B, handle manually
+        if (imgA && !imageDataUri && imageDataUriB) {
+          await db.prepare(
+            'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
+          ).bind(pieceId + '_b', imageDataUriB).run();
+          repairs.push('stored_image_b');
+        }
+
+        // Fix HTML placeholders regardless
+        if (hasPlaceholders) {
+          let fixedHtml = html;
+          fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL}}', `/api/pieces/${pieceId}/image`);
+          fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_B}}', imgB || imageDataUriB ? `/api/pieces/${pieceId}/image-b` : `/api/pieces/${pieceId}/image`);
+          fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_C}}', `/api/pieces/${pieceId}/image`);
+          fixedHtml = fixedHtml.replace('{{PIECE_IMAGE_URL_D}}', `/api/pieces/${pieceId}/image`);
+          fixedHtml = fixedHtml.replace(/\{\{PIECE_IMAGE_URL[^}]*\}\}/g, `/api/pieces/${pieceId}/image`);
+          await db.prepare('UPDATE pieces SET html = ? WHERE id = ?').bind(fixedHtml, pieceId).run();
+          repairs.push('html_placeholders_fixed');
+        }
+
+        // If we generated new images, store them properly
+        if (imageDataUri && imageDataUri !== 'EXISTING') {
+          await storeVeniceImage(db, pieceId, { html: piece.html, imageDataUri, imageDataUriB });
+          repairs.push('store_venice_image_ran');
+        }
+
+        return json({
+          ok: true,
+          pieceId,
+          method: piece.method,
+          repairs,
+          images: { a: !!imgA || !!imageDataUri, b: !!imgB || !!imageDataUriB },
+          message: repairs.length > 0 ? `Repaired: ${repairs.join(', ')}` : 'No repairs needed'
+        });
+      }
+
       // ========== MATCH SYSTEM (v2) ==========
 
       // POST /api/match — submit a match request
