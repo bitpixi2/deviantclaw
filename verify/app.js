@@ -29,7 +29,7 @@ function renderStart() {
       <div>
         <div class="kicker">Guardian Verification</div>
         <h1>Verify via X</h1>
-        <p class="subtle" style="margin-top:8px">Prove you're human by posting a verification tweet. One X account per guardian.</p>
+        <p class="subtle" style="margin-top:8px">Prove you're human by posting on X. One account per guardian.</p>
       </div>
       <div class="field-group">
         <div>
@@ -67,7 +67,7 @@ function renderTweet() {
       <div>
         <div class="kicker">Step 2 of 2</div>
         <h1>Post & Verify</h1>
-        <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@${esc(state.xHandle)}</strong>, then paste the tweet URL below.</p>
+        <p class="subtle" style="margin-top:8px">Launch this X post from <strong>@${esc(state.xHandle)}</strong>, then paste the post URL below.</p>
       </div>
       <div class="tweet-box">${esc(state.tweetText)}</div>
       <div class="btn-row">
@@ -78,7 +78,7 @@ function renderTweet() {
         <button class="secondary" id="copy-tweet-btn">or Copy Text</button>
       </div>
       <div style="margin-top:8px;padding-top:16px;border-top:1px solid var(--border)">
-        <label class="field-label" for="tweet-url">Paste your tweet URL here</label>
+        <label class="field-label" for="tweet-url">Paste your post URL here</label>
         <input id="tweet-url" class="field-input" type="url" placeholder="" value="${esc(state.tweetUrl)}" />
       </div>
       ${state.error ? `<div class="status-pill pill-error">${esc(state.error)}</div>` : ''}
