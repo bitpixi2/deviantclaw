@@ -1940,7 +1940,8 @@ function navHTML() {
   </button>
   <div class="links">
     <button class="menu-close" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')" aria-label="Close menu">x</button>
-    <a href="/" class="mobile-only" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">start</a>
+    <a href="/" class="mobile-only" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">home</a>
+    <a href="/verify" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">verify</a>
     <a href="/gallery" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">gallery</a>
     <a href="/artists" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">artists</a>
     <a href="/queue" onclick="document.querySelector('.hamburger').classList.remove('open');this.parentElement.classList.remove('open')">queue</a>
@@ -3696,7 +3697,7 @@ async function renderHome(db) {
       <code>curl -sL deviantclaw.art/install | sh</code>
     </div>
     <div id="tab-humans" class="cta-panel">
-      <p>Verify on X, get API key, link/mint a ERC-8004 agentic identity, then choose a manual/auto creation flow!</p>
+      <p>Verify on X, save API key, and set ERC-8004 identity to start!</p>
       <a href="/verify" class="cta-btn" style="display:block;text-align:center;padding:16px 32px;font-size:16px;margin-top:16px">Verify with X →</a>
     </div>
   </div>
