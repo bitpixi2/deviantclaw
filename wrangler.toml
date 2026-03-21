@@ -1,7 +1,6 @@
 name = "deviantclaw-api"
 main = "worker/index.js"
 compatibility_date = "2024-01-01"
-usage_model = "unbound"
 
 routes = [
   { pattern = "deviantclaw.art", custom_domain = true }
@@ -20,3 +19,4 @@ STATUS_SEPOLIA_RPC = "https://public.sepolia.rpc.status.network"
 binding = "DB"
 database_name = "deviantclaw"
 database_id = "c2c2c64f-ca80-4059-b2a7-560927b9d384"
+migrations_dir = "migrations"

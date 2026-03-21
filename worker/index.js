@@ -1712,7 +1712,8 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
 .brand-x img{height:30px;width:30px;filter:brightness(0) invert(1)}
 .brand-metamask img{height:38px;filter:brightness(0) invert(1)}
 .brand-superrare img{height:36px}
-.brand-markee img{height:38px;max-width:42px}
+.brand-markee{min-width:118px}
+.brand-markee-text{display:inline-flex;align-items:center;justify-content:center;font-size:22px;letter-spacing:4px;font-weight:700;color:rgba(255,255,255,0.92);text-transform:uppercase;line-height:1}
 .brand-status img{height:42px}
 .brand-ens img{height:28px}
 .brand-protocol img{height:42px;max-width:244px}
@@ -1736,7 +1737,8 @@ const HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1
   .brand-x svg{height:24px;width:24px}
   .brand-metamask img{height:31px}
   .brand-superrare img{height:29px}
-  .brand-markee img{height:28px;max-width:30px}
+  .brand-markee{min-width:92px}
+  .brand-markee-text{font-size:18px;letter-spacing:3px}
   .brand-ens img{height:23px}
   .brand-protocol img{height:34px;max-width:198px}
   .feature-promo-grid{grid-template-columns:1fr}
@@ -2057,6 +2059,23 @@ function absoluteUrl(origin, pathOrUrl) {
   if (/^(?:https?:)?\/\//.test(pathOrUrl) || pathOrUrl.startsWith('data:')) return pathOrUrl;
   const base = origin || 'https://deviantclaw.art';
   return `${base}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
+}
+
+function syncLegacyPieceHtml(html, piece, artists = []) {
+  const safeTitle = esc(piece?.title || 'untitled');
+  const safeArtists = artists.map(a => esc(a)).filter(Boolean).join(' × ');
+  const safeDate = esc(String(piece?.created_at || '').slice(0, 10));
+  let fixed = String(html || '');
+
+  fixed = fixed.replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeTitle} · DeviantClaw</title>`);
+  fixed = fixed.replace(/<div class="sig-t">[\s\S]*?<\/div>/i, `<div class="sig-t">${safeTitle}</div>`);
+  fixed = fixed.replace(/<div class="sig-a">[\s\S]*?<\/div>/i, `<div class="sig-a">${safeArtists}</div>`);
+  fixed = fixed.replace(/<div class="sig-g">[\s\S]*?<\/div>/i, `<div class="sig-g">deviantclaw · ${safeDate}</div>`);
+
+  if (artists[0]) fixed = fixed.replace(/<div class="label label-a">[\s\S]*?<\/div>/i, `<div class="label label-a">${esc(artists[0])}</div>`);
+  if (artists[1]) fixed = fixed.replace(/<div class="label label-b">[\s\S]*?<\/div>/i, `<div class="label label-b">${esc(artists[1])}</div>`);
+
+  return fixed;
 }
 
 function buildCollageThumbnailSvg({ imageUrls, labels }) {
@@ -3544,6 +3563,24 @@ function log(msg, cls) {
   document.getElementById('status').innerHTML += '<div class="' + (cls||'') + '">' + msg + '</div>';
 }
 
+function friendlyMintError(err) {
+  const msg = (err && (err.message || err.reason)) ? String(err.message || err.reason) : String(err || '');
+  const lower = msg.toLowerCase();
+  if (lower.includes('before initialization')) {
+    return 'Wallet connection failed before MetaMask finished initializing. Refresh the page, unlock MetaMask, then click "Connect Wallet & Mint" again.';
+  }
+  if (lower.includes('denied') || lower.includes('rejected') || err?.code === 4001) {
+    return 'Rejected in MetaMask.';
+  }
+  if (lower.includes('unsupported chain') || lower.includes('chain') && lower.includes('switch')) {
+    return 'Could not switch to Base automatically. Open MetaMask, switch to Base mainnet, then try again.';
+  }
+  if (lower.includes('insufficient funds')) {
+    return 'This wallet needs a little more ETH on Base for gas before minting can continue.';
+  }
+  return msg ? 'Error: ' + msg : 'Unexpected wallet error. Refresh the page and try again.';
+}
+
 async function doMint() {
   const btn = document.getElementById('mint-btn');
   btn.disabled = true;
@@ -3626,8 +3663,7 @@ async function doMint() {
       btn.textContent = 'Check Basescan';
     }
   } catch (err) {
-    const msg = err.message || JSON.stringify(err);
-    log(msg.includes('denied') || msg.includes('rejected') ? 'Rejected in MetaMask.' : 'Error: ' + msg, 'err');
+    log(friendlyMintError(err), 'err');
     btn.disabled = false; btn.textContent = 'Try Again';
   }
 }
@@ -3721,7 +3757,7 @@ function switchTab(tab) {
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
       <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
       <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.png" alt="Markee" loading="lazy"/></a>
+      <a href="https://markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><span class="brand-markee-text">MARKEE</span></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
       <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy"/></a>
@@ -3730,7 +3766,7 @@ function switchTab(tab) {
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
       <a href="https://metamask.io" target="_blank" rel="noreferrer" class="brand-link brand-metamask" aria-label="MetaMask"><img src="/assets/brands/metamask.svg" alt="MetaMask" loading="lazy"/></a>
       <a href="https://superrare.com" target="_blank" rel="noreferrer" class="brand-link brand-superrare" aria-label="SuperRare"><img src="/assets/brands/superrare.svg" alt="SuperRare" loading="lazy"/></a>
-      <a href="https://www.markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><img src="/assets/brands/markee.png" alt="Markee" loading="lazy"/></a>
+      <a href="https://markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><span class="brand-markee-text">MARKEE</span></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
       <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy"/></a>
@@ -4451,7 +4487,8 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
   // Determine the best way to display the piece
   let frameContent;
   const isCodeMethod = piece.method === 'code' || piece.method === 'game' || piece.method === 'reaction';
-  const hasVeniceImage = !isCodeMethod && (piece.venice_model || piece.art_prompt);
+  const prefersThumbnail = prefersStaticFullViewThumbnail(piece);
+  const hasStoredImage = !!piece._has_image;
   const hasImageUrl = piece.image_url;
   const demoRoutes = { 'collage-demo-001': '/collage-demo', 'split-demo-001': '/split-demo' };
 
@@ -4460,8 +4497,10 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
   } else if (isCodeMethod && piece.html && piece.html.length > 100) {
     // Code/game/reaction: always use iframe for interactive HTML
     frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
-  } else if (hasVeniceImage) {
-    // Venice image pieces: show the actual image
+  } else if (prefersThumbnail) {
+    frameContent = `<img src="/api/pieces/${esc(piece.id)}/thumbnail" alt="${esc(piece.title)}" />`;
+  } else if (hasStoredImage) {
+    // Venice image pieces: show the actual stored image
     frameContent = `<img src="/api/pieces/${esc(piece.id)}/image" alt="${esc(piece.title)}" />`;
   } else if (hasImageUrl) {
     frameContent = `<img src="${esc(piece.image_url)}" alt="${esc(piece.title)}" />`;
@@ -5650,8 +5689,20 @@ async function saveProfile(){
             contract: env.CONTRACT_ADDRESS || null,
             contractVersion: '1.0',
             chains: {
-              statusSepolia: { chainId: 1660990954, gasless: true },
-              base: { chainId: 8453, gasless: false }
+              statusSepolia: {
+                label: 'Legacy / Testnet',
+                network: 'Status Sepolia',
+                chainId: 1660990954,
+                gasless: true,
+                legacy: true
+              },
+              base: {
+                label: 'Base Mainnet',
+                network: 'Base',
+                chainId: 8453,
+                gasless: false,
+                legacy: false
+              }
             },
             agents: agentCount?.cnt || 0,
             pieces: pieceCount?.cnt || 0,
@@ -6595,7 +6646,16 @@ Content-Type: application/json
         const imageUrls = [id, `${id}_b`, `${id}_c`, `${id}_d`]
           .map(pieceId => imageMap.get(pieceId))
           .filter(Boolean);
-        if (imageUrls.length === 0) return new Response('Not found', { status: 404 });
+        if (imageUrls.length === 0) {
+          const svgDataUri = generateThumbnail(piece);
+          const svg = atob(svgDataUri.split(',')[1] || '');
+          return new Response(svg, {
+            headers: {
+              'Content-Type': 'image/svg+xml; charset=utf-8',
+              'Cache-Control': 'public, max-age=3600'
+            }
+          });
+        }
 
         let labels = [piece.agent_a_name, piece.agent_b_name].filter(Boolean);
         try {
@@ -6666,13 +6726,41 @@ Content-Type: application/json
       // GET /api/pieces/:id/view — raw art HTML for iframe (must be before generic /api/pieces/:id)
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/view$/)) {
         const id = path.split('/')[3];
-        const piece = await db.prepare('SELECT html FROM pieces WHERE id = ?').bind(id).first();
+        const piece = await db.prepare(
+          'SELECT id, title, html, method, created_at, agent_a_name, agent_b_name FROM pieces WHERE id = ?'
+        ).bind(id).first();
         if (!piece) return htmlResponse('<h1>Not found</h1>', 404);
         // D1 may return html as blob (ArrayBuffer/Uint8Array) — decode to string
         let html = piece.html;
         if (html instanceof ArrayBuffer) html = new TextDecoder().decode(html);
         else if (html instanceof Uint8Array) html = new TextDecoder().decode(html);
         else if (Array.isArray(html)) html = new TextDecoder().decode(new Uint8Array(html));
+        html = String(html || '');
+
+        let artists = [piece.agent_a_name, piece.agent_b_name].filter(Boolean);
+        try {
+          const collabs = await db.prepare(
+            'SELECT agent_name FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC'
+          ).bind(id).all();
+          const names = [...new Set((collabs.results || []).map(row => row.agent_name).filter(Boolean))];
+          if (names.length > 0) artists = names;
+        } catch { /* optional table */ }
+
+        html = syncLegacyPieceHtml(html, piece, artists);
+
+        if (html.includes('{{PIECE_IMAGE_URL')) {
+          const imgA = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
+          const imgB = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id + '_b').first();
+          const imgC = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id + '_c').first();
+          const imgD = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id + '_d').first();
+          const fallback = `/api/pieces/${id}/thumbnail`;
+
+          html = html.replace(/\{\{PIECE_IMAGE_URL\}\}/g, imgA ? `/api/pieces/${id}/image` : fallback);
+          html = html.replace(/\{\{PIECE_IMAGE_URL_B\}\}/g, imgB ? `/api/pieces/${id}/image-b` : fallback);
+          html = html.replace(/\{\{PIECE_IMAGE_URL_C\}\}/g, imgC ? `/api/pieces/${id}/image-c` : fallback);
+          html = html.replace(/\{\{PIECE_IMAGE_URL_D\}\}/g, imgD ? `/api/pieces/${id}/image-d` : fallback);
+          html = html.replace(/\{\{PIECE_IMAGE_URL[^}]*\}\}/g, fallback);
+        }
         return htmlResponse(html);
       }
 

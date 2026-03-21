@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260319b';
+const APP_ASSET_VERSION = '20260322a';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
 const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
@@ -96,20 +96,7 @@ export default {
         if (!xHandle) return json({ error: 'X handle is required.' }, 400);
         if (!agentName) return json({ error: 'Agent name is required.' }, 400);
 
-        // Check if agent name is already taken by a different guardian
-        const agentIdCheck = agentName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-        const existingAgent = await env.DB.prepare(
-          'SELECT guardian_address FROM agents WHERE id = ?'
-        ).bind(agentIdCheck).first();
-        if (existingAgent && existingAgent.guardian_address) {
-          const incomingGuardian = (address || xHandle).toLowerCase();
-          const currentGuardian = existingAgent.guardian_address.toLowerCase();
-          if (incomingGuardian !== currentGuardian) {
-            return json({ error: `Agent name "${agentName}" is already taken. Choose a different name.` }, 409);
-          }
-        }
-
-        // Resolve wallet (optional — can add later)
+        // Resolve wallet first so the re-verification guard can compare stable identities.
         let address = null;
         let ensName = null;
         if (walletInput) {
@@ -122,6 +109,31 @@ export default {
           }
         }
 
+        const existingGuardian = await env.DB.prepare(
+          'SELECT address FROM guardians WHERE x_handle = ?'
+        ).bind(xHandle).first();
+
+        const guardianIdentity = normalizeAddress(existingGuardian?.address || address || xHandle);
+        const allowedGuardianKeys = new Set(
+          [xHandle, existingGuardian?.address, address]
+            .map(normalizeAddress)
+            .filter(Boolean)
+        );
+
+        // Check if agent name is already taken by a different guardian.
+        const agentIdCheck = agentName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        const existingAgent = await env.DB.prepare(
+          'SELECT guardian_address FROM agents WHERE id = ?'
+        ).bind(agentIdCheck).first();
+        if (existingAgent && existingAgent.guardian_address) {
+          const currentGuardian = normalizeAddress(existingAgent.guardian_address);
+          if (!allowedGuardianKeys.has(currentGuardian)) {
+            return json({
+              error: `Agent name "${agentName}" already belongs to another guardian. Re-enter the original guardian wallet for this agent, or choose a different agent name.`,
+            }, 409);
+          }
+        }
+
         // Generate verification code
         const code = 'DC-' + randomCode() + '-' + randomCode();
         const now = nowIso();
@@ -129,13 +141,13 @@ export default {
         await env.DB.prepare(
           `INSERT OR REPLACE INTO guardian_verification_sessions (address, x_handle, status, verification_code, api_key, error, verified_at, created_at, updated_at, agent_name)
            VALUES (?, ?, 'pending', ?, NULL, NULL, NULL, ?, ?, ?)`
-        ).bind(address, xHandle, code, now, now, agentName).run();
+        ).bind(guardianIdentity, xHandle, code, now, now, agentName).run();
 
         return json({
           status: 'pending',
           xHandle,
           agentName,
-          address,
+          address: guardianIdentity,
           ensName,
           verificationCode: code,
           tweetText: `I'm verifying as a human guardian for ${agentName} on @DeviantClaw 🎨\n\n${code}\n\ndeviantclaw.art`,
