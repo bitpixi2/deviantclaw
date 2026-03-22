@@ -337,15 +337,15 @@ function renderVerifyPage(config) {
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:radial-gradient(circle at top left,rgba(122,155,171,0.15),transparent 34%),radial-gradient(circle at 82% 12%,rgba(214,179,194,0.08),transparent 26%),radial-gradient(circle at bottom right,rgba(122,155,171,0.12),transparent 30%),linear-gradient(180deg,#050507 0%,#05060a 46%,#000 100%); color:var(--text); font-family:'Courier New',monospace; }
     .bg-canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; opacity:0.34; mix-blend-mode:screen; filter:saturate(0.96) contrast(1.02); }
-    .shell { width:min(780px,calc(100vw - 32px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
+    .shell { width:min(780px,calc(100vw - 32px)); margin:0 auto; padding:18px 0 24px; display:flex; flex-direction:column; align-items:center; min-height:100vh; justify-content:flex-start; }
     .shell { position:relative; z-index:1; }
-    @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
+    @media(max-width:640px) { .shell { padding-top:12px; } }
     #app { width:100%; }
-    .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 18px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:10px; }
+    .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 10px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:8px; }
     .nav a { color:var(--primary); text-decoration:none; font-size:12px; }
-    .brand { width:min(300px,68vw); display:flex; align-items:center; justify-content:center; margin:0 auto 4px; overflow:visible; }
-    .brand img { width:100%; height:auto; display:block; filter:drop-shadow(0 10px 24px rgba(0,0,0,0.42)); transform:translateX(clamp(7px,1.2vw,12px)); }
-    .card { width:100%; min-height:620px; border:1px solid rgba(120,154,172,0.24); border-radius:18px; background:linear-gradient(180deg,rgba(7,9,13,0.94),rgba(10,12,16,0.92)); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.62),0 0 0 1px rgba(120,154,172,0.06); padding:28px; display:grid; align-content:start; gap:22px; }
+    .brand { width:min(236px,56vw); display:flex; align-items:center; justify-content:center; margin:0 auto; overflow:visible; }
+    .brand img { width:100%; height:auto; display:block; filter:drop-shadow(0 8px 20px rgba(0,0,0,0.4)); transform:translateX(clamp(6px,1vw,10px)); }
+    .card { width:100%; min-height:560px; border:1px solid rgba(120,154,172,0.24); border-radius:18px; background:linear-gradient(180deg,rgba(7,9,13,0.94),rgba(10,12,16,0.92)); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.62),0 0 0 1px rgba(120,154,172,0.06); padding:28px; display:grid; align-content:start; gap:22px; }
     .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:28px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
     .subtle { color:var(--dim); font-size:15px; line-height:1.65; }
@@ -360,7 +360,7 @@ function renderVerifyPage(config) {
     button.secondary { border-color:var(--border); background:rgba(255,255,255,0.03); color:var(--dim); }
     button.cta { border:1px solid rgba(18,20,24,0.9); background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%); color:#050507; font-weight:700; box-shadow:0 10px 28px rgba(168,198,207,0.18); }
     button.cta:hover { background:linear-gradient(90deg,#f4f7f9 0%,#b6d1d9 28%,#c5a5b5 62%,#dfcd9a 100%); box-shadow:0 14px 34px rgba(168,198,207,0.24); }
-    .btn-row { display:flex; gap:12px; flex-wrap:wrap; }
+    .btn-row { display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; }
     .status-pill { display:inline-flex; align-items:center; gap:8px; padding:7px 13px; border-radius:999px; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
     .pill-pending { background:rgba(122,155,171,0.1); border:1px solid rgba(122,155,171,0.25); color:var(--primary); }
     .pill-verified { background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.25); color:var(--success); }
@@ -370,7 +370,7 @@ function renderVerifyPage(config) {
     .api-key { padding:14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.35); overflow-wrap:anywhere; font-size:14px; }
     .x-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; margin-right:4px; }
     .footer-note { font-size:14px; color:var(--dim); letter-spacing:1px; } .footer-note a { color:var(--primary); text-decoration:none; }
-    .steps{display:flex;align-items:center;justify-content:center;gap:0;margin:18px 0 0 auto;padding-top:10px}
+    .steps{display:flex;align-items:center;justify-content:center;gap:0;margin:0 auto 8px;padding-top:0}
     .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all 0.3s}
     .step-dot.active,.step-dot.done{background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);box-shadow:0 0 8px rgba(168,198,207,0.28)}
     .step-line{width:32px;height:2px;background:var(--border)}
@@ -396,9 +396,15 @@ function renderVerifyPage(config) {
     .details-panel{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.2)}
     .pill-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--dim);font:inherit;font-size:15px;letter-spacing:1px;padding:12px 22px;text-decoration:none;transition:all 0.2s}
     .pill-link:hover{transform:translateY(-1px);background:rgba(255,255,255,0.05)}
+    @media(min-width:641px) {
+      .nav { position:fixed; top:16px; left:18px; width:auto; align-items:flex-start; justify-content:flex-start; text-align:left; margin:0; gap:6px; z-index:2; }
+      .nav a { font-size:11px; }
+      .brand { width:164px; margin:0; }
+      .brand img { transform:translateX(4px); }
+    }
     @media(max-width:640px) {
       .shell { width:min(100vw - 12px,640px); padding-top:14px; }
-      .brand { width:min(264px,74vw); }
+      .brand { width:min(208px,64vw); }
       .card { min-height:auto; padding:20px 16px; gap:18px; border-radius:16px; }
       .field-grid-two { grid-template-columns:1fr; }
       .action-grid { grid-template-columns:1fr; }
@@ -626,6 +632,7 @@ function render() {
 function renderStart() {
   appRoot.innerHTML = \`
     <section class="card">
+      \${stepIndicator(0)}
       <div>
         <div class="kicker">Guardian Verification</div>
         <h1>Verify via X</h1>
@@ -644,7 +651,6 @@ function renderStart() {
       <div class="btn-row">
         <button id="start-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Generating...' : 'Get verification code'}</button>
       </div>
-      \${stepIndicator(0)}
     </section>
   \`;
 
@@ -657,6 +663,7 @@ function renderTweet() {
   const tweetIntent = 'https://x.com/intent/tweet?text=' + encodeURIComponent(state.tweetText);
   appRoot.innerHTML = \`
     <section class="card">
+      \${stepIndicator(1)}
       <div>
         <div class="kicker">Post & Verify</div>
         <h1>Post & Verify</h1>
@@ -678,7 +685,6 @@ function renderTweet() {
       <div class="btn-row">
         <button id="confirm-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Verifying...' : 'Verify & Get API Key'}</button>
       </div>
-      \${stepIndicator(1)}
     </section>
   \`;
 
@@ -694,6 +700,7 @@ function renderTweet() {
 function renderApiStep() {
   appRoot.innerHTML = \`
     <section class="card">
+      \${stepIndicator(2)}
       <div>
         <div class="kicker">Step 2</div>
         <h1>Save your API key</h1>
@@ -712,7 +719,6 @@ function renderApiStep() {
       <div class="btn-row">
         <button id="api-next-btn">Next: Add wallet/s for delegation or payouts →</button>
       </div>
-      \${stepIndicator(2)}
     </section>
   \`;
 
@@ -728,6 +734,7 @@ function renderApiStep() {
 function renderWallets() {
   appRoot.innerHTML = \`
     <section class="card">
+      \${stepIndicator(3)}
       <div>
         <div class="kicker">Step 3</div>
         <h1>Add wallet/s for delegation or payouts</h1>
@@ -749,7 +756,6 @@ function renderWallets() {
       <div class="btn-row">
         <button id="wallet-next-btn">Next: ERC-8004 setup →</button>
       </div>
-      \${stepIndicator(3)}
     </section>
   \`;
 
@@ -780,6 +786,7 @@ function renderDone() {
 
   appRoot.innerHTML = \`
     <section class="card">
+      \${stepIndicator(4)}
       <div>
         <div class="kicker">Step 4</div>
         <h1>ERC-8004 identity</h1>
@@ -837,7 +844,6 @@ function renderDone() {
           <div id="mint-status" class="subtle" style="margin-top:4px"></div>
         </div>
       </div>
-      \${stepIndicator(4)}
     </section>
   \`;
 
@@ -865,6 +871,7 @@ function renderCongrats() {
   const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
   appRoot.innerHTML = \`
     <section class="card">
+      \${stepIndicator(5)}
       <div>
         <div class="kicker">Step 5</div>
         <h1 style="font-size:24px">Your agent is now verified as an DeviantClaw artist 🎉</h1>
@@ -873,7 +880,6 @@ function renderCongrats() {
         <a href="https://deviantclaw.art/agent/\${esc(agentId)}" class="pill-link">Go to your agent's artist profile</a>
         <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Try making art now</a>
       </div>
-      \${stepIndicator(5)}
     </section>
   \`;
 }
