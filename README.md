@@ -464,7 +464,7 @@ Pieces are being prepared for sale-reactive visual upgrades that carry cleanly t
 - **Gold foil** at `0.5 ETH`
 - **Rare diamond foil** at `1 ETH`
 
-The foil frame sits slightly inward at roughly `14px` from the edge. The rare diamond tier is clear-white with a rainbow glint / refraction sweep rather than metallic color.
+Collector-facing rule: earned foil states should stay restrained. The frame sits slightly inward at roughly `14px` from the edge, stays thin, and should not use sweeping animations, text overlays, or anything that obscures the artwork.
 
 ---
 

@@ -1036,7 +1036,7 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
 
   // 3. Title
   const title = formatArtworkTitle((await veniceText(apiKey,
-    'You name artworks. Output ONLY a 2-5 word title in Title Case. No quotes. Poetic, slightly cryptic.',
+    'You name artworks. Output ONLY a Title Case title with varied length: sometimes 1 word, sometimes 2 words, sometimes 3 words. No quotes. Poetic, slightly cryptic.',
     `Art: ${artPrompt}\nArtists: ${artists.join(', ')}`,
     { maxTokens: 20, temperature: 1.0 }
   )).trim().replace(/^["']|["']$/g, ''));
@@ -1281,7 +1281,7 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
   }
 
   const title = formatArtworkTitle((await veniceText(apiKey,
-    'You name artworks. Output ONLY a 2-5 word title in Title Case. No quotes. Poetic, slightly cryptic.',
+    'You name artworks. Output ONLY a Title Case title with varied length: sometimes 1 word, sometimes 2 words, sometimes 3 words. No quotes. Poetic, slightly cryptic.',
     `Art: ${artPrompt}\nArtists: ${artists.join(', ')}`,
     { maxTokens: 20, temperature: 1.0 }
   )).trim().replace(/^["']|["']$/g, ''));
@@ -2710,6 +2710,8 @@ nav .links a.make-art-btn:hover{color:#050507;filter:brightness(1.05)}
 .card-sr.sr-diamond img,.piece-header-sr.sr-diamond img,.artist-card-preview-sr.sr-diamond img{filter:brightness(0) saturate(100%) invert(100%) sepia(24%) saturate(487%) hue-rotate(180deg) brightness(105%) contrast(101%) drop-shadow(0 0 10px rgba(168,210,255,0.24))}
 .card-note-badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;border:1px solid rgba(194,199,206,0.18);background:rgba(255,255,255,0.035);color:#b9c0c9;font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap}
 .card-note-badge.card-note-legacy{border-color:rgba(164,171,180,0.16);background:rgba(150,158,168,0.08);color:#d0d4db}
+/* Collector-facing foil rule: keep silver/gold/diamond static and thin.
+   No sweeping animation, no text overlays, and never obscure the artwork. */
 .card-foil::before,.piece-frame-foil::before{content:'';position:absolute;inset:-1px;border-radius:inherit;padding:1.5px;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;z-index:3;animation:dcFoilPulse 4.6s ease-in-out infinite}
 .card-foil::after,.piece-frame-foil::after{content:'';position:absolute;inset:-3px;border-radius:inherit;padding:4px;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;mix-blend-mode:screen;filter:blur(7px);opacity:.24;z-index:2}
 .card-foil-silver::before,.piece-frame-foil-silver::before{background:conic-gradient(from 0deg,rgba(255,255,255,0.18),rgba(196,210,224,0.95),rgba(116,134,152,0.32),rgba(240,246,255,0.82),rgba(255,255,255,0.18))}
