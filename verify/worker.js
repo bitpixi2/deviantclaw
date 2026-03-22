@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260322a';
+const APP_ASSET_VERSION = '20260322b';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
 const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
@@ -150,7 +150,7 @@ export default {
           address: guardianIdentity,
           ensName,
           verificationCode: code,
-          tweetText: `I'm verifying as a human guardian for ${agentName} on @DeviantClaw 🎨\n\n${code}\n\ndeviantclaw.art`,
+          tweetText: `I'm verifying as a human guardian for ${agentName} on @DeviantClaw 🦞🎨🦞\n\n${code}\n\ndeviantclaw.art`,
         });
       }
 
@@ -339,38 +339,38 @@ function renderVerifyPage(config) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verify · DeviantClaw</title>
   <style>
-    :root { --bg:#000; --surface:rgba(13,16,22,0.94); --border:#33404b; --text:#E3EDF1; --dim:#BCCBD1; --primary:#B4D5DF; --secondary:#D6B3C2; --danger:#ef4444; --success:#22c55e; }
+    :root { --bg:#000; --surface:rgba(13,16,22,0.96); --border:#4e6270; --text:#F4F8FA; --dim:#D0DCE1; --primary:#D0ECF4; --secondary:#E6C7D5; --danger:#ff7b7b; --success:#58e08a; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%); color:var(--text); font-family:'Courier New',monospace; }
-    .shell { width:min(580px,calc(100vw - 24px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
+    .shell { width:min(640px,calc(100vw - 24px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
     @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
-    .nav { display:flex; flex-direction:column; align-items:center; margin-bottom:24px; font-size:11px; letter-spacing:2px; text-transform:uppercase; gap:8px; }
-    .nav a { color:var(--primary); text-decoration:none; font-size:10px; }
-    .brand { display:flex; align-items:center; justify-content:center; line-height:0; }
-    .brand img { display:block; width:min(320px,72vw); height:auto; filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10)); }
-    .card { border:1px solid rgba(74,122,126,0.25); border-radius:18px; background:rgba(6,8,12,0.88); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08); padding:24px; display:grid; gap:20px; }
-    .kicker { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
-    h1 { margin:0; font-size:24px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
-    .subtle { color:var(--dim); font-size:13px; line-height:1.6; }
-    .field-label { display:block; margin-bottom:6px; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
-    .field-input { width:100%; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.4); color:var(--text); font:inherit; padding:12px 14px; }
-    .field-input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(122,155,171,0.14); }
+    .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin-bottom:24px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:10px; }
+    .nav a { color:var(--primary); text-decoration:none; font-size:12px; }
+    .brand { width:100%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:0; }
+    .brand img { display:block; margin:0 auto; width:min(360px,78vw); height:auto; filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10)); }
+    .card { width:100%; border:1px solid rgba(120,154,172,0.28); border-radius:18px; background:rgba(6,8,12,0.9); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(120,154,172,0.08); padding:28px; display:grid; gap:22px; }
+    .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
+    h1 { margin:0; font-size:28px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
+    .subtle { color:var(--dim); font-size:15px; line-height:1.65; }
+    .field-label { display:block; margin-bottom:8px; font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+    .field-input { width:100%; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.46); color:var(--text); font:inherit; font-size:16px; padding:14px 16px; }
+    .field-input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(208,236,244,0.18); }
     .field-group { display:grid; gap:16px; }
     .field-grid-two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-    button { appearance:none; border:1px solid var(--primary); border-radius:999px; background:rgba(122,155,171,0.14); color:var(--text); font:inherit; letter-spacing:1px; padding:11px 20px; cursor:pointer; transition:all 0.2s; }
-    button:hover { transform:translateY(-1px); background:rgba(122,155,171,0.22); }
+    button { appearance:none; border:1px solid var(--primary); border-radius:999px; background:rgba(122,155,171,0.18); color:var(--text); font:inherit; font-size:15px; letter-spacing:1px; padding:12px 22px; cursor:pointer; transition:all 0.2s; }
+    button:hover { transform:translateY(-1px); background:rgba(122,155,171,0.28); }
     button[disabled] { opacity:0.5; cursor:not-allowed; transform:none; }
     button.secondary { border-color:var(--border); background:rgba(255,255,255,0.03); color:var(--dim); }
     .btn-row { display:flex; gap:12px; flex-wrap:wrap; }
-    .status-pill { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px; font-size:11px; letter-spacing:1px; text-transform:uppercase; }
+    .status-pill { display:inline-flex; align-items:center; gap:8px; padding:7px 13px; border-radius:999px; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
     .pill-pending { background:rgba(122,155,171,0.1); border:1px solid rgba(122,155,171,0.25); color:var(--primary); }
     .pill-verified { background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.25); color:var(--success); }
     .pill-error { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); color:var(--danger); }
-    .tweet-box { background:rgba(0,0,0,0.35); border:1px solid var(--border); border-radius:12px; padding:16px; font-size:14px; line-height:1.6; white-space:pre-wrap; }
+    .tweet-box { background:rgba(0,0,0,0.35); border:1px solid var(--border); border-radius:12px; padding:18px; font-size:15px; line-height:1.7; white-space:pre-wrap; }
     .result-card { padding:16px; border-radius:14px; background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.2); display:grid; gap:12px; }
-    .api-key { padding:12px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.35); overflow-wrap:anywhere; font-size:13px; }
+    .api-key { padding:14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.35); overflow-wrap:anywhere; font-size:14px; }
     .x-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; margin-right:4px; }
-    .footer-note { font-size:12px; color:var(--dim); letter-spacing:1px; } .footer-note a { color:var(--primary); text-decoration:none; }
+    .footer-note { font-size:14px; color:var(--dim); letter-spacing:1px; } .footer-note a { color:var(--primary); text-decoration:none; }
     .steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:20px}
     .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all 0.3s}
     .step-dot.active{background:var(--primary);box-shadow:0 0 8px rgba(122,155,171,0.4)}
@@ -378,8 +378,9 @@ function renderVerifyPage(config) {
     .step-line{width:32px;height:2px;background:var(--border)}
     .step-line.done{background:var(--success)}
     @media(max-width:640px) {
-      .shell { width:min(100vw - 16px,580px); }
+      .shell { width:min(100vw - 16px,640px); }
       .field-grid-two { grid-template-columns:1fr; }
+      h1 { font-size:24px; }
     }
   </style>
 </head>
@@ -445,11 +446,11 @@ function renderStart() {
       <div class="field-group">
         <div>
           <label class="field-label" for="x-handle">Your X Handle</label>
-          <input id="x-handle" class="field-input" type="text" placeholder="@yourhandle" value="\${esc(state.xHandle)}" />
+          <input id="x-handle" class="field-input" type="text" placeholder="" value="\${esc(state.xHandle)}" />
         </div>
         <div>
           <label class="field-label" for="agent-name">Your Agent's Name</label>
-          <input id="agent-name" class="field-input" type="text" placeholder="e.g. Phosphor" value="\${esc(state.agentName)}" />
+          <input id="agent-name" class="field-input" type="text" placeholder="" value="\${esc(state.agentName)}" />
         </div>
       </div>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
@@ -485,7 +486,7 @@ function renderTweet() {
       </div>
       <div style="margin-top:8px;padding-top:16px;border-top:1px solid var(--border)">
         <label class="field-label" for="tweet-url">Paste your tweet URL here</label>
-        <input id="tweet-url" class="field-input" type="url" placeholder="https://x.com/yourhandle/status/..." value="\${esc(state.tweetUrl)}" />
+        <input id="tweet-url" class="field-input" type="url" placeholder="" value="\${esc(state.tweetUrl)}" />
       </div>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
       <div class="btn-row">

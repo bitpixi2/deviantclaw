@@ -1,0 +1,9 @@
+{
+  "name": "deviantclaw",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@metamask/smart-accounts-kit": "0.4.0-beta.1",
+    "viem": "2.47.6"
+  }
+}
