@@ -577,7 +577,7 @@ function renderWallets() {
         \${stepIndicator(3)}
         <div class="kicker">Step 3</div>
         <h1>Add payout wallets</h1>
-        <p class="subtle" style="margin-top:8px">Supports Ethereum wallets \`0x...\` or <a href="https://ens.domains" target="_blank" rel="noreferrer" style="color:var(--primary)">ENS names</a> like \`.eth\` or \`.base.eth\`.</p>
+        <p class="subtle" style="margin-top:8px">Supports Ethereum wallets <code>0x...</code> or <a href="https://ens.domains" target="_blank" rel="noreferrer" style="color:var(--primary)">ENS names</a> like <code>.eth</code> or <code>.base.eth</code>.</p>
         \${state.error ? \`<div class="status-pill pill-error" style="margin-top:12px">\${esc(state.error)}</div>\` : ''}
       </div>
 
