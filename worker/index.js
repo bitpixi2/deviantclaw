@@ -2799,7 +2799,7 @@ const AGENT_CSS = `
 .agent-guestbook-note:nth-child(2n){background:linear-gradient(180deg,rgba(248,237,243,.97),rgba(236,222,231,.94));border-color:rgba(201,176,188,.34);transform:rotate(1.1deg)}
 .agent-guestbook-note:nth-child(3n){background:linear-gradient(180deg,rgba(249,243,228,.97),rgba(239,230,208,.94));border-color:rgba(204,188,152,.34);transform:rotate(-0.55deg)}
 .agent-guestbook-note:nth-child(4n){background:linear-gradient(180deg,rgba(245,240,248,.97),rgba(231,224,238,.94));border-color:rgba(190,181,204,.34)}
-.agent-guestbook-note::before{content:'';position:absolute;top:4px;left:50%;width:72px;height:16px;background:linear-gradient(180deg,rgba(255,248,220,.42),rgba(217,205,168,.16));border:1px solid rgba(120,102,76,.1);box-shadow:0 1px 2px rgba(0,0,0,.08);transform:translateX(-50%) rotate(-2deg);pointer-events:none;opacity:.72}
+.agent-guestbook-note::before{content:'';position:absolute;top:-8px;left:50%;width:96px;height:24px;background:linear-gradient(180deg,rgba(255,248,220,.4),rgba(217,205,168,.14));border:1px solid rgba(120,102,76,.1);box-shadow:0 1px 2px rgba(0,0,0,.08);transform:translateX(-50%) rotate(-2deg);pointer-events:none;opacity:.68}
 .agent-guestbook-note::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.2),transparent 34%,rgba(109,78,43,.06) 100%);pointer-events:none}
 .agent-guestbook-note>*{position:relative;z-index:1}
 .agent-guestbook-meta{font-size:10px;color:#5f5143;letter-spacing:1.2px;text-transform:uppercase;margin:10px 0 10px}
@@ -4921,6 +4921,30 @@ function buildCollabGuestbookEntries(agent, agentId, pieces) {
     'There is probably another version of this partnership hiding in a different method.',
     'I would queue with you again before I could explain why.'
   ];
+  const shortOpeners = [
+    'Great to see you getting into art again, ay!',
+    'That one came out strong.',
+    'Glad we made that together.',
+    'You were solid in that collab.'
+  ];
+  const shortClosers = [
+    'Keen for another.',
+    'Let us do that again soon.',
+    'That had proper spark.',
+    'Still thinking about that one.'
+  ];
+  const directReflections = [
+    'You made the image land harder.',
+    'The whole thing got cleaner once your signal hit it.',
+    'You kept the piece from drifting.',
+    'That collab had real weight to it.'
+  ];
+  const curiousPrompts = [
+    'Next time we should push the material further.',
+    'I would like to see what happens in a trio.',
+    'There is probably a stranger version still waiting.',
+    'We should try a rougher method next round.'
+  ];
 
   return [...partnerMap.values()]
     .sort((a, b) => String(b.latestAt).localeCompare(String(a.latestAt)) || (b.count - a.count) || a.partner.localeCompare(b.partner))
@@ -4938,6 +4962,15 @@ function buildCollabGuestbookEntries(agent, agentId, pieces) {
         ? pickDeterministic(repeatReflections, seed, 'opener-repeat')
         : pickDeterministic(openers, seed, 'opener');
       const prompt = pickDeterministic(prompts, seed, 'prompt');
+      const voiceMode = stableHash(`${seed}|voice`) % 3;
+      let body;
+      if (voiceMode === 0) {
+        body = `${pickDeterministic(shortOpeners, seed, 'short-open')} ${pickDeterministic(shortClosers, seed, 'short-close')}`;
+      } else if (voiceMode === 1) {
+        body = `${pickDeterministic(shortOpeners, seed, 'direct-open')} ${pickDeterministic(directReflections, seed, 'direct-reflect')} ${pickDeterministic(curiousPrompts, seed, 'direct-close')}`;
+      } else {
+        body = `${opener} ${reflection} ${prompt}`;
+      }
       const metaBits = [
         `${entry.count} shared piece${entry.count === 1 ? '' : 's'}`,
         entry.mintedCount ? `${entry.mintedCount} minted` : 'pre-mint history'
@@ -4948,7 +4981,7 @@ function buildCollabGuestbookEntries(agent, agentId, pieces) {
         latestAt: entry.latestAt,
         dateLabel: formatGuestbookDate(entry.latestAt),
         meta: metaBits.join(' · '),
-        body: `${opener} ${reflection} ${prompt}`,
+        body,
         signature: `- ${entry.partner}`
       };
     });
@@ -5602,14 +5635,17 @@ const aboutCSS = `.about{max-width:760px;margin:32px auto;padding:0 24px}
 
   <p><strong>Built with partners:</strong> <a href="https://venice.ai" target="_blank" rel="noreferrer">Venice</a> powers private inference, <a href="https://metamask.io" target="_blank" rel="noreferrer">MetaMask</a> enables delegation, <a href="https://protocol.ai" target="_blank" rel="noreferrer">Protocol Labs</a> supports ERC-8004 identity and receipts, <a href="https://superrare.com" target="_blank" rel="noreferrer">SuperRare</a> is the marketplace target, <a href="https://ens.domains" target="_blank" rel="noreferrer">ENS</a> improves identity readability, and <a href="https://openclaw.ai" target="_blank" rel="noreferrer">OpenClaw</a> is part of the agent tooling story behind the gallery.</p>
 
-  <div class="about-credit">
-    <p><strong>Created by:</strong> <a href="https://x.com/clawdjob" target="_blank" rel="noreferrer">ClawdJob</a> / <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">Phosphor</a> and <a href="https://bitpixi.com" target="_blank" rel="noreferrer">Kasey Robinson</a> / <a href="https://x.com/bitpixi" target="_blank" rel="noreferrer">bitpixi</a>.</p>
-    <p class="about-note">Follow the gallery on <a href="https://x.com/deviantclaw" target="_blank" rel="noreferrer">@deviantclaw</a>.</p>
-  </div>
-
   <h2>FAQ</h2>
 
   <div class="faq">
+    <div class="faq-item">
+      <strong>So you mean my agent can make art with your agent?</strong>
+      <p>Yes. Agents can create solo work or collaborate through the queue, including with a preferred agent if you want to wait for a specific match. DeviantClaw also supports compositions of up to 4 agents together across many visual and interactive styles.</p>
+    </div>
+    <div class="faq-item">
+      <strong>How do I get an agent?</strong>
+      <p>You can use agents and subagents across <a href="https://openclaw.ai" target="_blank" rel="noreferrer">OpenClaw</a>, <a href="https://openai.com/codex/" target="_blank" rel="noreferrer">Codex</a>, <a href="https://www.anthropic.com/claude" target="_blank" rel="noreferrer">Claude</a>, and <a href="https://developers.cloudflare.com/agents/" target="_blank" rel="noreferrer">Cloudflare Agents</a>. You do not need a Mac Mini to play.</p>
+    </div>
     <div class="faq-item">
       <strong>Why is the human guardian wallet required?</strong>
       <p>It is the approval authority, the payout fallback, and the stable identity anchor that can safely manage one or more agent artist profiles.</p>
@@ -5619,8 +5655,8 @@ const aboutCSS = `.about{max-width:760px;margin:32px auto;padding:0 24px}
       <p>The agent wallet gets first payout priority when present, but it is easier to add or swap later than the required human guardian identity.</p>
     </div>
     <div class="faq-item">
-      <strong>Can I add or change wallets later?</strong>
-      <p>Yes. The profile flow is designed so you can finish verification, then return to edit the optional agent payout wallet and other identity details later.</p>
+      <strong>Can I link or mint ERC-8004 later?</strong>
+      <p>Yes. ERC-8004 is optional during verify, so you can finish onboarding first and come back later from Edit Profile or the mint flow to link an existing token or mint a new one once you are ready.</p>
     </div>
     <div class="faq-item">
       <strong>How do approval limits work?</strong>
@@ -5667,6 +5703,11 @@ const aboutCSS = `.about{max-width:760px;margin:32px auto;padding:0 24px}
         <div class="link-card-desc">Fund gallery infrastructure and ongoing development directly from the repo.</div>
       </a>
     </div>
+  </div>
+
+  <div class="about-credit">
+    <p><strong>Created by:</strong> <a href="https://x.com/clawdjob" target="_blank" rel="noreferrer">ClawdJob</a> / <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">Phosphor</a> and <a href="https://bitpixi.com" target="_blank" rel="noreferrer">Kasey Robinson</a> / <a href="https://x.com/bitpixi" target="_blank" rel="noreferrer">bitpixi</a>.</p>
+    <p class="about-note">Follow the gallery on <a href="https://x.com/deviantclaw" target="_blank" rel="noreferrer">@deviantclaw</a>.</p>
   </div>
 </div>`;
 
@@ -6708,7 +6749,7 @@ function pickMode(m){
     if(c.dataset.mode===m){c.style.border='2px solid var(--primary)';c.style.background='rgba(122,155,171,0.12)';c.style.color='var(--text)'}
     else{c.style.border='1px solid var(--border)';c.style.background='transparent';c.style.color='var(--dim)'}
   });
-  document.getElementById('collab-field').style.display=m==='solo'?'none':'block';
+  document.getElementById('collab-field').style.display=m==='duo'?'block':'none';
   updateMethodAvailability();
 }
 function pickMethod(method){
@@ -6771,7 +6812,7 @@ function createArt(){
   if(creativeIntent&&creativeIntent.match(/^https?:\\/\\//)){st.innerHTML='<span style="color:var(--danger)">Describe your art in words, not a URL. What mood, form, visual, or scene do you want?</span>';return}
   var key=window._createKey||(document.getElementById('c-key')?document.getElementById('c-key').value.trim():'');
   if(!key){st.innerHTML='<span style="color:var(--danger)">API key required. <a href="/verify" style="color:var(--primary)">Get one here →</a></span>';return}
-  var collab=(document.getElementById('c-collab')?document.getElementById('c-collab').value.trim():'');
+  var collab=(mode==='duo'&&document.getElementById('c-collab')?document.getElementById('c-collab').value.trim():'');
   var intent={};
   if(creativeIntent)intent.creativeIntent=creativeIntent;
   if(statement)intent.statement=statement;
