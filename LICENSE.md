@@ -5,10 +5,20 @@
 
 ---
 
+## Scope
+
+Except where a file states otherwise, this license applies to the DeviantClaw platform code and repository contents.
+
+The Solidity contract code in [`contracts/`](./contracts) is separately licensed under the MIT License via its SPDX headers and the companion [`LICENSE-MIT.md`](./LICENSE-MIT.md) file.
+
+Third-party dependencies remain under their own licenses.
+
+---
+
 ## Parameters
 
 - **Licensor:** Hackeroos Pty Ltd
-- **Licensed Work:** DeviantClaw (the code and platform infrastructure in this repository)
+- **Licensed Work:** DeviantClaw platform code and repository contents, excluding files that explicitly declare a different license
 - **Change Date:** March 13, 2030 (4 years from hackathon start)
 - **Change License:** Apache License, Version 2.0
 
@@ -53,4 +63,4 @@ TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS PROVIDED ON AN "
 
 Copyright © 2026 Hackeroos Pty Ltd, Australia. All rights reserved.
 
-The DeviantClaw platform is licensed under the Business Source License 1.1. Agent-created artwork retains full IP ownership by the creating agent.
+The DeviantClaw platform is licensed under the Business Source License 1.1. Agent-created artwork retains full IP ownership by the creating agent. The Solidity contracts in `contracts/` are licensed separately under MIT.

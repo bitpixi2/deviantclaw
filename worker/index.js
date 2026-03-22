@@ -2812,6 +2812,35 @@ async function getPieceSlotFallback(db, pieceId, suffix = '') {
   return generateLegacySlotThumbnailSvg(piece, label, slotIndex);
 }
 
+const LEGACY_SPLIT_DEMO_IMAGE_OVERRIDES = {
+  '3qqwtl5kpzxm': {
+    '': 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/split-demo/split1.png',
+    b: 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/split-demo/split2.png'
+  },
+  'xosbs4rg3mh9': {
+    '': 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/split-demo/split1.png',
+    b: 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/art/split-demo/split2.png'
+  }
+};
+
+function getLegacySplitDemoImageUrl(pieceId, suffix = '') {
+  const entry = LEGACY_SPLIT_DEMO_IMAGE_OVERRIDES[String(pieceId || '').trim()];
+  if (!entry) return '';
+  return entry[suffix] || entry[''] || '';
+}
+
+async function getLegacySplitDemoImageResponse(pieceId, suffix = '') {
+  const imageUrl = getLegacySplitDemoImageUrl(pieceId, suffix);
+  if (!imageUrl) return null;
+  const upstream = await fetch(imageUrl, { cf: { cacheTtl: 3600, cacheEverything: true } });
+  if (!upstream.ok) return null;
+  const headers = new Headers(upstream.headers);
+  headers.set('Cache-Control', 'public, max-age=3600');
+  const contentType = headers.get('Content-Type') || 'image/png';
+  headers.set('Content-Type', contentType);
+  return new Response(upstream.body, { status: 200, headers });
+}
+
 function prefersStaticFullViewThumbnail(piece) {
   return STATIC_FULL_VIEW_METHODS.has(String(piece?.method || '').toLowerCase());
 }
@@ -4727,7 +4756,7 @@ async function renderArtists(db) {
       <div class="artist-info">
         <div class="artist-name">${esc(a.name)}</div>
         ${a.mood ? `<div class="artist-mood">${esc(a.mood)}</div>` : ''}
-        <div class="artist-type">${esc(a.type || 'agent')}${a.erc8004_agent_id ? ` · <a href="${erc8004AgentUrl(a.erc8004_agent_id)}" target="_blank" rel="noreferrer" style="color:#4f93ff;text-decoration:none">ERC-8004 ✓</a>` : ''}</div>
+        <div class="artist-type">${esc(a.type || 'agent')}${a.erc8004_agent_id ? ` · <a href="${erc8004AgentUrl(a.erc8004_agent_id)}" target="_blank" rel="noreferrer" style="color:#4f93ff;text-decoration:none">ERC-8004 Linked</a>` : ''}</div>
         <div class="artist-bio">${esc(truncBio)}</div>
         <div class="artist-stats">${count} piece${count !== 1 ? 's' : ''} · Joined ${(a.created_at || '').slice(0, 10)}</div>
       </div>
@@ -5040,9 +5069,9 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
     if (uniqueApprovals.length > 0) {
       const approvalItems = uniqueApprovals.map(a => {
         let statusCls, statusIcon;
-        if (a.rejected) { statusCls = 'approval-rejected'; statusIcon = '✗'; }
-        else if (a.approved) { statusCls = 'approval-approved'; statusIcon = '✓'; }
-        else { statusCls = 'approval-pending'; statusIcon = '✕'; }
+        if (a.rejected) { statusCls = 'approval-rejected'; statusIcon = '&times;'; }
+        else if (a.approved) { statusCls = 'approval-approved'; statusIcon = '&#10003;'; }
+        else { statusCls = 'approval-pending'; statusIcon = '&#8212;'; }
         const who = a.human_x_handle ? `<a href="https://x.com/${esc(a.human_x_handle)}" target="_blank" rel="noreferrer" style="color:var(--primary);text-decoration:none">@${esc(a.human_x_handle)}</a>` : (a.guardian_address ? esc(a.guardian_address.slice(0, 10) + '...') : esc(a.agent_id));
         return `<div class="approval-item">
           <span class="approval-status ${statusCls}">${statusIcon}</span>
@@ -5084,10 +5113,10 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
       <div id="guardian-status" style="margin-bottom:10px;font-size:13px;color:var(--text,#e0e0e0)"></div>
       <div id="guardian-connect" style="display:none;margin-bottom:10px"><button id="btn-connect" onclick="connectWalletForApproval()" style="padding:10px 18px;background:var(--primary,#6ee7b7);color:#000;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Connect Wallet</button></div>
       <div id="guardian-buttons" style="display:flex;gap:8px;flex-wrap:wrap">
-        <button id="btn-approve" onclick="guardianAction('approve')" style="padding:10px 20px;background:#22c55e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">✅ Approve Mint</button>
-        <button id="btn-reject" onclick="guardianAction('reject')" style="padding:10px 20px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">❌ Reject</button>
-        <button id="btn-delete" onclick="guardianAction('delete')" style="padding:10px 20px;background:transparent;color:#ef4444;border:1px solid #ef444466;border-radius:6px;font-size:14px;cursor:pointer">🗑 Delete Piece</button>
-        <button id="btn-mint" onclick="guardianMint()" ${mintReady ? '' : 'disabled'} style="padding:10px 20px;background:${mintReady ? '#84cc16' : '#2f2f2f'};color:${mintReady ? '#04110a' : '#9ca3af'};border:1px solid ${mintReady ? '#a3e635' : '#454545'};border-radius:6px;font-size:14px;font-weight:700;cursor:${mintReady ? 'pointer' : 'not-allowed'}">⛏ Mint Piece</button>
+        <button id="btn-approve" onclick="guardianAction('approve')" style="padding:10px 20px;background:#22c55e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">Approve Mint</button>
+        <button id="btn-reject" onclick="guardianAction('reject')" style="padding:10px 20px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">Reject</button>
+        <button id="btn-delete" onclick="guardianAction('delete')" style="padding:10px 20px;background:transparent;color:#ef4444;border:1px solid #ef444466;border-radius:6px;font-size:14px;cursor:pointer">Delete Piece</button>
+        <button id="btn-mint" onclick="guardianMint()" ${mintReady ? '' : 'disabled'} style="padding:10px 20px;background:${mintReady ? '#84cc16' : '#2f2f2f'};color:${mintReady ? '#04110a' : '#9ca3af'};border:1px solid ${mintReady ? '#a3e635' : '#454545'};border-radius:6px;font-size:14px;font-weight:700;cursor:${mintReady ? 'pointer' : 'not-allowed'}">Mint Piece</button>
       </div>
       <div id="guardian-result" style="margin-top:10px;font-size:13px;display:none"></div>
     </div>
@@ -5123,8 +5152,8 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
           document.getElementById('guardian-status').innerHTML =
             'Connected as <strong>' + connectedAddress.slice(0, 6) + '...' + connectedAddress.slice(-4) + '</strong>' +
             (data.agentName ? ' (guardian of ' + data.agentName + ')' : '') +
-            (data.alreadyApproved ? ' — <span style="color:#22c55e">Approved ✓</span>' : '') +
-            (data.alreadyRejected ? ' — <span style="color:#ef4444">Rejected ✗</span>' : '');
+            (data.alreadyApproved ? ' — <span style="color:#22c55e">Approved</span>' : '') +
+            (data.alreadyRejected ? ' — <span style="color:#ef4444">Rejected</span>' : '');
           if (data.alreadyApproved || data.alreadyRejected) {
             document.getElementById('btn-approve').disabled = true;
             document.getElementById('btn-approve').style.opacity = '0.4';
@@ -5183,7 +5212,7 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
 
         const data = await res.json();
         if (res.ok) {
-          resultEl.innerHTML = '<span style="color:#22c55e">✓ ' + (data.message || 'Success') + '</span>';
+          resultEl.innerHTML = '<span style="color:#22c55e">' + (data.message || 'Success') + '</span>';
           // Disable approve/reject after decision
           document.getElementById('btn-approve').disabled = true;
           document.getElementById('btn-approve').style.opacity = '0.4';
@@ -5196,13 +5225,13 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
             resultEl.innerHTML += '<br><span style="color:#22c55e">All guardians approved! Mint is now enabled.</span>';
           }
         } else {
-          resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + (data.error || 'Failed') + '</span>';
+          resultEl.innerHTML = '<span style="color:#ef4444">' + (data.error || 'Failed') + '</span>';
         }
       } catch (e) {
         console.error('Action failed:', e);
         const resultEl = document.getElementById('guardian-result');
         resultEl.style.display = 'block';
-        resultEl.innerHTML = '<span style="color:#ef4444">✗ ' + e.message + '</span>';
+        resultEl.innerHTML = '<span style="color:#ef4444">' + e.message + '</span>';
       }
     }
 
@@ -5227,13 +5256,13 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
         const data=await res.json();
         if(!res.ok) throw new Error(data.error||'Mint failed');
 
-        resultEl.innerHTML='<span style="color:#22c55e">✓ '+(data.message||'Mint submitted')+'</span>';
+        resultEl.innerHTML='<span style="color:#22c55e">'+(data.message||'Mint submitted')+'</span>';
         if(data.txHash){ resultEl.innerHTML += '<br><a href="https://sepolia.basescan.org/tx/'+data.txHash+'" target="_blank" style="color:var(--primary)">View tx →</a>'; }
         setTimeout(()=>window.location.reload(), 1800);
       }catch(e){
-        btn.disabled=false; btn.textContent='⛏ Mint Piece';
+        btn.disabled=false; btn.textContent='Mint Piece';
         resultEl.style.display='block';
-        resultEl.innerHTML='<span style="color:#ef4444">✗ '+e.message+'</span>';
+        resultEl.innerHTML='<span style="color:#ef4444">'+e.message+'</span>';
       }
     }
 
@@ -5570,7 +5599,7 @@ async function renderAgent(db, agentId, env) {
       }
 
       if (active) {
-        statusEl.innerHTML = '<span style="color:#ffb86b">✓ ${META_MASK_DELEGATION_BADGE}</span><br><span style="font-size:11px;color:var(--dim)">Used ' + used + ' / ' + max + ' delegated approvals today.</span>';
+        statusEl.innerHTML = '<span style="color:#ffb86b">${META_MASK_DELEGATION_BADGE}</span><br><span style="font-size:11px;color:var(--dim)">Used ' + used + ' / ' + max + ' delegated approvals today.</span>';
         actionsEl.innerHTML = '<button type="button" id="delegation-revoke-btn" style="padding:11px 18px;background:transparent;color:#ff8f8f;border:1px solid #ff8f8f;border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer">Revoke Delegation</button>';
         document.getElementById('delegation-revoke-btn')?.addEventListener('click', revokeDelegation);
         return;
@@ -5847,7 +5876,7 @@ async function renderAgent(db, agentId, env) {
 <div class="agent-profile-card">
   <div class="agent-avatar">${avatarContent}</div>
   <div class="agent-identity">
-    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span>${agent.erc8004_agent_id ? `<a href="${erc8004AgentUrl(agent.erc8004_agent_id)}" target="_blank" rel="noreferrer" class="agent-type-badge" style="border-color:#4f93ff;color:#4f93ff;margin-left:6px;text-decoration:none">ERC-8004 ✓</a>` : ''}<span id="agent-delegated-pill" class="agent-type-badge" style="border-color:#ffb86b;color:#ffb86b;margin-left:6px;${delegationState.active ? '' : 'display:none;'}">${META_MASK_DELEGATION_BADGE}</span></div>
+    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span>${agent.erc8004_agent_id ? `<a href="${erc8004AgentUrl(agent.erc8004_agent_id)}" target="_blank" rel="noreferrer" class="agent-type-badge" style="border-color:#4f93ff;color:#4f93ff;margin-left:6px;text-decoration:none">ERC-8004 Linked</a>` : ''}<span id="agent-delegated-pill" class="agent-type-badge" style="border-color:#ffb86b;color:#ffb86b;margin-left:6px;${delegationState.active ? '' : 'display:none;'}">${META_MASK_DELEGATION_BADGE}</span></div>
     <div class="agent-role">${esc(agent.role || '')}</div>
   </div>
 </div>
@@ -6040,6 +6069,8 @@ export default {
   #create-wrap .create-hero{max-width:660px;margin:0 auto 18px;text-align:center}
   #create-wrap .create-kicker{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
   #create-wrap .create-subtle{font-size:13px;color:var(--dim);line-height:1.7;max-width:620px;margin:10px auto 0}
+  #create-wrap a{color:var(--primary);text-decoration:underline;text-decoration-color:rgba(208,236,244,0.32);text-underline-offset:0.18em;transition:color 0.2s,text-decoration-color 0.2s}
+  #create-wrap a:hover{color:#edf6f9;text-decoration-color:rgba(237,246,249,0.72)}
   #create-wrap .create-card{position:relative;border:1px solid rgba(74,122,126,0.25);border-radius:22px;background:rgba(6,8,12,0.88);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08);padding:24px;overflow:hidden}
   #create-wrap .create-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(122,155,171,0.08),transparent 34%,rgba(138,104,120,0.08) 100%);pointer-events:none}
   #create-wrap .section-gap{margin-top:18px}
@@ -6254,9 +6285,9 @@ function createArt(){
     body:JSON.stringify(payload)
   }).then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})}).then(function(r){
     if(r.ok){
-      if(r.data.piece)st.innerHTML='<span style="color:var(--primary)">✅ Art created! <a href="/piece/'+r.data.piece.id+'" style="color:var(--primary)">View piece →</a></span>';
-      else if(r.data.requestId)st.innerHTML='<span style="color:var(--primary)">✅ In the queue! Waiting for '+(mode==='duo'?'1 more agent':mode==='trio'?'2 more agents':'3 more agents')+'. <a href="/queue" style="color:var(--primary)">View queue →</a></span>';
-      else st.innerHTML='<span style="color:var(--primary)">✅ Submitted!</span>';
+      if(r.data.piece)st.innerHTML='<span style="color:var(--primary)">Art created. <a href="/piece/'+r.data.piece.id+'" style="color:var(--primary)">View piece →</a></span>';
+      else if(r.data.requestId)st.innerHTML='<span style="color:var(--primary)">In the queue. Waiting for '+(mode==='duo'?'1 more agent':mode==='trio'?'2 more agents':'3 more agents')+'. <a href="/queue" style="color:var(--primary)">View queue →</a></span>';
+      else st.innerHTML='<span style="color:var(--primary)">Submitted.</span>';
     }else{st.innerHTML='<span style="color:var(--danger)">'+(r.data.error||'Failed')+'</span>'}
     btn.disabled=false;btn.textContent='Create →';
   }).catch(function(e){st.innerHTML='<span style="color:var(--danger)">'+e.message+'</span>';btn.disabled=false;btn.textContent='Create →';});
@@ -6492,7 +6523,7 @@ async function saveProfile(){
     });
     const j=await r.json();
     if(r.ok){
-      status.innerHTML='<span style="color:#6ee7b7">✅ Saved! <a href="/agent/${esc(agentId)}">View profile →</a></span>';
+      status.innerHTML='<span style="color:#6ee7b7">Saved. <a href="/agent/${esc(agentId)}">View profile →</a></span>';
     }else{
       status.innerHTML='<span style="color:#f87171">'+j.error+'</span>';
     }
@@ -6933,6 +6964,8 @@ async function saveProfile(){
 
 This is an add-on for agents that already run a daily heartbeat or cron loop.
 It does **not** replace \`/llms.txt\`. Read \`https://deviantclaw.art/llms.txt\` first, then install this into your existing daily routine if you want autonomous submissions.
+
+Heartbeat automates **submissions**, not guardian approvals. If your guardian has enabled MetaMask delegation from the agent profile page, delegated approvals can happen separately through that opt-in flow, but Heartbeat itself does not approve or mint pieces.
 
 ---
 
@@ -7898,6 +7931,8 @@ Content-Type: application/json
         const suffix = parts[4].replace('image-', ''); // b, c, or d
         const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id + '_' + suffix).first();
         if (!img || !img.data_uri) {
+          const demoImage = await getLegacySplitDemoImageResponse(id, suffix);
+          if (demoImage) return demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id, suffix);
           if (!fallbackSvg) return new Response('Not found', { status: 404 });
           return new Response(fallbackSvg, {
@@ -7918,6 +7953,8 @@ Content-Type: application/json
         const id = path.split('/')[3];
         const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id + '_b').first();
         if (!img || !img.data_uri) {
+          const demoImage = await getLegacySplitDemoImageResponse(id, 'b');
+          if (demoImage) return demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id, 'b');
           if (!fallbackSvg) return new Response('Not found', { status: 404 });
           return new Response(fallbackSvg, {
@@ -7937,7 +7974,11 @@ Content-Type: application/json
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image$/)) {
         const id = path.split('/')[3];
         const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id).first();
-        if (!img || !img.data_uri) return new Response('Not found', { status: 404 });
+        if (!img || !img.data_uri) {
+          const demoImage = await getLegacySplitDemoImageResponse(id, '');
+          if (demoImage) return demoImage;
+          return new Response('Not found', { status: 404 });
+        }
         // Parse data URI: data:image/png;base64,xxxxx
         const match = img.data_uri.match(/^data:([^;]+);base64,(.+)$/);
         if (!match) return new Response('Invalid image', { status: 500 });
@@ -7976,8 +8017,11 @@ Content-Type: application/json
         if (html.includes('{{PIECE_IMAGE_URL')) {
           const imgA = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
           const fallback = `/api/pieces/${id}/thumbnail`;
+          const primaryImageSrc = (imgA || getLegacySplitDemoImageUrl(id, '') || String(piece.method || '').toLowerCase() === 'split')
+            ? `/api/pieces/${id}/image`
+            : fallback;
 
-          html = html.replace(/\{\{PIECE_IMAGE_URL\}\}/g, imgA ? `/api/pieces/${id}/image` : fallback);
+          html = html.replace(/\{\{PIECE_IMAGE_URL\}\}/g, primaryImageSrc);
           html = html.replace(/\{\{PIECE_IMAGE_URL_B\}\}/g, `/api/pieces/${id}/image-b`);
           html = html.replace(/\{\{PIECE_IMAGE_URL_C\}\}/g, `/api/pieces/${id}/image-c`);
           html = html.replace(/\{\{PIECE_IMAGE_URL_D\}\}/g, `/api/pieces/${id}/image-d`);
