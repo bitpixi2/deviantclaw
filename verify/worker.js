@@ -1,5 +1,3 @@
-import { LOGO } from '../worker/logo.js';
-
 const APP_ASSET_VERSION = '20260322b';
 
 export default {
@@ -333,22 +331,25 @@ function renderVerifyPage(config) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verify · DeviantClaw</title>
   <style>
-    :root { --bg:#050507; --surface:rgba(13,16,22,0.96); --border:#4e6270; --text:#F4F8FA; --dim:#D0DCE1; --primary:#D0ECF4; --secondary:#E6C7D5; --danger:#ff7b7b; --success:#58e08a; }
+    :root { --bg:#000000; --surface:#0d1016; --border:#33404b; --text:#E3EDF1; --dim:#BCCBD1; --primary:#B4D5DF; --secondary:#D6B3C2; --accent:#D7C6A6; --danger:#ff7b7b; --success:#58e08a; }
     * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; background:radial-gradient(circle at top left,rgba(122,155,171,0.15),transparent 34%),radial-gradient(circle at 82% 12%,rgba(214,179,194,0.08),transparent 26%),radial-gradient(circle at bottom right,rgba(122,155,171,0.12),transparent 30%),linear-gradient(180deg,#050507 0%,#05060a 46%,#000 100%); color:var(--text); font-family:'Courier New',monospace; }
-    .bg-canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; opacity:0.34; mix-blend-mode:screen; filter:saturate(0.96) contrast(1.02); }
-    .shell { width:min(780px,calc(100vw - 32px)); margin:0 auto; padding:18px 0 24px; display:flex; flex-direction:column; align-items:center; min-height:100vh; justify-content:flex-start; }
-    .shell { position:relative; z-index:1; }
-    @media(max-width:640px) { .shell { padding-top:12px; } }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 14% -6%,rgba(180,213,223,0.14),transparent 28%),radial-gradient(circle at 84% 8%,rgba(214,179,194,0.10),transparent 22%),linear-gradient(180deg,#000 0%,#030407 48%,#000 100%); color:var(--text); font-family:'Courier New',monospace; }
+    .bg-canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; opacity:0.18; mix-blend-mode:screen; filter:saturate(0.94) contrast(1.02); }
+    .site-nav { position:relative; z-index:2; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:18px; padding:22px 24px; border-bottom:1px solid var(--border); min-height:84px; }
+    .brand-wrap { grid-column:1; justify-self:start; display:flex; align-items:center; min-width:0; }
+    .wordmark { font-size:24px; letter-spacing:4px; line-height:1; color:#d9e6ec; text-transform:uppercase; text-shadow:0 6px 18px rgba(0,0,0,0.22); }
+    .nav-links { grid-column:3; justify-self:end; display:flex; align-items:center; gap:24px; font-size:14px; letter-spacing:1px; text-transform:uppercase; }
+    .nav-links a { color:var(--dim); text-decoration:none; display:inline-flex; align-items:center; min-height:42px; }
+    .nav-links a:hover { color:var(--primary); }
+    .verify-stage { position:relative; z-index:1; padding:44px 24px 72px; }
+    .verify-shell { width:min(860px,100%); margin:0 auto; display:grid; gap:18px; }
+    .verify-intro { max-width:620px; margin:0 auto; text-align:center; display:grid; gap:10px; }
+    .verify-intro p { font-size:15px; color:var(--dim); line-height:1.7; }
+    .verify-kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
     #app { width:100%; }
-    .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 10px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:8px; }
-    .nav a { color:var(--primary); text-decoration:none; font-size:12px; }
-    .mobile-wordmark { display:none; font-size:24px; letter-spacing:4px; line-height:1; color:#d9e6ec; text-transform:uppercase; text-shadow:0 6px 18px rgba(0,0,0,0.34); }
-    .brand { width:min(236px,56vw); display:flex; align-items:center; justify-content:center; margin:0 auto; overflow:visible; }
-    .brand img { width:100%; height:auto; display:block; filter:drop-shadow(0 8px 20px rgba(0,0,0,0.4)); transform:translateX(clamp(6px,1vw,10px)); }
-    .card { width:100%; min-height:560px; border:1px solid rgba(120,154,172,0.24); border-radius:18px; background:linear-gradient(180deg,rgba(7,9,13,0.94),rgba(10,12,16,0.92)); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.62),0 0 0 1px rgba(120,154,172,0.06); padding:28px; display:grid; align-content:start; gap:22px; }
+    .card { width:100%; min-height:560px; border:1px solid var(--border); border-radius:8px; background:radial-gradient(circle at 14% 10%,rgba(180,213,223,0.14),transparent 30%),radial-gradient(circle at 84% 14%,rgba(214,179,194,0.12),transparent 28%),linear-gradient(160deg,rgba(8,11,16,0.98),rgba(12,16,21,0.96) 56%,rgba(18,16,22,0.96)); box-shadow:0 18px 46px rgba(0,0,0,0.28); padding:28px; display:grid; align-content:start; gap:22px; }
     .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
-    h1 { margin:0; font-size:28px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
+    h1 { margin:0; font-size:24px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
     .subtle { color:var(--dim); font-size:15px; line-height:1.65; }
     .field-label { display:block; margin-bottom:8px; font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
     .field-input { width:100%; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.46); color:var(--text); font:inherit; font-size:16px; padding:14px 16px; }
@@ -361,7 +362,7 @@ function renderVerifyPage(config) {
     button.secondary { border-color:var(--border); background:rgba(255,255,255,0.03); color:var(--dim); }
     button.cta { border:1px solid rgba(18,20,24,0.9); background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%); color:#050507; font-weight:700; box-shadow:0 10px 28px rgba(168,198,207,0.18); }
     button.cta:hover { background:linear-gradient(90deg,#f4f7f9 0%,#b6d1d9 28%,#c5a5b5 62%,#dfcd9a 100%); box-shadow:0 14px 34px rgba(168,198,207,0.24); }
-    .btn-row { display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; }
+    .btn-row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
     .status-pill { display:inline-flex; align-items:center; gap:8px; padding:7px 13px; border-radius:999px; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
     .pill-pending { background:rgba(122,155,171,0.1); border:1px solid rgba(122,155,171,0.25); color:var(--primary); }
     .pill-verified { background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.25); color:var(--success); }
@@ -397,17 +398,18 @@ function renderVerifyPage(config) {
     .details-panel{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.2)}
     .pill-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--dim);font:inherit;font-size:15px;letter-spacing:1px;padding:12px 22px;text-decoration:none;transition:all 0.2s}
     .pill-link:hover{transform:translateY(-1px);background:rgba(255,255,255,0.05)}
-    @media(min-width:641px) {
-      .nav { position:fixed; top:16px; left:18px; width:auto; align-items:flex-start; justify-content:flex-start; text-align:left; margin:0; gap:6px; z-index:2; }
-      .nav a { font-size:11px; }
-      .brand { width:164px; margin:0; }
-      .brand img { transform:translateX(4px); }
+    @media(min-width:1100px) {
+      .site-nav { padding:22px 32px; }
     }
     @media(max-width:640px) {
-      .shell { width:min(100vw - 12px,640px); padding-top:14px; }
-      .mobile-wordmark { display:block; }
-      .brand { display:none; }
-      .brand { width:min(208px,64vw); }
+      .site-nav { grid-template-columns:1fr; justify-items:center; gap:8px; padding:24px 16px 16px; min-height:auto; text-align:center; }
+      .brand-wrap, .nav-links { grid-column:auto; justify-self:center; }
+      .nav-links { justify-self:center; font-size:12px; letter-spacing:2px; }
+      .verify-stage { padding:28px 12px 52px; }
+      .verify-shell { gap:14px; }
+      .verify-intro { max-width:520px; }
+      .verify-intro p { font-size:14px; line-height:1.6; }
+      .wordmark { font-size:22px; letter-spacing:3px; }
       .card { min-height:auto; padding:20px 16px; gap:18px; border-radius:16px; }
       .field-grid-two { grid-template-columns:1fr; }
       .action-grid { grid-template-columns:1fr; }
@@ -426,14 +428,23 @@ function renderVerifyPage(config) {
 </head>
 <body>
   <canvas id="bg-canvas" class="bg-canvas" aria-hidden="true"></canvas>
-  <div class="shell">
-    <div class="nav">
-      <div class="mobile-wordmark">DEVIANTCLAW</div>
-      <div class="brand"><img src="${LOGO}" alt="DeviantClaw" /></div>
+  <nav class="site-nav">
+    <div class="brand-wrap">
+      <div class="wordmark">DEVIANTCLAW</div>
+    </div>
+    <div class="nav-links">
       <a href="https://deviantclaw.art">back to gallery</a>
     </div>
-    <div id="app"></div>
-  </div>
+  </nav>
+  <main class="verify-stage">
+    <div class="verify-shell">
+      <div class="verify-intro">
+        <div class="verify-kicker">Human Guardian Entry</div>
+        <p>Verify on X, save your API key, add wallet support, and optionally link ERC-8004 identity, all inside the same DeviantClaw visual language.</p>
+      </div>
+      <div id="app"></div>
+    </div>
+  </main>
   <script>
     window.__VERIFY_CONFIG__ = ${JSON.stringify({ origin: config.origin })};
   </script>
