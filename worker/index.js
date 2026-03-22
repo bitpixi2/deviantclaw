@@ -5931,6 +5931,33 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
     const PIECE_ID = '${esc(piece.id)}';
     let connectedAddress = null;
 
+    function shortAddress(value) {
+      const v = String(value || '').trim();
+      return v && v.length > 14 ? v.slice(0, 8) + '…' + v.slice(-4) : v;
+    }
+
+    function renderWrongWalletState(data) {
+      const guardianStatus = document.getElementById('guardian-status');
+      const guardianActions = document.getElementById('guardian-actions');
+      const guardianConnect = document.getElementById('guardian-connect');
+      const guardianButtons = document.getElementById('guardian-buttons');
+      const hints = Array.isArray(data?.guardianHints) ? data.guardianHints : [];
+      const expected = hints
+        .filter(h => h && h.guardianAddress)
+        .map(h => '<div style="margin-top:4px;color:var(--dim)">'
+          + (h.agentName ? (h.agentName + ': ') : '')
+          + '<strong>' + shortAddress(h.guardianAddress) + '</strong></div>')
+        .join('');
+
+      guardianActions.style.display = 'block';
+      guardianConnect.style.display = 'block';
+      guardianButtons.style.display = 'none';
+      guardianStatus.innerHTML =
+        '<span style="color:#ffb86b">Connected wallet <strong>' + shortAddress(connectedAddress) + '</strong> is not a guardian for this piece.</span>'
+        + (expected ? '<div style="margin-top:8px;font-size:12px">Guardian wallet' + (hints.length > 1 ? 's' : '') + ' for this piece:' + expected + '</div>' : '');
+      document.getElementById('btn-connect').textContent = 'Switch MetaMask Wallet';
+    }
+
     async function connectWalletForApproval() {
       if (!window.ethereum) {
         alert('Please install MetaMask or another Web3 wallet.');
@@ -5942,6 +5969,10 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
         checkGuardianStatus();
       } catch (e) {
         console.error('Wallet connect failed:', e);
+        document.getElementById('guardian-actions').style.display = 'block';
+        document.getElementById('guardian-connect').style.display = 'block';
+        document.getElementById('guardian-buttons').style.display = 'none';
+        document.getElementById('guardian-status').innerHTML = '<span style="color:#ef4444">Wallet connection was cancelled or failed.</span>';
       }
     }
 
@@ -5967,10 +5998,14 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
             document.getElementById('btn-reject').style.opacity = '0.4';
           }
         } else {
-          document.getElementById('guardian-actions').style.display = 'none';
+          renderWrongWalletState(data);
         }
       } catch (e) {
         console.error('Guardian check failed:', e);
+        document.getElementById('guardian-actions').style.display = 'block';
+        document.getElementById('guardian-connect').style.display = 'block';
+        document.getElementById('guardian-buttons').style.display = 'none';
+        document.getElementById('guardian-status').innerHTML = '<span style="color:#ef4444">Could not verify guardian access. Refresh and try again.</span>';
       }
     }
 
@@ -6082,6 +6117,16 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
           document.getElementById('guardian-actions').style.display = 'block';
           document.getElementById('guardian-buttons').style.display = 'none';
           document.getElementById('guardian-connect').style.display = 'block';
+          document.getElementById('guardian-status').textContent = 'Connect wallet to approve/reject/mint.';
+        }
+      });
+      window.ethereum.on?.('accountsChanged', (accounts) => {
+        connectedAddress = (accounts && accounts[0]) ? accounts[0] : null;
+        if (connectedAddress) checkGuardianStatus();
+        else {
+          document.getElementById('guardian-actions').style.display = 'block';
+          document.getElementById('guardian-connect').style.display = 'block';
+          document.getElementById('guardian-buttons').style.display = 'none';
           document.getElementById('guardian-status').textContent = 'Connect wallet to approve/reject/mint.';
         }
       });
@@ -8789,6 +8834,33 @@ Content-Type: application/json
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ isGuardian: false });
 
+        let guardianHints = [];
+        try {
+          const collabGuardians = await db.prepare(
+            `SELECT DISTINCT a.guardian_address, a.name as agent_name
+             FROM piece_collaborators pc
+             JOIN agents a ON a.id = pc.agent_id
+             WHERE pc.piece_id = ? AND a.guardian_address IS NOT NULL AND TRIM(a.guardian_address) != ''`
+          ).bind(id).all();
+          guardianHints = (collabGuardians.results || []).map(row => ({
+            agentName: row.agent_name || '',
+            guardianAddress: row.guardian_address || ''
+          }));
+        } catch {}
+        if (guardianHints.length === 0) {
+          try {
+            const legacyGuardians = await db.prepare(
+              `SELECT DISTINCT guardian_address, name as agent_name
+               FROM agents
+               WHERE id IN (?, ?) AND guardian_address IS NOT NULL AND TRIM(guardian_address) != ''`
+            ).bind(piece.agent_a_id || '', piece.agent_b_id || '').all();
+            guardianHints = (legacyGuardians.results || []).map(row => ({
+              agentName: row.agent_name || '',
+              guardianAddress: row.guardian_address || ''
+            }));
+          } catch {}
+        }
+
         // Check if wallet is guardian for any collaborator on this piece
         const collab = await db.prepare(
           `SELECT pc.agent_id, a.name as agent_name
@@ -8803,7 +8875,7 @@ Content-Type: application/json
           const legacy = await db.prepare(
             'SELECT id, name FROM agents WHERE id IN (?, ?) AND LOWER(guardian_address) = ? LIMIT 1'
           ).bind(piece.agent_a_id || '', piece.agent_b_id || '', normalizedWallet).first();
-          if (!legacy) return json({ isGuardian: false });
+          if (!legacy) return json({ isGuardian: false, guardianHints });
 
           // Check approval status
           const approval = await db.prepare(
@@ -8814,7 +8886,8 @@ Content-Type: application/json
             isGuardian: true,
             agentName: legacy.name || legacy.id,
             alreadyApproved: !!(approval && approval.approved),
-            alreadyRejected: !!(approval && approval.rejected)
+            alreadyRejected: !!(approval && approval.rejected),
+            guardianHints
           });
         }
 
@@ -8827,7 +8900,8 @@ Content-Type: application/json
           isGuardian: true,
           agentName: collab.agent_name || collab.agent_id,
           alreadyApproved: !!(approval && approval.approved),
-          alreadyRejected: !!(approval && approval.rejected)
+          alreadyRejected: !!(approval && approval.rejected),
+          guardianHints
         });
       }
 
