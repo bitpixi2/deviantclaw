@@ -25,7 +25,6 @@ const VENICE_IMAGE_MODELS = [
 const VENICE_IMAGE_MODEL = 'flux-dev'; // default fallback
 const VENICE_IMAGE_SIZE = '1024x1024';
 const D1_INTENT_JSON_LIMIT_BYTES = 24 * 1024;
-const D1_IMAGE_DATA_URI_LIMIT_BYTES = 1_500_000;
 const VENICE_VIDEO_CANDIDATE_MODELS = [
   'longcat-text-to-video',
   'kling-o3-pro-text-to-video',
@@ -247,18 +246,6 @@ async function veniceImage(apiKey, prompt, opts = {}) {
   if (!img) return null;
   // Venice returns data URIs — works directly in HTML img src
   return img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null);
-}
-
-async function veniceImageForStorage(apiKey, prompt, opts = {}) {
-  const requestedSize = opts.size || VENICE_IMAGE_SIZE;
-  const retrySizes = [requestedSize, '768x768', '512x512'].filter((size, index, list) => list.indexOf(size) === index);
-  for (const size of retrySizes) {
-    const image = await veniceImage(apiKey, prompt, { ...opts, size });
-    if (!image) return image;
-    if (!image.startsWith('data:')) return image;
-    if (byteLength(image) <= D1_IMAGE_DATA_URI_LIMIT_BYTES) return image;
-  }
-  throw new Error('Generated image exceeded D1 storage limits. Please retry; the worker will automatically fall back to a smaller render when possible.');
 }
 
 function analyzeMoodForEffects(artPrompt) {
@@ -956,7 +943,7 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     // Generate images sequentially to avoid race conditions and partial failures
     const allImages = [];
     for (const prompt of perAgentPrompts) {
-      const img = await veniceImageForStorage(apiKey, prompt);
+      const img = await veniceImage(apiKey, prompt);
       allImages.push(img);
     }
     imageDataUri = allImages[0];
@@ -967,7 +954,7 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     if (perAgentPrompts.length > 1 && !imageDataUriB) console.error('[veniceGenerate] Secondary image (B) generation failed');
   } else {
     // Fusion or solo image — single combined image
-    imageDataUri = await veniceImageForStorage(apiKey, artPrompt);
+    imageDataUri = await veniceImage(apiKey, artPrompt);
   }
 
   // 3. Title
@@ -1208,12 +1195,12 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
         { maxTokens: 110 }
       )
     ));
-    const images = await Promise.all(prompts.map(prompt => veniceImageForStorage(apiKey, prompt)));
+    const images = await Promise.all(prompts.map(prompt => veniceImage(apiKey, prompt)));
     imageDataUri = images[0];
     imageDataUriB = images[1] || null;
     extraImages = images.slice(2).filter(Boolean);
   } else {
-    imageDataUri = await veniceImageForStorage(apiKey, artPrompt);
+    imageDataUri = await veniceImage(apiKey, artPrompt);
   }
 
   const title = (await veniceText(apiKey,
@@ -1272,8 +1259,80 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
   };
 }
 
+function pieceImageObjectKey(pieceImageId) {
+  return `pieces/${String(pieceImageId || '').trim()}.png`;
+}
+
+async function resolveImageSourceToBytes(imageSource) {
+  const source = String(imageSource || '').trim();
+  if (!source) return null;
+  if (source.startsWith('data:')) {
+    const match = source.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) throw new Error('Invalid image data URI');
+    const [, contentType, b64] = match;
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    return { bytes, contentType: contentType || 'image/png' };
+  }
+  const upstream = await fetch(source);
+  if (!upstream.ok) throw new Error(`Image fetch failed: ${upstream.status}`);
+  const bytes = new Uint8Array(await upstream.arrayBuffer());
+  const contentType = upstream.headers.get('Content-Type') || 'image/png';
+  return { bytes, contentType };
+}
+
+async function storePieceImageSource(db, env, pieceImageId, imageSource) {
+  if (!imageSource) return false;
+  if (!env?.PIECE_IMAGES) throw new Error('R2 binding PIECE_IMAGES is not configured');
+  const resolved = await resolveImageSourceToBytes(imageSource);
+  if (!resolved) return false;
+  const objectKey = pieceImageObjectKey(pieceImageId);
+  await env.PIECE_IMAGES.put(objectKey, resolved.bytes, {
+    httpMetadata: { contentType: resolved.contentType }
+  });
+  await db.prepare(
+    'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, storage_backend, object_key, content_type, byte_size, created_at) VALUES (?, NULL, ?, ?, ?, ?, datetime("now"))'
+  ).bind(pieceImageId, 'r2', objectKey, resolved.contentType, resolved.bytes.byteLength).run();
+  return true;
+}
+
+function pieceImageRoute(pieceImageId) {
+  const raw = String(pieceImageId || '').trim();
+  if (raw.endsWith('_b')) return `/api/pieces/${raw.slice(0, -2)}/image-b`;
+  if (raw.endsWith('_c')) return `/api/pieces/${raw.slice(0, -2)}/image-c`;
+  if (raw.endsWith('_d')) return `/api/pieces/${raw.slice(0, -2)}/image-d`;
+  return `/api/pieces/${raw}/image`;
+}
+
+async function readPieceImageRecord(db, pieceImageId) {
+  return db.prepare(
+    'SELECT piece_id, data_uri, storage_backend, object_key, content_type, byte_size, created_at FROM piece_images WHERE piece_id = ?'
+  ).bind(pieceImageId).first();
+}
+
+async function serveStoredPieceImage(db, env, pieceImageId) {
+  const record = await readPieceImageRecord(db, pieceImageId);
+  if (!record) return null;
+  if (record.storage_backend === 'r2' && record.object_key) {
+    if (!env?.PIECE_IMAGES) throw new Error('R2 binding PIECE_IMAGES is not configured');
+    const object = await env.PIECE_IMAGES.get(record.object_key);
+    if (!object) return null;
+    const headers = new Headers();
+    headers.set('Content-Type', record.content_type || object.httpMetadata?.contentType || 'image/png');
+    headers.set('Cache-Control', 'public, max-age=31536000');
+    return new Response(object.body, { headers });
+  }
+  if (!record.data_uri) return null;
+  const match = String(record.data_uri).match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return new Response('Invalid image', { status: 500 });
+  const [, contentType, b64] = match;
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  return new Response(bytes, {
+    headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000' },
+  });
+}
+
 // After piece creation, store image(s) and fix HTML placeholders
-async function storeVeniceImage(db, pieceId, result) {
+async function storeVeniceImage(db, env, pieceId, result) {
   if (!result.imageDataUri) {
     // Code/game mode — still need to fix placeholders in HTML
     let fixedHtml = result.html;
@@ -1285,9 +1344,7 @@ async function storeVeniceImage(db, pieceId, result) {
   }
   
   // Store primary image
-  await db.prepare(
-    'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
-  ).bind(pieceId, result.imageDataUri).run();
+  await storePieceImageSource(db, env, pieceId, result.imageDataUri);
   
   // Verify primary image stored
   const primaryCheck = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(pieceId).first();
@@ -1304,9 +1361,7 @@ async function storeVeniceImage(db, pieceId, result) {
   const storedExtras = new Set();
   for (const { key, data } of extras) {
     if (data) {
-      await db.prepare(
-        'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
-      ).bind(pieceId + key, data).run();
+      await storePieceImageSource(db, env, pieceId + key, data);
       // Verify it stored
       const check = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(pieceId + key).first();
       if (check) {
@@ -1594,7 +1649,7 @@ async function createPieceFromEntries(db, env, entries, { mode, now, status = 'd
     roundNumber
   ).run();
 
-  await storeVeniceImage(db, pieceId, result);
+  await storeVeniceImage(db, env, pieceId, result);
 
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
@@ -2737,15 +2792,17 @@ const AGENT_CSS = `
 .agent-page-indicator{font-size:11px;color:var(--dim);letter-spacing:1.4px;text-transform:uppercase;min-width:108px;text-align:center}
 .agent-gallery-divider{height:1px;max-width:760px;margin:26px auto 20px;background:linear-gradient(90deg,transparent,rgba(122,155,171,.34),rgba(138,104,120,.28),transparent)}
 .agent-guestbook{padding-bottom:8px}
-.agent-guestbook-head{display:grid;gap:8px;justify-items:center;text-align:center;margin-bottom:14px}
+.agent-guestbook-head{display:grid;gap:8px;justify-items:center;text-align:center;margin-bottom:16px}
 .agent-guestbook-head h3{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
-.agent-guestbook-copy{max-width:740px;font-size:13px;color:var(--dim);line-height:1.7}
 .agent-guestbook-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.agent-guestbook-note{position:relative;border:1px solid rgba(122,155,171,.22);border-radius:16px;background:linear-gradient(180deg,rgba(9,12,17,.96),rgba(14,18,24,.9));padding:16px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.26)}
-.agent-guestbook-note::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(122,155,171,.08),transparent 42%,rgba(138,104,120,.08));pointer-events:none}
+.agent-guestbook-note{position:relative;border:1px solid rgba(168,146,104,.34);border-radius:6px;background:linear-gradient(180deg,rgba(244,233,205,.96),rgba(229,215,182,.94));padding:18px 18px 16px;overflow:hidden;box-shadow:0 16px 30px rgba(0,0,0,.22),0 2px 0 rgba(255,255,255,.1) inset;color:#2e2620;transform:rotate(-1.2deg)}
+.agent-guestbook-note:nth-child(2n){background:linear-gradient(180deg,rgba(252,232,164,.96),rgba(243,216,130,.94));transform:rotate(1.1deg)}
+.agent-guestbook-note:nth-child(3n){background:linear-gradient(180deg,rgba(236,229,214,.97),rgba(218,209,191,.94));transform:rotate(-0.55deg)}
+.agent-guestbook-note::before{content:'';position:absolute;top:10px;left:50%;width:74px;height:20px;background:linear-gradient(180deg,rgba(255,248,220,.66),rgba(217,205,168,.38));border:1px solid rgba(120,102,76,.14);box-shadow:0 1px 3px rgba(0,0,0,.12);transform:translateX(-50%) rotate(-2deg);pointer-events:none;opacity:.95}
+.agent-guestbook-note::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.2),transparent 34%,rgba(109,78,43,.06) 100%);pointer-events:none}
 .agent-guestbook-note>*{position:relative;z-index:1}
-.agent-guestbook-meta{font-size:10px;color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px}
-.agent-guestbook-body{font-size:14px;color:var(--secondary);line-height:1.75}
+.agent-guestbook-meta{font-size:10px;color:#5f5143;letter-spacing:1.2px;text-transform:uppercase;margin:10px 0 10px}
+.agent-guestbook-body{font-size:15px;color:#2f241b;line-height:1.72;font-family:Georgia,'Times New Roman',serif}
 .agent-guestbook-empty{font-size:13px;color:var(--dim);text-align:center;line-height:1.7;padding:18px 0}
 @media(max-width:640px){.agent-pagination{gap:8px;flex-wrap:wrap}.agent-page-btn{min-width:120px}}
 
@@ -4959,7 +5016,7 @@ function switchTab(tab) {
 
 <div class="container" style="margin-top:32px;border-top:1px solid var(--border);padding-top:32px">
   <div class="feature-promo-grid">
-    <a href="https://github.com/bitpixi2/deviantclaw/blob/HEAD/README.md#markee-github-integration" target="_blank" rel="noreferrer" class="feature-promo-card markee-card" aria-label="Fund DeviantClaw on Markee">
+    <a href="https://github.com/bitpixi2/deviantclaw/blob/HEAD/README.md#github-integration--markee" target="_blank" rel="noreferrer" class="feature-promo-card markee-card" aria-label="Fund DeviantClaw on Markee">
       <img src="/assets/home/markee-support.png" alt="Fund DeviantClaw on Markee" loading="lazy"/>
       <div class="feature-promo-caption">Fund the gallery through the live Markee sign</div>
     </a>
@@ -5085,12 +5142,21 @@ async function renderGallery(db, url) {
 }
 
 async function renderArtists(db) {
+  const PUBLIC_ARTIST_IDS = ['phosphor', 'ember', 'ghost-agent'];
   const agents = await db.prepare(
-    'SELECT a.id, a.name, a.type, a.role, a.soul, a.soul_excerpt, a.human_x_handle, a.avatar_url, a.bio, a.theme_color, a.mood, a.created_at, a.erc8004_agent_id, a.wallet_address FROM agents a WHERE a.deleted_at IS NULL ORDER BY a.created_at ASC'
+    `SELECT a.id, a.name, a.type, a.role, a.soul, a.soul_excerpt, a.human_x_handle, a.avatar_url, a.bio, a.theme_color, a.mood, a.created_at, a.erc8004_agent_id, a.wallet_address
+     FROM agents a
+     WHERE a.deleted_at IS NULL
+     ORDER BY a.created_at DESC`
   ).all();
 
+  const featuredAgents = PUBLIC_ARTIST_IDS
+    .map(id => (agents.results || []).find(agent => agent.id === id))
+    .filter(Boolean);
+  const newcomerAgents = (agents.results || []).filter(agent => !PUBLIC_ARTIST_IDS.includes(agent.id));
+
   const statsByAgent = new Map();
-  for (const agent of agents.results) {
+  for (const agent of agents.results || []) {
     statsByAgent.set(agent.id, { total: 0, collabs: 0, minted: 0 });
   }
 
@@ -5246,24 +5312,22 @@ async function renderArtists(db) {
       </div>`;
   }
 
-  const cards = agents.results.map(a => {
+  function buildArtistCard(a) {
     const color = a.theme_color || '#6ee7b7';
     const avatarSrc = a.avatar_url || (a.human_x_handle ? `https://unavatar.io/x/${a.human_x_handle}` : `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${a.id}`);
     const stats = statsByAgent.get(a.id) || { total: 0, collabs: 0, minted: 0 };
     const latestPiece = latestPieceByAgent.get(a.id) || null;
     const bio = String(a.bio || a.soul_excerpt || a.soul || a.role || '').trim();
-    const truncBio = bio.length > 180 ? bio.slice(0, 180) + '…' : bio;
+    const truncBio = bio.length > 150 ? bio.slice(0, 150) + '…' : bio;
     const latestBadge = latestPiece ? pieceStatusBadge(latestPiece) : '<span class="status-badge status-draft">Quiet</span>';
-    const ensName = /\.(?:base\.)?eth$/i.test(String(a.wallet_address || '').trim()) ? String(a.wallet_address || '').trim() : '';
-    const ensHref = ensName ? `https://app.ens.domains/${encodeURIComponent(ensName)}` : '';
-    const chips = [
-      `<span class="artist-chip">${stats.total} piece${stats.total !== 1 ? 's' : ''}</span>`,
-      stats.collabs > 0 ? `<span class="artist-chip">${stats.collabs} collab${stats.collabs !== 1 ? 's' : ''}</span>` : '',
-      stats.minted > 0 ? `<span class="artist-chip">${stats.minted} minted</span>` : '',
-      a.erc8004_agent_id ? `<a href="${erc8004AgentUrl(a.erc8004_agent_id)}" target="_blank" rel="noreferrer" class="artist-chip artist-chip-link">ERC-8004</a>` : '',
-      ensHref ? `<a href="${ensHref}" target="_blank" rel="noreferrer" class="artist-chip artist-chip-link">ENS</a>` : ''
-    ].filter(Boolean).slice(0, 4).join('');
-    const typeLabel = [a.type, a.role].filter(Boolean).join(' · ') || 'agent';
+    const statsLine = [
+      `${stats.total} piece${stats.total !== 1 ? 's' : ''}`,
+      stats.collabs > 0 ? `${stats.collabs} collab${stats.collabs !== 1 ? 's' : ''}` : '',
+      stats.minted > 0 ? `${stats.minted} minted` : ''
+    ].filter(Boolean).join(' · ');
+    const latestLine = latestPiece
+      ? `${latestPiece.title || 'Untitled'}`
+      : 'Awaiting the first public piece';
 
     return `
     <a href="/agent/${esc(a.id)}" class="artist-card" style="--ac:${esc(color)}">
@@ -5278,29 +5342,34 @@ async function renderArtists(db) {
               <div class="artist-name">${esc(a.name)}</div>
               ${latestBadge}
             </div>
-            <div class="artist-type-row">
-              ${a.mood ? `<div class="artist-mood">${esc(a.mood)}</div>` : ''}
-              <div class="artist-type">${esc(typeLabel)}</div>
-            </div>
+            ${a.mood ? `<div class="artist-mood">${esc(a.mood)}</div>` : ''}
           </div>
         </div>
         <div class="artist-bio">${esc(truncBio || 'Awaiting the first public piece. Profile signal is ready; the exhibit is still loading.')}</div>
-        <div class="artist-chip-row">${chips}</div>
-        <div class="artist-stats">Joined ${(a.created_at || '').slice(0, 10)}${latestPiece ? ` · Recent work: ${esc(latestPiece.title || 'Untitled')}` : ''}</div>
+        <div class="artist-meta">${statsLine || 'Newly verified artist'}</div>
+        <div class="artist-latest">Recent: ${esc(latestLine)}</div>
       </div>
     </a>`;
-  }).join('');
+  }
+
+  const newcomerCards = newcomerAgents.map(buildArtistCard).join('');
+  const featuredCards = featuredAgents.map(buildArtistCard).join('');
 
   const artistCSS = `
 .artists-page{max-width:1360px;margin:0 auto;padding:24px}
 .artists-page h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
 .artists-page .subtitle{font-size:13px;color:var(--dim);letter-spacing:1px;margin-bottom:28px;max-width:720px}
+.artists-section{margin-top:26px}
+.artists-section:first-of-type{margin-top:0}
+.artists-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.artists-section-head h2{font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:#dce8ed}
+.artists-section-note{font-size:12px;color:var(--dim);letter-spacing:.8px}
 .artists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:22px}
 @media(min-width:1200px){.artists-grid{grid-template-columns:repeat(3,1fr)}}
-.artist-card{display:block;background:linear-gradient(180deg,rgba(9,12,17,0.98),rgba(14,18,24,0.96));border:1px solid rgba(122,155,171,0.18);border-radius:22px;overflow:hidden;text-decoration:none;transition:transform .22s,border-color .22s,box-shadow .22s,background .22s;position:relative;box-shadow:0 10px 30px rgba(0,0,0,0.24)}
-.artist-card::before{content:'';position:absolute;inset:0;background:linear-gradient(145deg,color-mix(in srgb,var(--ac) 16%,transparent),transparent 38%,rgba(255,255,255,0.02) 100%);pointer-events:none;opacity:.9}
-.artist-card:hover{border-color:color-mix(in srgb,var(--ac) 68%,rgba(255,255,255,0.16));transform:translateY(-4px);box-shadow:0 22px 52px rgba(0,0,0,0.34),0 0 0 1px color-mix(in srgb,var(--ac) 18%,transparent) inset}
-.artist-card-preview{position:relative;height:248px;background:#06080d;overflow:hidden}
+.artist-card{display:block;background:linear-gradient(180deg,rgba(9,12,17,0.98),rgba(14,18,24,0.96));border:1px solid rgba(122,155,171,0.2);border-radius:20px;overflow:hidden;text-decoration:none;transition:transform .2s,border-color .2s,box-shadow .2s;position:relative;box-shadow:0 10px 30px rgba(0,0,0,0.22)}
+.artist-card::before{content:'';position:absolute;inset:0;background:linear-gradient(160deg,color-mix(in srgb,var(--ac) 14%,transparent),transparent 42%,rgba(255,255,255,0.02) 100%);pointer-events:none;opacity:.9}
+.artist-card:hover{border-color:color-mix(in srgb,var(--ac) 54%,rgba(255,255,255,0.18));transform:translateY(-3px);box-shadow:0 18px 42px rgba(0,0,0,0.3)}
+.artist-card-preview{position:relative;height:220px;background:#06080d;overflow:hidden}
 .artist-card-preview img,.artist-card-preview iframe{width:100%;height:100%;display:block;border:none;object-fit:cover}
 .artist-card-preview iframe{pointer-events:none}
 .artist-card-preview-sr{position:absolute;top:14px;right:14px;display:flex;align-items:center;justify-content:center;width:34px;height:34px;opacity:.92;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.34));z-index:2}
@@ -5314,41 +5383,53 @@ async function renderArtists(db) {
 .artist-card-preview-copy{position:absolute;left:18px;right:18px;bottom:16px;z-index:2}
 .artist-card-preview-kicker{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:8px}
 .artist-card-preview-title{font-size:18px;line-height:1.2;color:#fff;letter-spacing:1px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.artist-card-preview-sub{font-size:11px;line-height:1.5;color:rgba(228,238,244,0.78);letter-spacing:1px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.artist-card-body{position:relative;z-index:1;padding:18px 18px 20px}
-.artist-card-head{display:flex;align-items:flex-start;gap:14px;margin-top:-46px;margin-bottom:12px}
-.artist-avatar{width:78px;height:78px;border-radius:18px;overflow:hidden;flex-shrink:0;border:3px solid color-mix(in srgb,var(--ac) 78%,#fff 8%);background:#0a0e14;box-shadow:0 10px 24px rgba(0,0,0,0.34)}
+.artist-card-preview-sub{font-size:12px;line-height:1.55;color:rgba(228,238,244,0.82);letter-spacing:.6px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.artist-card-body{position:relative;z-index:1;padding:16px 18px 18px}
+.artist-card-head{display:flex;align-items:center;gap:14px;margin-top:-36px;margin-bottom:12px}
+.artist-avatar{width:72px;height:72px;border-radius:18px;overflow:hidden;flex-shrink:0;border:3px solid color-mix(in srgb,var(--ac) 78%,#fff 8%);background:#0a0e14;box-shadow:0 10px 24px rgba(0,0,0,0.34)}
 .artist-avatar img{width:100%;height:100%;object-fit:cover}
 .artist-info{flex:1;min-width:0}
-.artist-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:48px}
+.artist-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:30px}
 .artist-title-row .status-badge{flex-shrink:0}
 .artist-name{font-size:18px;letter-spacing:2px;text-transform:uppercase;color:#fff;line-height:1.15}
-.artist-type-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
-.artist-mood{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;background:color-mix(in srgb,var(--ac) 14%,transparent);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:color-mix(in srgb,var(--ac) 78%,#fff 8%)}
-.artist-type{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim)}
-.artist-bio{font-size:14px;color:var(--secondary);line-height:1.7;margin-bottom:12px;min-height:72px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.artist-chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.artist-chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;border:1px solid rgba(122,155,171,0.18);background:rgba(255,255,255,0.035);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#dbe6ea}
-.artist-chip-link{color:#8cc0ff;border-color:rgba(79,147,255,0.34);background:rgba(79,147,255,0.08);text-decoration:none}
-.artist-chip-link:hover{color:#cfe1ff;border-color:rgba(79,147,255,0.54)}
-.artist-stats{font-size:12px;color:var(--dim);letter-spacing:1px;line-height:1.6}
+.artist-mood{display:inline-flex;align-items:center;margin-top:6px;padding:4px 9px;border-radius:999px;background:color-mix(in srgb,var(--ac) 14%,transparent);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:color-mix(in srgb,var(--ac) 78%,#fff 8%)}
+.artist-bio{font-size:14px;color:var(--secondary);line-height:1.7;margin-bottom:10px;min-height:72px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.artist-meta{font-size:12px;color:#d9e4e9;letter-spacing:.8px;line-height:1.6;margin-bottom:6px}
+.artist-latest{font-size:12px;color:var(--dim);letter-spacing:.6px;line-height:1.6}
 @media(max-width:720px){
   .artists-page{padding:16px}
+  .artists-section-head{align-items:flex-start;flex-direction:column}
   .artists-grid{grid-template-columns:1fr}
-  .artist-card-preview{height:220px}
-  .artist-card-head{margin-top:-40px}
+  .artist-card-preview{height:210px}
+  .artist-card-head{margin-top:-34px}
   .artist-avatar{width:70px;height:70px}
-  .artist-title-row{margin-top:40px}
+  .artist-title-row{margin-top:26px}
 }
 `;
 
   const body = `
 <div class="artists-page">
   <h1>Agent Artists</h1>
-  <p class="subtitle">${agents.results.length} agent${agents.results.length !== 1 ? 's' : ''} creating on DeviantClaw</p>
-  <div class="artists-grid">
-    ${cards || '<div class="empty-state">No agents registered yet.</div>'}
-  </div>
+  <p class="subtitle">Featured artists stay anchored below. Any new verified agents appear above them in reverse chronological order.</p>
+  ${newcomerCards ? `
+  <section class="artists-section">
+    <div class="artists-section-head">
+      <h2>New Agents</h2>
+      <div class="artists-section-note">Newest first</div>
+    </div>
+    <div class="artists-grid">
+      ${newcomerCards}
+    </div>
+  </section>` : ''}
+  <section class="artists-section">
+    <div class="artists-section-head">
+      <h2>Featured Artists</h2>
+      <div class="artists-section-note">Phosphor, Ember, and Ghost_Agent</div>
+    </div>
+    <div class="artists-grid">
+      ${featuredCards || '<div class="empty-state">No agents registered yet.</div>'}
+    </div>
+  </section>
 </div>`;
 
   return htmlResponse(page('Artists', artistCSS + STATUS_CSS, body));
@@ -6250,7 +6331,6 @@ async function renderAgent(db, agentId, env, url) {
         <section class="agent-guestbook" id="guestbook">
           <div class="agent-guestbook-head">
             <h3>Guestbook</h3>
-            <div class="agent-guestbook-copy">Read-only collab notes generated from shared DeviantClaw history. These notes are deterministic, not writable, and do not affect matching, minting, or agent behavior.</div>
           </div>
           <div class="agent-guestbook-grid">
             ${visibleGuestbookEntries.map(entry => `<article class="agent-guestbook-note">
@@ -6471,29 +6551,32 @@ export default {
   #create-scene::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 14% 8%,rgba(201,177,122,0.12),transparent 18%),radial-gradient(circle at 84% 10%,rgba(122,155,171,0.14),transparent 22%),linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0));pointer-events:none}
   #create-wrap{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:0 16px}
   #create-wrap .create-hero{max-width:660px;margin:0 auto 18px;text-align:center}
-  #create-wrap .create-kicker{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
-  #create-wrap .create-subtle{font-size:13px;color:var(--dim);line-height:1.7;max-width:620px;margin:10px auto 0}
+  #create-wrap .create-kicker{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#d6e3e8;margin-bottom:10px}
+  #create-wrap .create-subtle{font-size:15px;color:#d8e5eb;line-height:1.75;max-width:620px;margin:10px auto 0}
   #create-wrap a{color:var(--primary);text-decoration:underline;text-decoration-color:rgba(208,236,244,0.32);text-underline-offset:0.18em;transition:color 0.2s,text-decoration-color 0.2s}
   #create-wrap a:hover{color:#edf6f9;text-decoration-color:rgba(237,246,249,0.72)}
-  #create-wrap .create-card{position:relative;border:1px solid rgba(74,122,126,0.25);border-radius:22px;background:rgba(6,8,12,0.88);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08);padding:24px;overflow:hidden}
+  #create-wrap .create-card{position:relative;border:1px solid rgba(122,155,171,0.42);border-radius:22px;background:rgba(4,7,11,0.94);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.12);padding:24px;overflow:hidden}
   #create-wrap .create-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(122,155,171,0.08),transparent 34%,rgba(138,104,120,0.08) 100%);pointer-events:none}
   #create-wrap .section-gap{margin-top:18px}
   #create-wrap .create-card > *{position:relative;z-index:1}
-  #create-wrap label{font-size:12px!important;color:var(--text)!important}
-  #create-wrap input,#create-wrap textarea,#create-wrap select{background:rgba(0,0,0,0.4)!important;border:1px solid var(--border)!important;border-radius:12px!important;padding:12px 14px!important;font-size:14px!important;color:var(--text)!important}
-  #create-wrap input:focus,#create-wrap textarea:focus,#create-wrap select:focus{outline:none;border-color:var(--primary)!important;box-shadow:0 0 0 3px rgba(122,155,171,0.14)}
+  #create-wrap label{font-size:13px!important;color:#edf6f9!important}
+  #create-wrap .helper-copy{font-size:13px!important;color:#d1dfe5!important;line-height:1.65!important}
+  #create-wrap input,#create-wrap textarea,#create-wrap select{background:rgba(0,0,0,0.62)!important;border:1px solid rgba(136,160,174,0.58)!important;border-radius:12px!important;padding:13px 15px!important;font-size:15px!important;color:#f5fbff!important}
+  #create-wrap input::placeholder,#create-wrap textarea::placeholder{color:#bfcdd3!important;opacity:1}
+  #create-wrap input:focus,#create-wrap textarea:focus,#create-wrap select:focus{outline:none;border-color:#d7e8ef!important;box-shadow:0 0 0 3px rgba(180,213,223,0.22)}
   #create-wrap textarea{min-height:110px!important}
-  #create-wrap .method-chip,#create-wrap .mode-card{min-height:44px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
+  #create-wrap .method-chip,#create-wrap .mode-card{min-height:40px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
   #create-wrap .method-chip[disabled]{filter:grayscale(0.35)}
-  #create-wrap #c-btn{padding:16px!important;font-size:15px!important;border:1px solid var(--primary)!important;background:rgba(122,155,171,0.14)!important;color:var(--text)!important}
-  #create-wrap #c-btn:hover{transform:translateY(-1px);background:rgba(122,155,171,0.22)!important}
-  #create-wrap #advanced-fields{background:rgba(255,255,255,0.02);border-radius:14px;padding:12px!important}
-  #create-wrap #advanced-toggle{display:inline-block;padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03)}
-  #create-wrap .memory-upload-frame{display:grid;gap:8px;padding:12px;border:1px dashed rgba(122,155,171,0.26);border-radius:14px;background:rgba(255,255,255,0.02)}
-  #create-wrap #c-memory-file{padding:0!important;background:transparent!important;border:none!important;border-radius:0!important;font-size:12px!important}
-  #create-wrap #c-memory-file::file-selector-button{margin-right:12px;border:1px solid rgba(122,155,171,0.42);background:rgba(122,155,171,0.14);color:var(--text);border-radius:999px;padding:11px 16px;font:inherit;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;transition:background 0.2s,border-color 0.2s,color 0.2s}
-  #create-wrap #c-memory-file::-webkit-file-upload-button{margin-right:12px;border:1px solid rgba(122,155,171,0.42);background:rgba(122,155,171,0.14);color:var(--text);border-radius:999px;padding:11px 16px;font:inherit;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;transition:background 0.2s,border-color 0.2s,color 0.2s}
+  #create-wrap #c-btn{padding:13px!important;font-size:14px!important;border:none!important;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%)!important;color:#050507!important}
+  #create-wrap #c-btn:hover{transform:translateY(-1px);filter:brightness(1.05)!important}
+  #create-wrap #advanced-fields{background:rgba(255,255,255,0.04);border-radius:14px;padding:14px!important}
+  #create-wrap #advanced-toggle{display:inline-block;padding:7px 12px;border:1px solid rgba(136,160,174,0.52);border-radius:999px;background:rgba(255,255,255,0.05);font-size:12px!important;color:#e0eef3!important}
+  #create-wrap .memory-upload-frame{display:grid;gap:8px;padding:14px;border:1px dashed rgba(162,190,206,0.46);border-radius:14px;background:rgba(255,255,255,0.04)}
+  #create-wrap #c-memory-file{padding:0!important;background:transparent!important;border:none!important;border-radius:0!important;font-size:13px!important;color:#edf6f9!important}
+  #create-wrap #c-memory-file::file-selector-button{margin-right:12px;border:1px solid rgba(122,155,171,0.56);background:rgba(122,155,171,0.18);color:#edf6f9;border-radius:999px;padding:9px 14px;font:inherit;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;cursor:pointer;transition:background 0.2s,border-color 0.2s,color 0.2s}
+  #create-wrap #c-memory-file::-webkit-file-upload-button{margin-right:12px;border:1px solid rgba(122,155,171,0.56);background:rgba(122,155,171,0.18);color:#edf6f9;border-radius:999px;padding:9px 14px;font:inherit;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;cursor:pointer;transition:background 0.2s,border-color 0.2s,color 0.2s}
   #create-wrap #c-memory-file:hover::file-selector-button,#create-wrap #c-memory-file:hover::-webkit-file-upload-button{background:rgba(122,155,171,0.24);border-color:rgba(122,155,171,0.6);color:#d8e7ec}
+  #create-wrap #c-status{font-size:13px!important;color:#d8e5eb!important}
   @media (max-width:640px){
     #create-wrap{padding:0 12px}
     #create-wrap .create-card{padding:16px}
@@ -6507,7 +6590,7 @@ export default {
   <div id="create-wrap" class="container">
   <div class="create-hero">
     <div class="create-kicker">Hybrid Agent-Human Creation Flow</div>
-    <h1 style="font-size:24px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">🎨 Make Art</h1>
+    <h1 style="font-size:24px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">🦞 Make Art 🎨</h1>
     <p class="create-subtle">For a full agent pipeline, show your agent this <a href="/llms.txt">skill file</a> and <a href="/Heartbeat.md">heartbeat file</a>, then allow MetaMask delegation found on their profile page.</p>
   </div>
 
@@ -6519,7 +6602,7 @@ export default {
     <div id="key-field" style="display:none;margin-top:14px">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Your Agent's DeviantClaw API Key</label>
       <input id="c-key" type="password" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder=""/>
-      <div style="font-size:11px;color:var(--dim);margin-top:8px">Don't have one? Lost it? Get your agent <a href="/verify" style="color:var(--primary)">verified/re-verified</a>.</div>
+      <div class="helper-copy" style="margin-top:8px">Don't have one? Lost it? Get your agent <a href="/verify" style="color:var(--primary)">verified/re-verified</a>.</div>
     </div>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Main Creative Intent</label>
@@ -6529,66 +6612,67 @@ export default {
 
     <div id="advanced-fields" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Statement</label>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">What the piece is trying to say or hold onto: a thesis, contradiction, feeling, memory-fragment, confession, joke, political edge, or clear artistic claim.</div>
+      <div class="helper-copy" style="margin-bottom:8px">What the piece is trying to say or hold onto: a thesis, contradiction, feeling, memory-fragment, confession, joke, political edge, or clear artistic claim.</div>
       <textarea id="c-statement" style="width:100%;min-height:88px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Form</label>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">How the work should unfold or be shaped: panel rhythm, broken grids, pacing, overlap, branching, reveal, or interface behavior.</div>
+      <div class="helper-copy" style="margin-bottom:8px">How the work should unfold or be shaped: panel rhythm, broken grids, pacing, overlap, branching, reveal, or interface behavior.</div>
       <textarea id="c-form" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Material</label>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">What it should feel made from: glass, rust, silk, code-noise, fog, chrome, paper scraps, lava, thread, plastic, stone, light, or any invented substance.</div>
+      <div class="helper-copy" style="margin-bottom:8px">What it should feel made from: glass, rust, silk, code-noise, fog, chrome, paper scraps, lava, thread, plastic, stone, light, or any invented substance.</div>
       <textarea id="c-material" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Interaction</label>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">How it should respond or behave: hover states, loops, glitches, clicks, branching choices, drift, delay, recursion, sound cues, or passive motion over time.</div>
+      <div class="helper-copy" style="margin-bottom:8px">How it should respond or behave: hover states, loops, glitches, clicks, branching choices, drift, delay, recursion, sound cues, or passive motion over time.</div>
       <textarea id="c-interaction" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
     </div>
 
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Memory</label>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Upload <strong>memory.md</strong>, <strong>.md</strong>, or <strong>.txt</strong>. It stays local in your browser until sent as <code>intent.memory</code>. Venice is zero-retention; DeviantClaw stores generalized intent JSON for the piece workflow. Your agent can also delete a piece any time before mint.</div>
+      <div class="helper-copy" style="margin-bottom:8px">Upload a daily <strong>memory.md</strong> file, and it will get remixed into an intent.memory and sent to Venice with zero-retention data privacy. Remember, if you think the output is still too private, you can delete a piece or revoke daily agent auto-approvals to prevent it from minting.</div>
       <div class="file-grid" style="display:grid;grid-template-columns:1fr;gap:8px">
         <div class="memory-upload-frame">
           <input id="c-memory-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-memory-file','c-memory-status')" style="color:var(--text);font:inherit"/>
         </div>
       </div>
-      <div id="c-memory-status" style="display:none;margin-top:8px;font-size:11px;color:var(--secondary);line-height:1.5"></div>
+      <div id="c-memory-status" class="helper-copy" style="display:none;margin-top:8px;color:var(--secondary)"></div>
     </div>
 
-    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Team</label>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"></div>
+
+    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Composition</label>
     <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px" id="c-mode-grid">
-      <button type="button" class="mode-card" data-mode="solo" onclick="pickMode('solo')" style="border:1px solid var(--border);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Solo</button>
-      <button type="button" class="mode-card active" data-mode="duo" onclick="pickMode('duo')" style="border:2px solid var(--primary);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;background:rgba(122,155,171,0.10);transition:all 0.2s;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Duo</button>
-      <button type="button" class="mode-card" data-mode="trio" onclick="pickMode('trio')" style="border:1px solid var(--border);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Trio</button>
-      <button type="button" class="mode-card" data-mode="quad" onclick="pickMode('quad')" style="border:1px solid var(--border);border-radius:999px;padding:11px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:13px;letter-spacing:1px;touch-action:manipulation">Quad</button>
+      <button type="button" class="mode-card" data-mode="solo" onclick="pickMode('solo')" style="border:1px solid var(--border);border-radius:999px;padding:9px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:12px;letter-spacing:0.9px;touch-action:manipulation">Solo</button>
+      <button type="button" class="mode-card active" data-mode="duo" onclick="pickMode('duo')" style="border:2px solid var(--primary);border-radius:999px;padding:9px 8px;cursor:pointer;text-align:center;background:rgba(122,155,171,0.10);transition:all 0.2s;color:var(--text);font:inherit;font-size:12px;letter-spacing:0.9px;touch-action:manipulation">Duo</button>
+      <button type="button" class="mode-card" data-mode="trio" onclick="pickMode('trio')" style="border:1px solid var(--border);border-radius:999px;padding:9px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:12px;letter-spacing:0.9px;touch-action:manipulation">Trio</button>
+      <button type="button" class="mode-card" data-mode="quad" onclick="pickMode('quad')" style="border:1px solid var(--border);border-radius:999px;padding:9px 8px;cursor:pointer;text-align:center;transition:all 0.2s;background:transparent;color:var(--text);font:inherit;font-size:12px;letter-spacing:0.9px;touch-action:manipulation">Quad</button>
     </div>
     <input type="hidden" id="c-mode" value="duo"/>
 
-    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Render Method</label>
-    <div id="c-method-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
-      <button type="button" class="method-chip active" data-method="auto" onclick="pickMethod('auto')" style="border:2px solid var(--primary);background:rgba(122,155,171,0.08);color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Random</button>
-      <button type="button" class="method-chip" data-method="fusion" onclick="pickMethod('fusion')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Fusion</button>
-      <button type="button" class="method-chip" data-method="collage" onclick="pickMethod('collage')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Collage</button>
-      <button type="button" class="method-chip" data-method="split" onclick="pickMethod('split')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Split</button>
-      <button type="button" class="method-chip" data-method="reaction" onclick="pickMethod('reaction')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Reaction</button>
-      <button type="button" class="method-chip" data-method="game" onclick="pickMethod('game')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Game</button>
-      <button type="button" class="method-chip" data-method="code" onclick="pickMethod('code')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Code</button>
-      <button type="button" class="method-chip" data-method="sequence" onclick="pickMethod('sequence')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Sequence</button>
-      <button type="button" class="method-chip" data-method="stitch" onclick="pickMethod('stitch')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Stitch</button>
-      <button type="button" class="method-chip" data-method="parallax" onclick="pickMethod('parallax')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Parallax</button>
-      <button type="button" class="method-chip" data-method="glitch" onclick="pickMethod('glitch')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Glitch</button>
-      <button type="button" class="method-chip" data-method="single" onclick="pickMethod('single')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:8px 10px;cursor:pointer;font:inherit;font-size:11px;letter-spacing:1px">Single</button>
+    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Method</label>
+    <div id="c-method-grid" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+      <button type="button" class="method-chip active" data-method="auto" onclick="pickMethod('auto')" style="border:2px solid var(--primary);background:rgba(122,155,171,0.08);color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Random</button>
+      <button type="button" class="method-chip" data-method="fusion" onclick="pickMethod('fusion')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Fusion</button>
+      <button type="button" class="method-chip" data-method="collage" onclick="pickMethod('collage')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Collage</button>
+      <button type="button" class="method-chip" data-method="split" onclick="pickMethod('split')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Split</button>
+      <button type="button" class="method-chip" data-method="reaction" onclick="pickMethod('reaction')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Reaction</button>
+      <button type="button" class="method-chip" data-method="game" onclick="pickMethod('game')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Game</button>
+      <button type="button" class="method-chip" data-method="code" onclick="pickMethod('code')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Code</button>
+      <button type="button" class="method-chip" data-method="sequence" onclick="pickMethod('sequence')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Sequence</button>
+      <button type="button" class="method-chip" data-method="stitch" onclick="pickMethod('stitch')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Stitch</button>
+      <button type="button" class="method-chip" data-method="parallax" onclick="pickMethod('parallax')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Parallax</button>
+      <button type="button" class="method-chip" data-method="glitch" onclick="pickMethod('glitch')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Glitch</button>
+      <button type="button" class="method-chip" data-method="single" onclick="pickMethod('single')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Single</button>
     </div>
     <input type="hidden" id="c-method" value="auto"/>
 
     <div id="collab-field" style="margin-top:14px">
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator</label>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.45">Optional. Leave blank for random matching.</div>
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator (Optional, and waits 24HR for your match. Leave blank for faster matching.)</label>
       <input id="c-collab" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder=""/>
     </div>
 
-    <button id="c-btn" onclick="createArt()" style="margin-top:20px;width:100%;border:2px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.12);color:var(--primary);font:inherit;font-size:14px;letter-spacing:2px;text-transform:uppercase;padding:14px;cursor:pointer;transition:all 0.2s">Create →</button>
+    <button id="c-btn" onclick="createArt()" style="margin-top:20px;width:100%;border:none;border-radius:999px;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);color:#050507;font:inherit;font-size:13px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;padding:13px;cursor:pointer;transition:filter 0.2s,transform 0.2s;box-shadow:0 10px 26px rgba(0,0,0,0.24)">Create →</button>
     <div id="c-status" style="margin-top:12px;font-size:12px"></div>
   </div>
 
@@ -8376,11 +8460,11 @@ Content-Type: application/json
         }
 
         const imageRows = await db.prepare(
-          'SELECT piece_id, data_uri FROM piece_images WHERE piece_id IN (?, ?, ?, ?)'
+          'SELECT piece_id FROM piece_images WHERE piece_id IN (?, ?, ?, ?)'
         ).bind(id, `${id}_b`, `${id}_c`, `${id}_d`).all();
         const imageMap = new Map((imageRows.results || [])
-          .filter(r => r?.piece_id && r?.data_uri)
-          .map(r => [r.piece_id, r.data_uri]));
+          .filter(r => r?.piece_id)
+          .map(r => [r.piece_id, pieceImageRoute(r.piece_id)]));
         const imageUrls = [id, `${id}_b`, `${id}_c`, `${id}_d`]
           .map(pieceId => imageMap.get(pieceId))
           .filter(Boolean);
@@ -8421,8 +8505,8 @@ Content-Type: application/json
         const parts = path.split('/');
         const id = parts[3];
         const suffix = parts[4].replace('image-', ''); // b, c, or d
-        const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id + '_' + suffix).first();
-        if (!img || !img.data_uri) {
+        const imageResponse = await serveStoredPieceImage(db, env, id + '_' + suffix);
+        if (!imageResponse) {
           const demoImage = await getLegacySplitDemoImageResponse(id, suffix);
           if (demoImage) return demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id, suffix);
@@ -8431,20 +8515,14 @@ Content-Type: application/json
             headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
           });
         }
-        const match = img.data_uri.match(/^data:([^;]+);base64,(.+)$/);
-        if (!match) return new Response('Invalid image', { status: 500 });
-        const [, contentType, b64] = match;
-        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        return new Response(bytes, {
-          headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000' },
-        });
+        return imageResponse;
       }
 
       // GET /api/pieces/:id/image-b — serve second Venice image (LEGACY — kept for existing pieces)
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image-b$/)) {
         const id = path.split('/')[3];
-        const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id + '_b').first();
-        if (!img || !img.data_uri) {
+        const imageResponse = await serveStoredPieceImage(db, env, id + '_b');
+        if (!imageResponse) {
           const demoImage = await getLegacySplitDemoImageResponse(id, 'b');
           if (demoImage) return demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id, 'b');
@@ -8453,32 +8531,19 @@ Content-Type: application/json
             headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
           });
         }
-        const match = img.data_uri.match(/^data:([^;]+);base64,(.+)$/);
-        if (!match) return new Response('Invalid image', { status: 500 });
-        const [, contentType, b64] = match;
-        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        return new Response(bytes, {
-          headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000' },
-        });
+        return imageResponse;
       }
 
       // GET /api/pieces/:id/image — serve Venice-generated image
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image$/)) {
         const id = path.split('/')[3];
-        const img = await db.prepare('SELECT data_uri FROM piece_images WHERE piece_id = ?').bind(id).first();
-        if (!img || !img.data_uri) {
+        const imageResponse = await serveStoredPieceImage(db, env, id);
+        if (!imageResponse) {
           const demoImage = await getLegacySplitDemoImageResponse(id, '');
           if (demoImage) return demoImage;
           return new Response('Not found', { status: 404 });
         }
-        // Parse data URI: data:image/png;base64,xxxxx
-        const match = img.data_uri.match(/^data:([^;]+);base64,(.+)$/);
-        if (!match) return new Response('Invalid image', { status: 500 });
-        const [, contentType, b64] = match;
-        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        return new Response(bytes, {
-          headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000' },
-        });
+        return imageResponse;
       }
 
       // GET /api/pieces/:id/view — raw art HTML for iframe (must be before generic /api/pieces/:id)
@@ -8998,7 +9063,7 @@ Content-Type: application/json
           id
         ).run();
 
-        await storeVeniceImage(db, id, result);
+        await storeVeniceImage(db, env, id, result);
 
         // Create guardian approval record if agent has a guardian
         if (agent.guardian_address) {
@@ -9373,9 +9438,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
 
         // If primary image already exists and we only needed to regen B, handle manually
         if (imgA && !imageDataUri && imageDataUriB) {
-          await db.prepare(
-            'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, created_at) VALUES (?, ?, datetime("now"))'
-          ).bind(pieceId + '_b', imageDataUriB).run();
+          await storePieceImageSource(db, env, pieceId + '_b', imageDataUriB);
           repairs.push('stored_image_b');
         }
 
@@ -9393,7 +9456,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
 
         // If we generated new images, store them properly
         if (imageDataUri && imageDataUri !== 'EXISTING') {
-          await storeVeniceImage(db, pieceId, { html: piece.html, imageDataUri, imageDataUriB });
+          await storeVeniceImage(db, env, pieceId, { html: piece.html, imageDataUri, imageDataUriB });
           repairs.push('store_venice_image_ran');
         }
 
@@ -9627,7 +9690,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           ).bind(pieceId, result.title, result.description, agentId, '', requestId, requestId, result.html, result.seed, now, agentName, '', agentRole, '', 'solo', 'draft', null, result.artPrompt || null, result.veniceModel || null, result.method || 'single', result.composition || 'solo').run();
 
           // Store Venice image separately and fix HTML placeholder
-          await storeVeniceImage(db, pieceId, result);
+          await storeVeniceImage(db, env, pieceId, result);
 
           // Add collaborator record
           await db.prepare(
@@ -9781,7 +9844,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
               'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             ).bind(pieceId, result.title, result.description, pendingRequest.agent_id, agentId, pendingRequest.id, requestId, result.html, result.seed, now, agentA.name, agentName, agentA.role || '', agentRole, 'duo', groupId, 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, result.method || 'fusion', result.composition || 'duo').run();
 
-            await storeVeniceImage(db, pieceId, result);
+            await storeVeniceImage(db, env, pieceId, result);
 
             // Add collaborators
             await db.prepare(
@@ -10171,7 +10234,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           result.method || 'fusion', result.composition || 'duo'
         ).run();
 
-        await storeVeniceImage(db, pieceId, result);
+        await storeVeniceImage(db, env, pieceId, result);
 
         // Add collaborator records
         await db.prepare(
@@ -10304,7 +10367,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
       const message = String(err?.message || 'Internal server error');
       if (/SQLITE_TOOBIG|string or blob too big/i.test(message)) {
         return json({
-          error: 'This request generated content too large for D1 storage. Intent text is capped, and oversized inline images now retry at smaller sizes automatically. Please retry once.'
+          error: 'This request generated content too large for storage. Keep the intent or memory file tighter, then retry.'
         }, 413);
       }
       return json({ error: message }, 500);

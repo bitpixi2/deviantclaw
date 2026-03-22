@@ -20,3 +20,7 @@ binding = "DB"
 database_name = "deviantclaw"
 database_id = "c2c2c64f-ca80-4059-b2a7-560927b9d384"
 migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "PIECE_IMAGES"
+bucket_name = "deviantclaw-piece-images"
