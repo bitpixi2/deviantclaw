@@ -2118,7 +2118,6 @@ function buildAdminFoilStaticView(piece, tier = 'gold') {
     : 'linear-gradient(120deg,transparent 18%,rgba(255,255,255,0.02) 32%,rgba(255,255,255,0.84) 45%,rgba(207,236,255,0.32) 49%,rgba(255,214,241,0.26) 53%,transparent 72%)';
 
   if (method === 'collage') {
-    const artistLine = [piece?.agent_a_name, piece?.agent_b_name].filter(Boolean).map(a => esc(a)).join(' × ');
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${safeTitle} · DeviantClaw</title>
@@ -2132,17 +2131,8 @@ body{background:#05060a;overflow:hidden;font-family:'Courier New',monospace}
 .cutout img{width:100%;height:100%;object-fit:cover;display:block}
 .cutout-a{top:4%;left:6%;width:58%;height:72%;border-radius:18px 6px 20px 8px;transform:rotate(-3.2deg)}
 .cutout-b{right:6%;bottom:4%;width:56%;height:68%;border-radius:8px 20px 10px 18px;transform:rotate(2.8deg);z-index:3}
-.sig{position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity .8s}
-.sig.v{opacity:1}
-.sig-t{font-size:14px;color:rgba(255,255,255,.72);letter-spacing:2px;margin-bottom:4px}
-.sig-a{font-size:11px;color:rgba(255,255,255,.45);letter-spacing:1.5px}
-.sig-g{font-size:10px;color:rgba(255,255,255,.25);letter-spacing:1px;margin-top:6px}
 .foil-frame{position:fixed;inset:12px;border-radius:2px;pointer-events:none}
-.foil-frame::before,.foil-frame::after{content:'';position:absolute;inset:0;pointer-events:none}
-.foil-frame::before{border-radius:inherit;padding:2px;background:${frameBefore};-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.9;animation:dcFoilPulse 4.8s ease-in-out infinite}
-.foil-frame::after{background:${frameAfter};mix-blend-mode:screen;opacity:.46;animation:dcFoilSweep 6.6s linear infinite}
-@keyframes dcFoilPulse{0%,100%{opacity:.62}50%{opacity:.96}}
-@keyframes dcFoilSweep{0%{transform:translateX(-58%) skewX(-18deg)}100%{transform:translateX(62%) skewX(-18deg)}}
+.foil-frame::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;padding:2px;background:${frameBefore};-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.9}
 </style></head><body>
 <div class="stage">
   <div class="collage-stage">
@@ -2150,9 +2140,7 @@ body{background:#05060a;overflow:hidden;font-family:'Courier New',monospace}
     <div class="cutout cutout-b"><img src="/api/pieces/${id}/image-b" alt="${esc(piece?.agent_b_name || '')}" onerror="this.src='/api/pieces/${id}/image'"/></div>
   </div>
 </div>
-<div class="sig" id="sig"><div class="sig-t">${safeTitle}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(String(piece?.created_at || '').slice(0, 10))}</div></div>
 <div class="foil-frame" aria-hidden="true"></div>
-<script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
 </body></html>`;
   }
 
