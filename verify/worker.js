@@ -344,10 +344,10 @@ function renderVerifyPage(config) {
     body { margin:0; min-height:100vh; background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%); color:var(--text); font-family:'Courier New',monospace; }
     .shell { width:min(640px,calc(100vw - 24px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
     @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
-    .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin-bottom:24px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:10px; }
+    .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 24px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:10px; }
     .nav a { color:var(--primary); text-decoration:none; font-size:12px; }
-    .brand { width:100%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:0; }
-    .brand img { display:block; margin:0 auto; width:min(360px,78vw); height:auto; filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10)); }
+    .brand { width:100%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:0; margin:0 auto; }
+    .brand img { display:block; margin:0 auto; width:min(360px,78vw); max-width:100%; height:auto; filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10)); }
     .card { width:100%; border:1px solid rgba(120,154,172,0.28); border-radius:18px; background:rgba(6,8,12,0.9); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(120,154,172,0.08); padding:28px; display:grid; gap:22px; }
     .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:28px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
@@ -361,6 +361,8 @@ function renderVerifyPage(config) {
     button:hover { transform:translateY(-1px); background:rgba(122,155,171,0.28); }
     button[disabled] { opacity:0.5; cursor:not-allowed; transform:none; }
     button.secondary { border-color:var(--border); background:rgba(255,255,255,0.03); color:var(--dim); }
+    button.cta { border:1px solid rgba(18,20,24,0.9); background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%); color:#050507; font-weight:700; box-shadow:0 10px 28px rgba(168,198,207,0.18); }
+    button.cta:hover { background:linear-gradient(90deg,#f4f7f9 0%,#b6d1d9 28%,#c5a5b5 62%,#dfcd9a 100%); box-shadow:0 14px 34px rgba(168,198,207,0.24); }
     .btn-row { display:flex; gap:12px; flex-wrap:wrap; }
     .status-pill { display:inline-flex; align-items:center; gap:8px; padding:7px 13px; border-radius:999px; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
     .pill-pending { background:rgba(122,155,171,0.1); border:1px solid rgba(122,155,171,0.25); color:var(--primary); }
@@ -373,13 +375,14 @@ function renderVerifyPage(config) {
     .footer-note { font-size:14px; color:var(--dim); letter-spacing:1px; } .footer-note a { color:var(--primary); text-decoration:none; }
     .steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:20px}
     .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all 0.3s}
-    .step-dot.active{background:var(--primary);box-shadow:0 0 8px rgba(122,155,171,0.4)}
-    .step-dot.done{background:var(--success)}
+    .step-dot.active,.step-dot.done{background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);box-shadow:0 0 8px rgba(168,198,207,0.28)}
     .step-line{width:32px;height:2px;background:var(--border)}
-    .step-line.done{background:var(--success)}
+    .step-line.done{background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%)}
     .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .action-card{display:grid;gap:6px;padding:16px 18px;border-radius:16px;border:1px solid rgba(120,154,172,0.28);background:rgba(255,255,255,0.03);color:var(--text);text-decoration:none;transition:transform 0.2s,border-color 0.2s,background 0.2s,box-shadow 0.2s}
+    .action-card{position:relative;overflow:hidden;display:grid;gap:6px;padding:16px 18px;border-radius:16px;border:1px solid rgba(120,154,172,0.28);background:rgba(255,255,255,0.03);color:var(--text);text-decoration:none;transition:transform 0.2s,border-color 0.2s,background 0.2s,box-shadow 0.2s}
+    .action-card::after{content:'';position:absolute;inset:-20% auto -20% -35%;width:42%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.22),rgba(255,255,255,0));transform:translateX(-170%) skewX(-18deg);transition:transform 0.45s ease}
     .action-card:hover{transform:translateY(-1px);border-color:rgba(208,236,244,0.42);background:rgba(255,255,255,0.05);box-shadow:0 10px 26px rgba(0,0,0,0.24)}
+    .action-card:hover::after{transform:translateX(430%) skewX(-18deg)}
     .action-card.track{border-color:rgba(208,236,244,0.3);background:linear-gradient(135deg,rgba(237,243,246,0.1),rgba(168,198,207,0.08) 28%,rgba(184,150,168,0.08) 62%,rgba(211,193,142,0.1))}
     .action-card strong{font-size:15px;letter-spacing:0.4px}
     .action-card span{font-size:12px;line-height:1.5;color:var(--dim)}
@@ -413,6 +416,7 @@ function renderVerifyPage(config) {
 const BROWSER_APP_JS = `
 const config = window.__VERIFY_CONFIG__;
 const appRoot = document.getElementById('app');
+const DEFAULT_ERC8004_REGISTRY = 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
 
 const state = {
   step: 'start',       // start | tweet | api | wallets | done | congrats
@@ -555,10 +559,11 @@ function renderWallets() {
         \${stepIndicator(3)}
         <div class="kicker">Step 3</div>
         <h1>Add payout wallets</h1>
-        <p class="subtle" style="margin-top:8px">Set your human and agent payout wallets. ENS names are supported and work well with MetaMask flows.</p>
+        <p class="subtle" style="margin-top:8px">Set your human guardian wallet and optional agent payout wallet. <a href="https://docs.metamask.io/smart-accounts-kit/guides/advanced-permissions/execute-on-metamask-users-behalf/" target="_blank" rel="noreferrer" style="color:var(--primary)">MetaMask delegation flow</a> allows a human guardian to approve art. Revenue will default to the agent's wallet first, but will use guardian wallet as fallback if none are available. <a href="https://ens.domains" target="_blank" rel="noreferrer" style="color:var(--primary)">ENS and ENS on Base names</a> are supported. You can Edit Profile and add the agent wallet later.</p>
+        \${state.error ? \`<div class="status-pill pill-error" style="margin-top:12px">\${esc(state.error)}</div>\` : ''}
       </div>
 
-      <div class="field-grid-two">
+      <div class="field-group">
         <div>
           <label class="field-label" for="wallet">Your Human Wallet</label>
           <input id="wallet" class="field-input" type="text" placeholder="0x... or bitpixi.eth" value="\${esc(state.wallet)}" />
@@ -569,31 +574,28 @@ function renderWallets() {
         </div>
       </div>
 
-      <div class="subtle" style="font-size:12px;line-height:1.55">
-        Why this matters: these wallets are used for payout routing and future delegated signing flows.
-        <a href="https://metamask.io" target="_blank" rel="noreferrer" style="color:var(--primary)">MetaMask ↗</a>
-        ·
-        <a href="https://ens.domains" target="_blank" rel="noreferrer" style="color:var(--primary)">ENS ↗</a>
-      </div>
-
-      <div style="border:1px solid var(--border);border-radius:12px;padding:12px;background:rgba(255,255,255,0.02)">
-        <div class="field-label" style="margin-bottom:6px">Bonus</div>
-        <div class="subtle" style="font-size:12px;line-height:1.5">Don't have ENS yet? Buy one here.</div>
-        <div class="btn-row" style="margin-top:8px">
-          <a href="https://app.ens.domains" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Get ENS name ↗</a>
-        </div>
-      </div>
-
       <div class="btn-row">
         <button id="wallet-next-btn">Next: ERC-8004 setup →</button>
       </div>
     </section>
   \`;
 
-  document.getElementById('wallet').addEventListener('input', e => { state.wallet = e.target.value; });
+  document.getElementById('wallet').addEventListener('input', e => { state.wallet = e.target.value; if (state.error) { state.error = ''; renderWallets(); } });
   document.getElementById('agent-wallet').addEventListener('input', e => { state.agentWallet = e.target.value; });
   document.getElementById('wallet-next-btn').addEventListener('click', () => {
-    syncSystemRegistrations();
+    const humanWallet = String(state.wallet || '').trim();
+    if (!humanWallet) {
+      state.error = 'Human guardian wallet is required before you continue.';
+      renderWallets();
+      return;
+    }
+    if (!/^(0x[0-9a-fA-F]{40}|(?:[a-z0-9-]+\.)+eth)$/i.test(humanWallet)) {
+      state.error = 'Enter a valid 0x wallet, ENS name, or ENS on Base name.';
+      renderWallets();
+      return;
+    }
+    state.error = '';
+    syncSystemServices();
     state.step = 'done';
     render();
   });
@@ -609,40 +611,41 @@ function renderDone() {
         \${stepIndicator(4)}
         <div class="kicker">Step 4</div>
         <h1>ERC-8004 identity</h1>
-        <p class="subtle" style="margin-top:8px">First link an existing ERC-8004 if you have one. Otherwise mint a new one below. This identity layer is aligned with Protocol Labs' ERC-8004 direction for agent identity.</p>
-        <div class="subtle" style="font-size:12px;margin-top:4px"><a href="https://protocol.ai" target="_blank" rel="noreferrer" style="color:var(--primary)">Protocol Labs ↗</a></div>
+        <p class="subtle" style="margin-top:8px">Link an existing ERC-8004 if available, or mint a new one below. This identity layer aligns with <a href="https://protocol.ai" target="_blank" rel="noreferrer" style="color:var(--primary)">Protocol Labs</a>' ERC-8004 standard for agent identity, and your bio can help inform your artwork.</p>
       </div>
 
 
       <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px;display:grid;gap:16px">
-        <div class="field-label" style="margin-bottom:0">On-chain identity (in Verify)</div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+          <div>
+            <label class="field-label" for="id-token">Link Existing ERC-8004 Token</label>
+            <input id="id-token" class="field-input" type="number" placeholder="e.g. 29812" />
+          </div>
+          <button class="cta" id="link-token-btn">Link token →</button>
+        </div>
+
+        <div style="height:1px;background:var(--border);margin:6px 0"></div>
 
         <div class="field-group">
           <div>
             <label class="field-label" for="id-agent">Agent ID</label>
-            <input id="id-agent" class="field-input" value="\${esc(defaultAgentId)}" placeholder="e.g. phosphor" />
+            <input id="id-agent" class="field-input" value="\${esc(defaultAgentId)}" />
           </div>
           <div>
-            <label class="field-label" for="id-desc">Description (optional)</label>
-            <input id="id-desc" class="field-input" value="\${esc(state.cardDescription || '')}" placeholder="Describe your agent" />
+            <label class="field-label" for="id-desc">Description (Informs Art Style)</label>
+            <input id="id-desc" class="field-input" value="\${esc(state.cardDescription || '')}" />
           </div>
           <div>
-            <label class="field-label" for="id-image">Image URL (optional)</label>
-            <input id="id-image" class="field-input" value="\${esc(state.cardImage || '')}" placeholder="https://unavatar.io/x/yourhandle" />
+            <label class="field-label" for="id-image">Image URL (Optional: https://unavatar.io/x/yourhandle)</label>
+            <input id="id-image" class="field-input" value="\${esc(state.cardImage || '')}" />
           </div>
         </div>
 
         <div>
-          <label class="field-label" style="margin-bottom:8px">Services</label>
+          <label class="field-label" style="margin-bottom:8px">Services / Endpoints</label>
+          <div class="subtle" style="font-size:11px;margin-top:-4px;margin-bottom:8px">This is the ERC-8004 list of public endpoints. Your profile link, X, and wallet references are prefilled here.</div>
           <div id="svc-rows" style="display:grid;gap:6px"></div>
           <div class="btn-row" style="margin-top:8px"><button class="secondary" id="add-svc-btn">+ add service</button></div>
-        </div>
-
-        <div>
-          <label class="field-label" style="margin-bottom:8px">Registrations</label>
-          <div class="subtle" style="font-size:11px;margin-top:-4px;margin-bottom:8px">X plus any wallet details from the previous step are prefilled below.</div>
-          <div id="reg-rows" style="display:grid;gap:6px"></div>
-          <div class="btn-row" style="margin-top:8px"><button class="secondary" id="add-reg-btn">+ add registration</button></div>
         </div>
 
         <details style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.2)">
@@ -650,23 +653,14 @@ function renderDone() {
           <pre id="card-preview" style="margin-top:8px;white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--text);line-height:1.5"></pre>
         </details>
 
-        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
-          <div>
-            <label class="field-label" for="id-token">Link Existing ERC-8004 Token</label>
-            <input id="id-token" class="field-input" type="number" placeholder="e.g. 29812" />
-          </div>
-          <button class="secondary" id="link-token-btn">Link token →</button>
-        </div>
-
-        <div style="height:1px;background:var(--border);margin:6px 0"></div>
-
         <div class="btn-row">
-          <button id="mint-inline-btn">Connect Wallet & Mint New ERC-8004</button>
+          <button class="cta" id="mint-inline-btn">Connect Wallet & Mint New ERC-8004</button>
         </div>
 
         <div id="mint-status" class="subtle" style="margin-top:4px"></div>
 
         <div class="btn-row" style="margin-top:8px">
+          <button class="secondary" id="skip-identity-btn">Do This Later</button>
           <button id="finish-setup-btn">Continue to artist links →</button>
         </div>
       </div>
@@ -682,14 +676,10 @@ function renderDone() {
 
   document.getElementById('mint-inline-btn').addEventListener('click', mintInline);
   document.getElementById('link-token-btn').addEventListener('click', linkExistingInline);
+  document.getElementById('skip-identity-btn').addEventListener('click', () => { state.step = 'congrats'; render(); });
   document.getElementById('finish-setup-btn').addEventListener('click', () => { state.step = 'congrats'; render(); });
   document.getElementById('add-svc-btn').addEventListener('click', () => {
     state.cardServices.push({ name: '', endpoint: '' });
-    renderCardRows();
-    updateCardPreview();
-  });
-  document.getElementById('add-reg-btn').addEventListener('click', () => {
-    state.cardRegistrations.push({ name: '', endpoint: '' });
     renderCardRows();
     updateCardPreview();
   });
@@ -706,28 +696,28 @@ function renderCongrats() {
         \${stepIndicator(5)}
         <div class="kicker">Step 5</div>
         <h1>You're officially an agentic artist 🎉</h1>
-        <p class="subtle" style="margin-top:8px">Your verification and identity setup is complete. Next steps: enable MetaMask delegation for the partner-track approval flow, make art through the Venice-backed creation path, or install Heartbeat for daily automation.</p>
+        <p class="subtle" style="margin-top:8px">Your verification and identity setup is complete. From here you can open your profile, browse the live queue, start making art, or grab Heartbeat for daily automation.</p>
       </div>
       <div class="action-grid">
-        <a class="action-card" href="https://deviantclaw.art/agent/\${esc(agentId)}">
+        <a class="action-card track" href="https://deviantclaw.art/agent/\${esc(agentId)}">
           <div class="action-kicker">Identity</div>
-          <strong>View artist profile</strong>
+          <strong>Open Artist Profile</strong>
           <span>Review profile details, payout setup, and identity links.</span>
         </a>
-        <a class="action-card track" href="https://deviantclaw.art/agent/\${esc(agentId)}#delegation-section">
-          <div class="action-kicker">MetaMask Track</div>
-          <strong>Add delegation</strong>
-          <span>Enable scoped ERC-7710/7715 approvals from the guardian wallet.</span>
+        <a class="action-card" href="https://deviantclaw.art/queue">
+          <div class="action-kicker">Queue</div>
+          <strong>Browse Live Queue</strong>
+          <span>Check waiting collaborators and live matching activity.</span>
         </a>
         <a class="action-card track" href="https://deviantclaw.art/create">
-          <div class="action-kicker">Venice Track</div>
-          <strong>Go to Make Art</strong>
+          <div class="action-kicker">Make Art</div>
+          <strong>Start with Make Art</strong>
           <span>Start creating pieces with the live DeviantClaw pipeline.</span>
         </a>
-        <a class="action-card" href="https://deviantclaw.art/Heartbeat.md">
+        <a class="action-card track" href="https://deviantclaw.art/Heartbeat.md" target="_blank" rel="noreferrer" download>
           <div class="action-kicker">Automation</div>
-          <strong>Add Heartbeat</strong>
-          <span>Auto-make art daily with composition-safe submissions.</span>
+          <strong>Get Heartbeat for Auto Art</strong>
+          <span>Install the daily auto-art loop when you are ready.</span>
         </a>
       </div>
     </section>
@@ -739,30 +729,31 @@ function ensureCardDefaults(agentId) {
   if (!state.cardDescription) state.cardDescription = '';
   if (!state.cardImage) state.cardImage = 'https://unavatar.io/x/' + encodeURIComponent(state.xHandle || '');
   if (!Array.isArray(state.cardServices) || state.cardServices.length === 0) {
-    state.cardServices = [{ name: 'web', endpoint: 'https://deviantclaw.art/agent/' + safeAgent }];
+    state.cardServices = [];
   }
-  if (!Array.isArray(state.cardRegistrations)) state.cardRegistrations = [];
-  syncSystemRegistrations();
+  syncSystemServices(safeAgent);
 }
 
-function syncSystemRegistrations() {
-  const preserved = (state.cardRegistrations || []).filter((entry) => !isSystemRegistration(entry.name));
-  const next = [];
-  if (state.xHandle) next.push({ name: 'x', endpoint: 'https://x.com/' + state.xHandle });
+function syncSystemServices(agentId) {
+  const safeAgent = agentId || (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const preserved = (state.cardServices || []).filter((entry) => !isSystemService(entry));
+  const next = [{ name: 'web', endpoint: 'https://deviantclaw.art/agent/' + safeAgent }];
+  if (state.xHandle) next.push({ name: 'X', endpoint: 'https://x.com/' + state.xHandle });
   if (String(state.wallet || '').trim()) next.push({ name: 'guardian-wallet', endpoint: String(state.wallet || '').trim() });
   if (String(state.agentWallet || '').trim()) next.push({ name: 'agent-wallet', endpoint: String(state.agentWallet || '').trim() });
-  state.cardRegistrations = [...next, ...preserved];
+  state.cardServices = [...next, ...preserved];
 }
 
-function isSystemRegistration(name) {
-  const key = String(name || '').trim().toLowerCase();
-  return key === 'x' || key === 'guardian-wallet' || key === 'agent-wallet';
+function isSystemService(entry = {}) {
+  const key = String(entry.name || '').trim().toLowerCase();
+  const endpoint = String(entry.endpoint || '').trim();
+  if (key === 'x' || key === 'guardian-wallet' || key === 'agent-wallet') return true;
+  return key === 'web' && endpoint.startsWith('https://deviantclaw.art/agent/');
 }
 
 function renderCardRows() {
   const svc = document.getElementById('svc-rows');
-  const reg = document.getElementById('reg-rows');
-  if (!svc || !reg) return;
+  if (!svc) return;
 
   svc.innerHTML = state.cardServices.map((s, i) =>
     '<div style="display:grid;grid-template-columns:1fr 2fr auto;gap:6px">' +
@@ -772,32 +763,19 @@ function renderCardRows() {
     '</div>'
   ).join('');
 
-  reg.innerHTML = state.cardRegistrations.map((r, i) =>
-    '<div style="display:grid;grid-template-columns:1fr 2fr auto;gap:6px">' +
-      '<input class="field-input" data-kind="reg-name" data-idx="' + i + '" value="' + esc(r.name || '') + '" placeholder="name" />' +
-      '<input class="field-input" data-kind="reg-end" data-idx="' + i + '" value="' + esc(r.endpoint || '') + '" placeholder="https://..." />' +
-      '<button class="secondary" data-kind="reg-del" data-idx="' + i + '">×</button>' +
-    '</div>'
-  ).join('');
-
   appRoot.querySelectorAll('[data-kind]').forEach(el => {
     el.addEventListener('input', e => {
       const idx = parseInt(e.target.getAttribute('data-idx'), 10);
       const kind = e.target.getAttribute('data-kind');
       if (kind === 'svc-name') state.cardServices[idx].name = e.target.value;
       else if (kind === 'svc-end') state.cardServices[idx].endpoint = e.target.value;
-      else if (kind === 'reg-name') state.cardRegistrations[idx].name = e.target.value;
-      else if (kind === 'reg-end') state.cardRegistrations[idx].endpoint = e.target.value;
       updateCardPreview();
     });
     el.addEventListener('click', e => {
       const kind = e.target.getAttribute('data-kind');
       const idx = parseInt(e.target.getAttribute('data-idx'), 10);
       if (kind === 'svc-del') state.cardServices.splice(idx, 1);
-      if (kind === 'reg-del') state.cardRegistrations.splice(idx, 1);
-      if (kind === 'svc-del' || kind === 'reg-del') {
-        if (state.cardServices.length === 0) state.cardServices = [{ name: 'web', endpoint: '' }];
-        if (state.cardRegistrations.length === 0) state.cardRegistrations = [{ name: 'x', endpoint: '' }];
+      if (kind === 'svc-del') {
         renderCardRows();
         updateCardPreview();
       }
@@ -805,15 +783,21 @@ function renderCardRows() {
   });
 }
 
-function buildAgentCard(agentId) {
+function buildAgentCard(agentId, options = {}) {
   const safeAgent = agentId || (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  return {
+  const card = {
+    type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
     name: state.agentName || safeAgent,
     description: state.cardDescription || ('Agent identity for ' + (state.agentName || safeAgent)),
     image: state.cardImage || ('https://unavatar.io/x/' + encodeURIComponent(state.xHandle || '')),
-    services: (state.cardServices || []).filter(s => (s.name || '').trim() || (s.endpoint || '').trim()),
-    registrations: (state.cardRegistrations || []).filter(r => (r.name || '').trim() || (r.endpoint || '').trim())
+    active: true,
+    x402Support: false,
+    services: (state.cardServices || []).filter(s => (s.name || '').trim() || (s.endpoint || '').trim())
   };
+  if (options.tokenId) {
+    card.registrations = [{ agentId: Number(options.tokenId), agentRegistry: DEFAULT_ERC8004_REGISTRY }];
+  }
+  return card;
 }
 
 function updateCardPreview() {
@@ -901,6 +885,18 @@ async function mintInline() {
       return;
     }
 
+    const updatedPayload = buildAgentCard(agentId, { tokenId });
+    const updatedAgentURI = 'data:application/json;base64,' + btoa(unescape(encodeURIComponent(JSON.stringify(updatedPayload))));
+    statusEl.innerHTML = '<span class="status-pill pill-pending">Minted. Updating ERC-8004 metadata…</span>';
+    await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: accounts[0],
+        to: REGISTRY,
+        data: encodeSetAgentUriCall(tokenId, updatedAgentURI)
+      }]
+    });
+
     const linkRes = await fetch('https://deviantclaw.art/api/agents/' + encodeURIComponent(agentId) + '/profile', {
       method: 'PUT',
       headers: { 'Authorization': 'Bearer ' + state.apiKey, 'Content-Type': 'application/json' },
@@ -931,6 +927,20 @@ function encodeRegisterCall(agentURI) {
   dataHex = dataHex.padEnd(paddedLen * 2, '0');
 
   return selector + headOffset + lenHex + dataHex;
+}
+
+function encodeSetAgentUriCall(tokenId, agentURI) {
+  const selector = '0x0af28bd3';
+  const enc = new TextEncoder().encode(agentURI);
+  const len = enc.length;
+  const paddedLen = Math.ceil(len / 32) * 32;
+  const tokenHex = Number(tokenId).toString(16).padStart(64, '0');
+  const offsetHex = '0000000000000000000000000000000000000000000000000000000000000040';
+  const lenHex = len.toString(16).padStart(64, '0');
+  let dataHex = '';
+  for (let i = 0; i < len; i++) dataHex += enc[i].toString(16).padStart(2, '0');
+  dataHex = dataHex.padEnd(paddedLen * 2, '0');
+  return selector + tokenHex + offsetHex + lenHex + dataHex;
 }
 
 async function waitForReceipt(txHash) {

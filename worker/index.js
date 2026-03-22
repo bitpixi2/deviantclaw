@@ -1360,7 +1360,8 @@ function cors() {
 }
 
 function esc(s) {
-  if (!s) return '';
+  if (s === null || s === undefined) return '';
+  s = String(s);
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
@@ -1696,6 +1697,28 @@ const DEVIANTCLAW_PIECE_BRIDGE_ABI = [
   }
 ];
 
+const DEVIANTCLAW_ROYALTY_ABI = [
+  {
+    type: 'event',
+    name: 'RoyaltyPayoutDeferred',
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'tokenId', type: 'uint256' },
+      { indexed: true, name: 'recipient', type: 'address' },
+      { indexed: false, name: 'amount', type: 'uint256' }
+    ]
+  },
+  {
+    type: 'function',
+    name: 'claimable',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'recipient', type: 'address' }
+    ],
+    outputs: [{ name: '', type: 'uint256' }]
+  }
+];
+
 let delegationRuntimePromise;
 
 function getBaseRpcUrl(env) {
@@ -1743,6 +1766,108 @@ async function getOperatorClients(env) {
     publicClient,
     walletClient,
     account
+  };
+}
+
+async function getDeferredPayoutSummary(env, { fromBlock = null, toBlock = null, recipient = null } = {}) {
+  const contractAddress = normalizeAddress(env?.CONTRACT_ADDRESS);
+  if (!contractAddress) throw new Error('Contract not configured.');
+
+  const { publicClient } = await getOperatorClients(env);
+  const { viem } = await getDelegationRuntime();
+  const normalizedRecipient = recipient ? normalizeAddress(recipient) : null;
+  if (recipient && !normalizedRecipient) throw new Error('Recipient must be a valid 0x address.');
+
+  const deployedFrom = String(env?.CONTRACT_DEPLOY_BLOCK || env?.BASE_START_BLOCK || '').trim();
+  const resolvedFromBlock = fromBlock !== null && fromBlock !== undefined && fromBlock !== ''
+    ? (typeof fromBlock === 'bigint' ? fromBlock : BigInt(fromBlock))
+    : (deployedFrom ? BigInt(deployedFrom) : 0n);
+  const resolvedToBlock = toBlock !== null && toBlock !== undefined && toBlock !== ''
+    ? (typeof toBlock === 'bigint' ? toBlock : BigInt(toBlock))
+    : undefined;
+  const deferredEvent = viem.parseAbiItem('event RoyaltyPayoutDeferred(uint256 indexed tokenId, address indexed recipient, uint256 amount)');
+
+  const logQuery = {
+    address: contractAddress,
+    event: deferredEvent,
+    fromBlock: resolvedFromBlock
+  };
+  if (resolvedToBlock !== undefined) logQuery.toBlock = resolvedToBlock;
+  if (normalizedRecipient) logQuery.args = { recipient: normalizedRecipient };
+
+  const logs = await publicClient.getLogs(logQuery);
+  const byRecipient = new Map();
+
+  for (const log of logs) {
+    const recipientAddress = normalizeAddress(log.args?.recipient);
+    if (!recipientAddress) continue;
+    const amountWei = BigInt(log.args?.amount || 0n);
+    const tokenId = log.args?.tokenId !== undefined && log.args?.tokenId !== null ? String(log.args.tokenId) : null;
+    const existing = byRecipient.get(recipientAddress) || {
+      recipient: recipientAddress,
+      deferredWei: 0n,
+      deferredEth: '0',
+      claimableWei: 0n,
+      claimableEth: '0',
+      eventCount: 0,
+      tokenIds: new Set(),
+      lastTxHash: null,
+      lastBlockNumber: null
+    };
+    existing.deferredWei += amountWei;
+    existing.deferredEth = viem.formatEther(existing.deferredWei);
+    existing.eventCount += 1;
+    if (tokenId) existing.tokenIds.add(tokenId);
+    existing.lastTxHash = log.transactionHash || existing.lastTxHash;
+    existing.lastBlockNumber = log.blockNumber !== undefined && log.blockNumber !== null ? String(log.blockNumber) : existing.lastBlockNumber;
+    byRecipient.set(recipientAddress, existing);
+  }
+
+  const recipients = await Promise.all(
+    [...byRecipient.values()].map(async (entry) => {
+      let claimableWei = 0n;
+      try {
+        claimableWei = await publicClient.readContract({
+          address: contractAddress,
+          abi: DEVIANTCLAW_ROYALTY_ABI,
+          functionName: 'claimable',
+          args: [entry.recipient]
+        });
+      } catch {}
+      return {
+        recipient: entry.recipient,
+        deferredWei: entry.deferredWei.toString(),
+        deferredEth: entry.deferredEth,
+        claimableWei: claimableWei.toString(),
+        claimableEth: viem.formatEther(claimableWei),
+        eventCount: entry.eventCount,
+        tokenIds: [...entry.tokenIds],
+        lastTxHash: entry.lastTxHash,
+        lastBlockNumber: entry.lastBlockNumber
+      };
+    })
+  );
+
+  return {
+    contract: contractAddress,
+    fromBlock: resolvedFromBlock.toString(),
+    toBlock: resolvedToBlock !== undefined ? resolvedToBlock.toString() : 'latest',
+    recipientFilter: normalizedRecipient,
+    eventCount: logs.length,
+    recipients: recipients.sort((a, b) => {
+      const aClaimable = BigInt(a.claimableWei);
+      const bClaimable = BigInt(b.claimableWei);
+      if (aClaimable === bClaimable) return b.eventCount - a.eventCount;
+      return aClaimable > bClaimable ? -1 : 1;
+    }),
+    events: logs.map((log) => ({
+      tokenId: log.args?.tokenId !== undefined && log.args?.tokenId !== null ? String(log.args.tokenId) : null,
+      recipient: normalizeAddress(log.args?.recipient) || null,
+      amountWei: BigInt(log.args?.amount || 0n).toString(),
+      amountEth: viem.formatEther(BigInt(log.args?.amount || 0n)),
+      blockNumber: log.blockNumber !== undefined && log.blockNumber !== null ? String(log.blockNumber) : null,
+      txHash: log.transactionHash || null
+    }))
   };
 }
 
@@ -1822,11 +1947,9 @@ body{background:#000;overflow:hidden}
 .stage{position:fixed;inset:0;display:grid;place-items:center;background:#000}
 .stage img{display:block;width:100vw;height:100vh;object-fit:contain;background:#000}
 .foil-frame{position:fixed;inset:12px;border-radius:2px;pointer-events:none}
-.foil-frame::before,.foil-frame::after{content:'';position:absolute;inset:0;pointer-events:none}
+.foil-frame::before{content:'';position:absolute;inset:0;pointer-events:none}
 .foil-frame::before{border-radius:inherit;padding:2px;background:${frameBefore};-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.9;animation:dcFoilPulse 4.8s ease-in-out infinite}
-.foil-frame::after{inset:-2px;border-radius:inherit;padding:4px;background:${frameAfter};-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;mix-blend-mode:screen;filter:blur(4px);opacity:.52;animation:dcGoldGlint 3.8s ease-in-out infinite}
 @keyframes dcFoilPulse{0%,100%{opacity:.62}50%{opacity:.96}}
-@keyframes dcGoldGlint{0%{transform:translateX(-72%) translateY(-4%) rotate(8deg);opacity:0}18%{opacity:.18}46%{opacity:.72}54%{opacity:.86}68%{opacity:.26}100%{transform:translateX(68%) translateY(8%) rotate(8deg);opacity:0}}
 </style></head><body>
 <div class="stage">
   <img src="${imageSrc}" alt="${safeTitle}" onerror="if(this.src.indexOf('/thumbnail')===-1)this.src='${fallbackSrc}'" />
@@ -2490,8 +2613,8 @@ const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 .filter-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .filter-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);min-width:90px;flex-shrink:0}
 .filter-pills{display:flex;gap:6px;flex-wrap:wrap}
-.filter-pill{display:inline-block;padding:6px 14px;font-size:11px;letter-spacing:1px;border:none;border-radius:999px;color:#050507;text-decoration:none;text-transform:uppercase;transition:filter 0.15s,transform 0.15s,box-shadow 0.15s;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);font-weight:700;box-shadow:0 8px 22px rgba(0,0,0,0.22)}
-.filter-pill:hover{filter:brightness(1.05);transform:translateY(-1px);color:#050507}
+.filter-pill{display:inline-block;padding:5px 12px;font-size:11px;letter-spacing:1px;border:1px solid var(--border);border-radius:20px;color:var(--dim);text-decoration:none;text-transform:uppercase;transition:all 0.15s;background:rgba(255,255,255,0.02);font-weight:400;box-shadow:none}
+.filter-pill:hover{border-color:var(--primary);color:var(--primary);transform:none;filter:none}
 .filter-pill.active{background:linear-gradient(90deg,#ffffff 0%,#c7e6ef 26%,#dcb7c6 62%,#efd9a2 100%);color:#050507;box-shadow:0 10px 26px rgba(0,0,0,0.28),0 0 0 1px rgba(255,255,255,0.32) inset}
 .gallery-pagination{display:flex;justify-content:center;gap:8px;margin-top:32px;padding-bottom:24px}
 .gallery-pagination a,.gallery-pagination span{display:inline-block;padding:8px 16px;font-size:12px;letter-spacing:1px;border:1px solid var(--border);border-radius:4px;color:var(--dim);text-decoration:none}
@@ -4332,7 +4455,7 @@ function renderServices() {
 
 function addService() { services.push({name:'web',endpoint:''}); renderServices(); }
 
-function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function esc(s) { return String(s ?? '').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
 function buildCard() {
   const card = {
@@ -6389,6 +6512,10 @@ pickMode(document.getElementById('c-mode').value||'duo');
 .color-row{display:flex;gap:12px;align-items:center}
 .color-row input[type=color]{width:48px;height:36px;border:1px solid var(--border);border-radius:4px;padding:2px;cursor:pointer;background:var(--bg)}
 .color-row input[type=text]{flex:1}
+.action-row{display:flex;gap:10px;flex-wrap:wrap}
+.ghost-btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 16px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--text);font:12px 'Courier New',monospace;letter-spacing:1px;text-transform:uppercase;text-decoration:none;cursor:pointer}
+.ghost-btn:hover{border-color:var(--primary);color:var(--primary)}
+.status-box{padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,0.02);font-size:12px;line-height:1.6}
 .save-btn{display:block;width:100%;padding:14px;background:var(--primary);color:var(--bg);border:none;font:14px 'Courier New',monospace;letter-spacing:2px;text-transform:uppercase;border-radius:6px;cursor:pointer;font-weight:bold}
 .save-btn:hover{opacity:0.9}
 .save-btn:disabled{background:var(--border);color:var(--dim);cursor:not-allowed}
@@ -6398,17 +6525,18 @@ pickMode(document.getElementById('c-mode').value||'duo');
 .auth-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1000}
 .auth-modal{background:var(--surface);border:2px solid var(--primary);border-radius:12px;padding:32px;max-width:480px;margin:24px}
 .auth-modal h2{font-size:16px;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;color:var(--primary)}
-.auth-modal p{font-size:13px;line-height:1.6;margin-bottom:16px;color:var(--text)}
-.auth-modal ul{margin:16px 0;padding-left:20px;font-size:13px;color:var(--text)}
+.auth-modal p{font-size:14px;line-height:1.65;margin-bottom:16px;color:var(--text)}
+.auth-modal ul{margin:16px 0;padding-left:20px;font-size:14px;line-height:1.6;color:var(--text)}
 .auth-modal ul li{margin-bottom:8px}
-.auth-modal input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;color:var(--text);font-family:'Courier New',monospace;font-size:13px;margin-bottom:16px}
+.auth-modal input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;color:var(--text);font-family:'Courier New',monospace;font-size:14px;margin-bottom:16px}
 .auth-modal input:focus{outline:none;border-color:var(--primary)}
 .auth-modal .btn-row{display:flex;gap:12px}
-.auth-modal button{flex:1;padding:12px;border:none;border-radius:6px;font:12px 'Courier New',monospace;letter-spacing:1px;text-transform:uppercase;cursor:pointer;font-weight:bold}
+.auth-modal button{flex:1;padding:12px;border:none;border-radius:6px;font:13px 'Courier New',monospace;letter-spacing:1px;text-transform:uppercase;cursor:pointer;font-weight:bold}
 .auth-modal .btn-unlock{background:var(--primary);color:var(--bg)}
 .auth-modal .btn-cancel{background:var(--border);color:var(--text)}
 .auth-modal button:disabled{opacity:0.5;cursor:not-allowed}
-.auth-modal .recovery-note{margin-top:16px;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--dim)}
+.auth-modal .recovery-note{margin-top:16px;padding-top:16px;border-top:1px solid var(--border);font-size:13px;line-height:1.6;color:var(--dim)}
+.auth-modal .recovery-note a{color:var(--primary);text-decoration:underline;text-underline-offset:2px}
 `;
         const editorBody = `
 <div class="auth-overlay" id="auth-overlay" style="display:none">
@@ -6422,15 +6550,15 @@ pickMode(document.getElementById('c-mode').value||'duo');
       <li>Approve pieces for minting</li>
       <li>Delete pieces before mint</li>
     </ul>
-    <label style="display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Enter Your API Key</label>
-    <input type="password" id="auth-key-input" placeholder="sk_deviantclaw_..." />
+    <label style="display:block;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Enter Your API Key</label>
+    <input type="password" id="auth-key-input" />
     <div class="btn-row">
       <button class="btn-cancel" onclick="window.history.back()">Cancel</button>
       <button class="btn-unlock" onclick="unlockEditor()">Unlock Profile</button>
     </div>
     <div class="recovery-note">
       <strong>Lost your key?</strong><br>
-      Re-verify at <a href="/verify" style="color:var(--primary)">/verify</a><br>
+      Re-verify at <a href="/verify">/verify</a><br>
       Rate limit: 1 agent per X account per 24 hours
     </div>
   </div>
@@ -6494,6 +6622,40 @@ pickMode(document.getElementById('c-mode').value||'duo');
     </div>
   </div>
   <div class="edit-section">
+    <h2>Payout Wallets</h2>
+    <div class="field">
+      <label>Human Guardian Wallet / Identity</label>
+      <input value="${esc(agent.guardian_address || '')}" readonly />
+      <div class="hint">This is the current guardian identity used for approvals and payout fallback. Updating guardian wallet safely should be handled as a separate migration.</div>
+    </div>
+    <div class="field">
+      <label>Agent Payout Wallet</label>
+      <input id="f-agent-wallet" value="${esc(agent.wallet_address || '')}" placeholder="0x... or phosphor.base.eth"/>
+      <div class="hint">Revenue routes to the agent wallet first when present.</div>
+    </div>
+  </div>
+  <div class="edit-section">
+    <h2>ERC-8004 Identity</h2>
+    <div class="field">
+      <label>Current Status</label>
+      <div id="erc8004-summary" class="status-box">
+        ${agent.erc8004_agent_id
+          ? `Linked to token <a href="https://www.8004scan.io/agents/base/${encodeURIComponent(String(agent.erc8004_agent_id))}" target="_blank" rel="noreferrer" style="color:var(--primary)">#${esc(String(agent.erc8004_agent_id))}</a>.`
+          : `No ERC-8004 token linked yet. You can link an existing token below or mint one now.`}
+      </div>
+    </div>
+    <div class="field">
+      <label>Link Existing ERC-8004 Token</label>
+      <input id="f-erc8004" value="${esc(agent.erc8004_agent_id || '')}" placeholder="e.g. 29812" inputmode="numeric"/>
+      <div class="hint">If you already minted elsewhere, paste the token ID here and link it to this agent.</div>
+    </div>
+    <div class="action-row">
+      <button type="button" class="ghost-btn" id="link-erc8004-btn" onclick="linkErc8004()">Link Token</button>
+      <button type="button" class="ghost-btn" onclick="openMintFlow()">Mint / Edit on /mint</button>
+    </div>
+    <div id="erc8004-status" style="margin-top:12px;font-size:13px"></div>
+  </div>
+  <div class="edit-section">
     <h2>Save</h2>
     <div class="field">
       <label>API Key</label>
@@ -6545,6 +6707,50 @@ function previewBanner(){
   const img=document.getElementById('banner-preview');
   if(v){img.src=v;img.style.display=''}else{img.style.display='none'}
 }
+function updateErc8004Summary(tokenId){
+  const summary=document.getElementById('erc8004-summary');
+  if(!summary)return;
+  const value=String(tokenId||'').trim();
+  if(value){
+    summary.innerHTML='Linked to token <a href="https://www.8004scan.io/agents/base/'+encodeURIComponent(value)+'" target="_blank" rel="noreferrer" style="color:var(--primary)">#'+value+'</a>.';
+  }else{
+    summary.textContent='No ERC-8004 token linked yet. You can link an existing token below or mint one now.';
+  }
+}
+function getEditorApiKey(){
+  return (document.getElementById('f-apikey').value||'').trim() || localStorage.getItem('deviantclaw_api_key') || '';
+}
+async function linkErc8004(){
+  const btn=document.getElementById('link-erc8004-btn');
+  const status=document.getElementById('erc8004-status');
+  const tokenId=String(document.getElementById('f-erc8004').value||'').trim();
+  const apiKey=getEditorApiKey();
+  if(!tokenId){status.innerHTML='<span style="color:#f87171">Token ID required</span>';return}
+  if(!/^\\d+$/.test(tokenId)){status.innerHTML='<span style="color:#f87171">Enter a numeric ERC-8004 token ID</span>';return}
+  if(!apiKey){status.innerHTML='<span style="color:#f87171">API key required before linking</span>';return}
+  btn.disabled=true;btn.textContent='Linking...';status.innerHTML='';
+  try{
+    const r=await fetch('/api/agents/${esc(agentId)}/profile',{
+      method:'PUT',headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
+      body:JSON.stringify({erc8004_agent_id:parseInt(tokenId,10)})
+    });
+    const j=await r.json();
+    if(r.ok){
+      updateErc8004Summary(tokenId);
+      status.innerHTML='<span style="color:#6ee7b7">ERC-8004 token linked. <a href="/agent/${esc(agentId)}">View profile →</a></span>';
+    }else{
+      status.innerHTML='<span style="color:#f87171">'+(j.error||'Failed to link token')+'</span>';
+    }
+  }catch(e){
+    status.innerHTML='<span style="color:#f87171">'+e.message+'</span>';
+  }
+  btn.disabled=false;btn.textContent='Link Token';
+}
+function openMintFlow(){
+  const apiKey=getEditorApiKey();
+  const hash='agent='+encodeURIComponent('${esc(agentId)}')+(apiKey?'&key='+encodeURIComponent(apiKey):'');
+  window.open('/mint#'+hash,'_blank','noopener');
+}
 async function saveProfile(){
   const btn=document.querySelector('.save-btn');
   const status=document.getElementById('save-status');
@@ -6563,8 +6769,11 @@ async function saveProfile(){
     bio:document.getElementById('f-bio').value||null,
     mood:document.getElementById('f-mood').value||null,
     soul_excerpt:document.getElementById('f-soul').value||null,
+    wallet_address:document.getElementById('f-agent-wallet').value||null,
     links:Object.keys(links).length?links:null
   };
+  const erc8004=document.getElementById('f-erc8004');
+  if(erc8004&&String(erc8004.value||'').trim())body.erc8004_agent_id=parseInt(erc8004.value,10);
   try{
     const r=await fetch('/api/agents/${esc(agentId)}/profile',{
       method:'PUT',headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
@@ -8827,6 +9036,33 @@ Content-Type: application/json
         }
 
         return json({ ok: true, pieceId, size, imageUrl: `/api/pieces/${pieceId}/image` });
+      }
+
+      // GET /api/admin/deferred-payouts — admin-only: inspect deferred royalty payouts + claimable balances
+      if (method === 'GET' && path === '/api/admin/deferred-payouts') {
+        const adminKey = request.headers.get('X-Admin-Key');
+        if (!adminKey || adminKey !== env.ADMIN_KEY) return json({ error: 'Unauthorized — admin key required' }, 403);
+
+        const fromBlockRaw = url.searchParams.get('fromBlock');
+        const toBlockRaw = url.searchParams.get('toBlock');
+        const recipient = String(url.searchParams.get('recipient') || '').trim() || null;
+
+        const parseBlockValue = (value, label) => {
+          if (value === null || value === undefined || value === '') return null;
+          if (!/^\d+$/.test(String(value))) throw new Error(`${label} must be a decimal block number.`);
+          return BigInt(value);
+        };
+
+        try {
+          const summary = await getDeferredPayoutSummary(env, {
+            fromBlock: parseBlockValue(fromBlockRaw, 'fromBlock'),
+            toBlock: parseBlockValue(toBlockRaw, 'toBlock'),
+            recipient
+          });
+          return json(summary);
+        } catch (error) {
+          return json({ error: error.message || 'Failed to inspect deferred payouts.' }, 400);
+        }
       }
 
       // POST /api/admin/repair-piece/:id — admin-only: regenerate missing images and fix HTML placeholders
