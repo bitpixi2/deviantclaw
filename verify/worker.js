@@ -350,10 +350,8 @@ function renderVerifyPage(config) {
     body { margin:0; min-height:100vh; background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%); color:var(--text); font-family:'Courier New',monospace; }
     .shell { width:min(640px,calc(100vw - 24px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
     @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
-    .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 24px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:10px; }
+    .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 18px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:10px; }
     .nav a { color:var(--primary); text-decoration:none; font-size:12px; }
-    .brand { width:100%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:0; margin:0 auto; }
-    .brand img { display:block; margin:0 auto; width:min(520px,90vw); max-width:100%; height:auto; filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10)); }
     .card { width:100%; border:1px solid rgba(120,154,172,0.28); border-radius:18px; background:rgba(6,8,12,0.9); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(120,154,172,0.08); padding:28px; display:grid; gap:22px; }
     .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:28px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
@@ -419,7 +417,6 @@ function renderVerifyPage(config) {
 <body>
   <div class="shell">
     <div class="nav">
-      <div class="brand"><img src="/brand-lockup.svg?v=${APP_ASSET_VERSION}" alt="DeviantClaw" /></div>
       <a href="https://deviantclaw.art">back to gallery</a>
     </div>
     <div id="app"></div>
