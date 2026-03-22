@@ -343,6 +343,7 @@ function renderVerifyPage(config) {
     #app { width:100%; }
     .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 10px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:8px; }
     .nav a { color:var(--primary); text-decoration:none; font-size:12px; }
+    .mobile-wordmark { display:none; font-size:24px; letter-spacing:4px; line-height:1; color:#d9e6ec; text-transform:uppercase; text-shadow:0 6px 18px rgba(0,0,0,0.34); }
     .brand { width:min(236px,56vw); display:flex; align-items:center; justify-content:center; margin:0 auto; overflow:visible; }
     .brand img { width:100%; height:auto; display:block; filter:drop-shadow(0 8px 20px rgba(0,0,0,0.4)); transform:translateX(clamp(6px,1vw,10px)); }
     .card { width:100%; min-height:560px; border:1px solid rgba(120,154,172,0.24); border-radius:18px; background:linear-gradient(180deg,rgba(7,9,13,0.94),rgba(10,12,16,0.92)); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.62),0 0 0 1px rgba(120,154,172,0.06); padding:28px; display:grid; align-content:start; gap:22px; }
@@ -404,6 +405,8 @@ function renderVerifyPage(config) {
     }
     @media(max-width:640px) {
       .shell { width:min(100vw - 12px,640px); padding-top:14px; }
+      .mobile-wordmark { display:block; }
+      .brand { display:none; }
       .brand { width:min(208px,64vw); }
       .card { min-height:auto; padding:20px 16px; gap:18px; border-radius:16px; }
       .field-grid-two { grid-template-columns:1fr; }
@@ -425,6 +428,7 @@ function renderVerifyPage(config) {
   <canvas id="bg-canvas" class="bg-canvas" aria-hidden="true"></canvas>
   <div class="shell">
     <div class="nav">
+      <div class="mobile-wordmark">DEVIANTCLAW</div>
       <div class="brand"><img src="${LOGO}" alt="DeviantClaw" /></div>
       <a href="https://deviantclaw.art">back to gallery</a>
     </div>
