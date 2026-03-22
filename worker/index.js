@@ -5911,6 +5911,7 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
       <div id="guardian-connect" style="display:none;margin-bottom:10px"><button id="btn-connect" onclick="connectWalletForApproval()" style="padding:10px 18px;background:var(--primary,#6ee7b7);color:#000;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Connect Wallet</button></div>
       <div id="guardian-buttons" style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="btn-approve" onclick="guardianAction('approve')" style="padding:10px 20px;background:#22c55e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">Approve Mint</button>
+        <a id="btn-delegate" href="#" style="display:none;align-items:center;justify-content:center;padding:10px 20px;background:rgba(255,184,107,0.14);color:#ffb86b;border:1px solid rgba(255,184,107,0.42);border-radius:6px;font-size:14px;font-weight:600;text-decoration:none">MetaMask Auto-Approve</a>
         <button id="btn-reject" onclick="guardianAction('reject')" style="padding:10px 20px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">Reject</button>
         <button id="btn-delete" onclick="guardianAction('delete')" style="padding:10px 20px;background:transparent;color:#ef4444;border:1px solid #ef444466;border-radius:6px;font-size:14px;cursor:pointer">Delete Piece</button>
         <button id="btn-mint" onclick="guardianMint()" ${mintReady ? '' : 'disabled'} style="padding:10px 20px;background:${mintReady ? '#84cc16' : '#2f2f2f'};color:${mintReady ? '#04110a' : '#9ca3af'};border:1px solid ${mintReady ? '#a3e635' : '#454545'};border-radius:6px;font-size:14px;font-weight:700;cursor:${mintReady ? 'pointer' : 'not-allowed'}">Mint Piece</button>
@@ -5925,6 +5926,18 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
     function shortAddress(value) {
       const v = String(value || '').trim();
       return v && v.length > 14 ? v.slice(0, 8) + '…' + v.slice(-4) : v;
+    }
+
+    function updateDelegationButton(agentId) {
+      const btn = document.getElementById('btn-delegate');
+      if (!btn) return;
+      if (!agentId) {
+        btn.style.display = 'none';
+        btn.removeAttribute('href');
+        return;
+      }
+      btn.href = '/agent/' + encodeURIComponent(agentId) + '#delegation-section';
+      btn.style.display = 'inline-flex';
     }
 
     function renderWrongWalletState(data) {
@@ -5943,6 +5956,7 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
       guardianActions.style.display = 'block';
       guardianConnect.style.display = 'block';
       guardianButtons.style.display = 'none';
+      updateDelegationButton(null);
       guardianStatus.innerHTML =
         '<span style="color:#ffb86b">Connected wallet <strong>' + shortAddress(connectedAddress) + '</strong> is not a guardian for this piece.</span>'
         + (expected ? '<div style="margin-top:8px;font-size:12px">Guardian wallet' + (hints.length > 1 ? 's' : '') + ' for this piece:' + expected + '</div>' : '');
@@ -5977,6 +5991,7 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
           document.getElementById('guardian-actions').style.display = 'block';
           document.getElementById('guardian-connect').style.display = 'none';
           document.getElementById('guardian-buttons').style.display = 'flex';
+          updateDelegationButton(data.agentId);
           document.getElementById('guardian-status').innerHTML =
             'Connected as <strong>' + connectedAddress.slice(0, 6) + '...' + connectedAddress.slice(-4) + '</strong>' +
             (data.agentName ? ' (guardian of ' + data.agentName + ')' : '') +
@@ -5996,6 +6011,7 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
         document.getElementById('guardian-actions').style.display = 'block';
         document.getElementById('guardian-connect').style.display = 'block';
         document.getElementById('guardian-buttons').style.display = 'none';
+        updateDelegationButton(null);
         document.getElementById('guardian-status').innerHTML = '<span style="color:#ef4444">Could not verify guardian access. Refresh and try again.</span>';
       }
     }
@@ -8875,6 +8891,7 @@ Content-Type: application/json
 
           return json({
             isGuardian: true,
+            agentId: legacy.id || null,
             agentName: legacy.name || legacy.id,
             alreadyApproved: !!(approval && approval.approved),
             alreadyRejected: !!(approval && approval.rejected),
@@ -8889,6 +8906,7 @@ Content-Type: application/json
 
         return json({
           isGuardian: true,
+          agentId: collab.agent_id || null,
           agentName: collab.agent_name || collab.agent_id,
           alreadyApproved: !!(approval && approval.approved),
           alreadyRejected: !!(approval && approval.rejected),
