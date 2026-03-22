@@ -49,6 +49,44 @@ function byteLength(value) {
   return new TextEncoder().encode(String(value || '')).length;
 }
 
+const SMALL_TITLE_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'nor', 'of', 'on', 'or', 'per', 'the', 'to', 'vs', 'via']);
+
+function titleCaseSegment(segment, force = false) {
+  const raw = String(segment || '');
+  if (!raw) return '';
+  if (/^[0-9]+$/.test(raw)) return raw;
+  if (/^[A-Z0-9]+$/.test(raw) && raw.length <= 5) return raw;
+  const lower = raw.toLowerCase();
+  if (!force && SMALL_TITLE_WORDS.has(lower)) return lower;
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+function titleCaseWord(word, force = false) {
+  return String(word || '')
+    .split(/([\-–—/:]+)/)
+    .map(part => {
+      if (/^[\-–—/:]+$/.test(part)) return part;
+      let isFirstSegment = true;
+      return part
+        .split(/([’'])/)
+        .map(sub => {
+          if (sub === '\'' || sub === '’') return sub;
+          const out = titleCaseSegment(sub, isFirstSegment ? force : false);
+          isFirstSegment = false;
+          return out;
+        })
+        .join('');
+    })
+    .join('');
+}
+
+function formatArtworkTitle(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const words = raw.split(/\s+/);
+  return words.map((word, index) => titleCaseWord(word, index === 0 || index === words.length - 1)).join(' ');
+}
+
 function cleanIntentValue(value, maxLen = 4000) {
   if (value === undefined || value === null) return '';
   return String(value).replace(/\r\n?/g, '\n').trim().slice(0, maxLen);
@@ -592,7 +630,7 @@ function buildSplitHTML(imageUrlA, imageUrlB, title, artists, date) {
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh}
 .split{position:relative;width:100vw;height:100vh;overflow:hidden}
-.half{position:absolute;top:0;height:100%;overflow:hidden}
+.half{position:absolute;top:0;width:100%;height:100%;overflow:hidden}
 .half img{position:absolute;top:0;width:100vw;height:100vh;object-fit:cover}
 .left{left:0;clip-path:polygon(0 0,50% 0,50% 100%,0 100%)}
 .left img{left:0}
@@ -795,6 +833,43 @@ imageSrcs.forEach((src,i)=>{
 </html>`;
 }
 
+function buildLegacyOverlapCollageHTML(imageUrls, title, artists, date) {
+  const displayTitle = formatArtworkTitle(title);
+  const artistLine = artists.map(a => esc(a)).join(' × ');
+  const imageA = imageUrls[0] || '';
+  const imageB = imageUrls[1] || imageUrls[0] || '';
+  const artistA = artists[0] || 'Agent A';
+  const artistB = artists[1] || 'Agent B';
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(displayTitle)} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.collage-stage{position:relative;width:min(90vw,860px);height:min(88vh,760px)}
+.cutout{position:absolute;overflow:hidden;border:2px solid rgba(255,255,255,0.08);background:#05060a;box-shadow:0 24px 70px rgba(0,0,0,0.56);transition:transform .28s ease,box-shadow .28s ease,border-color .28s ease;will-change:transform}
+.cutout:hover{box-shadow:0 34px 90px rgba(0,0,0,0.68);border-color:rgba(214,236,237,0.36)}
+.cutout img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(1.02) contrast(1.02)}
+.cutout-a{top:4%;left:6%;width:58%;height:72%;border-radius:18px 6px 20px 8px;transform:rotate(-3.2deg)}
+.cutout-a:hover{transform:translate(-10px,-8px) rotate(-4deg) scale(1.03);z-index:4}
+.cutout-b{right:6%;bottom:4%;width:56%;height:68%;border-radius:8px 20px 10px 18px;transform:rotate(2.8deg);z-index:3}
+.cutout-b:hover{transform:translate(10px,-10px) rotate(3.6deg) scale(1.03);z-index:5}
+.tag{position:absolute;bottom:8px;left:8px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.42);padding:5px 8px;background:rgba(0,0,0,0.54);border-radius:4px;pointer-events:none}
+.sig{position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity .8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,.72);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,.45);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,.25);letter-spacing:1px;margin-top:6px}
+</style></head><body>
+<div class="collage-stage">
+  <div class="cutout cutout-a"><img src="${esc(imageA)}" alt="${esc(artistA)}"/><div class="tag">${esc(artistA)}</div></div>
+  <div class="cutout cutout-b"><img src="${esc(imageB)}" alt="${esc(artistB)}"/><div class="tag">${esc(artistB)}</div></div>
+</div>
+<div class="sig" id="sig"><div class="sig-t">${esc(displayTitle)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(date)}</div></div>
+<script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
+</body></html>`;
+}
+
 async function buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists, date) {
   const artistLine = artists.map(a => esc(a)).join(' × ');
   const codeModel = pickCodeModel();
@@ -847,11 +922,12 @@ Create a generative art piece that captures the collision between these two pers
 }
 
 function buildVeniceArtHTML(imageUrl, title, artists, artPrompt, date) {
+  const displayTitle = formatArtworkTitle(title);
   const artistLine = artists.map(a => esc(a)).join(' × ');
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} · DeviantClaw</title>
+<title>${esc(displayTitle)} · DeviantClaw</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;display:flex;align-items:center;justify-content:center;height:100vh}
@@ -862,9 +938,9 @@ img{max-width:100vw;max-height:100vh;object-fit:contain;display:block}
 .sig-a{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1.5px}
 .sig-g{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:6px}
 </style></head><body>
-<img src="${esc(imageUrl)}" alt="${esc(title)}"/>
+<img src="${esc(imageUrl)}" alt="${esc(displayTitle)}"/>
 <div class="sig" id="sig">
-<div class="sig-t">${esc(title)}</div>
+<div class="sig-t">${esc(displayTitle)}</div>
 <div class="sig-a">${artistLine}</div>
 <div class="sig-g">deviantclaw · ${esc(date)}</div>
 </div>
@@ -958,11 +1034,11 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
   }
 
   // 3. Title
-  const title = (await veniceText(apiKey,
-    'You name artworks. Output ONLY a 2-5 word title. Lowercase. No quotes. Poetic, slightly cryptic.',
+  const title = formatArtworkTitle((await veniceText(apiKey,
+    'You name artworks. Output ONLY a 2-5 word title in Title Case. No quotes. Poetic, slightly cryptic.',
     `Art: ${artPrompt}\nArtists: ${artists.join(', ')}`,
     { maxTokens: 20, temperature: 1.0 }
-  )).trim().replace(/^["']|["']$/g, '');
+  )).trim().replace(/^["']|["']$/g, ''));
 
   // 4. Description
   const description = (await veniceText(apiKey,
@@ -1203,11 +1279,11 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     imageDataUri = await veniceImage(apiKey, artPrompt);
   }
 
-  const title = (await veniceText(apiKey,
-    'You name artworks. Output ONLY a 2-5 word title. Lowercase. No quotes. Poetic, slightly cryptic.',
+  const title = formatArtworkTitle((await veniceText(apiKey,
+    'You name artworks. Output ONLY a 2-5 word title in Title Case. No quotes. Poetic, slightly cryptic.',
     `Art: ${artPrompt}\nArtists: ${artists.join(', ')}`,
     { maxTokens: 20, temperature: 1.0 }
-  )).trim().replace(/^["']|["']$/g, '');
+  )).trim().replace(/^["']|["']$/g, ''));
 
   const description = (await veniceText(apiKey,
     'Write a 1-2 sentence gallery description. Max 50 words. Output ONLY the description.',
@@ -3043,7 +3119,7 @@ function generateLegacySlotThumbnailSvg(piece, label, slotIndex = 0) {
   const accent = colors.ca;
   const accent2 = colors.c2;
   const shadow = colors.c1;
-  const title = esc(piece?.title || 'Untitled');
+  const title = esc(formatArtworkTitle(piece?.title || 'Untitled'));
   const agent = esc(label || `slot ${slotIndex + 1}`);
   const method = esc(String(piece?.method || 'legacy').toUpperCase());
 
@@ -3166,7 +3242,7 @@ function absoluteUrl(origin, pathOrUrl) {
 }
 
 function syncLegacyPieceHtml(html, piece, artists = []) {
-  const safeTitle = esc(piece?.title || 'untitled');
+  const safeTitle = esc(formatArtworkTitle(piece?.title || 'untitled'));
   const safeArtists = artists.map(a => esc(a)).filter(Boolean).join(' × ');
   const safeDate = esc(String(piece?.created_at || '').slice(0, 10));
   let fixed = String(html || '');
@@ -3476,15 +3552,15 @@ function pieceCard(p) {
   const demoRoutes = { 'collage-demo-001': '/collage-demo', 'split-demo-001': '/split-demo' };
   const previewImage = piecePreviewImagePath(p);
   if (demoRoutes[p.id]) {
-    previewContent = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
+    previewContent = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(formatArtworkTitle(p.title))}" sandbox="allow-scripts"></iframe>`;
   } else if (LIVE_IFRAME_PREVIEW_METHODS.has(String(p.method || '').toLowerCase()) && (p.html_len > 100 || (p.html && p.html.length > 100))) {
-    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
+    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(formatArtworkTitle(p.title))}" sandbox="allow-scripts"></iframe>`;
   } else if (previewImage) {
-    previewContent = `<img src="${esc(previewImage)}" alt="${esc(p.title)}" loading="lazy" />`;
+    previewContent = `<img src="${esc(previewImage)}" alt="${esc(formatArtworkTitle(p.title))}" loading="lazy" />`;
   } else if (p.html_len > 100 || (p.html && p.html.length > 100)) {
-    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
+    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(formatArtworkTitle(p.title))}" sandbox="allow-scripts"></iframe>`;
   } else {
-    previewContent = `<img src="${generateThumbnail(p)}" alt="${esc(p.title)}" loading="lazy" />`;
+    previewContent = `<img src="${generateThumbnail(p)}" alt="${esc(formatArtworkTitle(p.title))}" loading="lazy" />`;
   }
 
   // Build artist names from collaborators array if available, else fall back to agent_a/agent_b
@@ -3502,7 +3578,7 @@ function pieceCard(p) {
 
   return `<a href="/piece/${esc(p.id)}" class="card${foilCardClass(p)}">
       <div class="card-preview">${previewContent}${interactiveTag}</div>
-      <div class="card-title">${esc(p.title)}</div>
+      <div class="card-title">${esc(formatArtworkTitle(p.title))}</div>
       <div class="card-agents">${artistsDisplay}</div>
       <div class="card-status-row">${badge}${legacyBadge}</div>
       <div class="card-footer">
@@ -5342,30 +5418,19 @@ async function renderArtists(db) {
       : '';
     let media;
     if (demoRoutes[piece.id]) {
-      media = `<iframe src="${demoRoutes[piece.id]}" loading="lazy" title="${esc(piece.title)}" sandbox="allow-scripts"></iframe>`;
+      media = `<iframe src="${demoRoutes[piece.id]}" loading="lazy" title="${esc(formatArtworkTitle(piece.title))}" sandbox="allow-scripts"></iframe>`;
     } else if (LIVE_IFRAME_PREVIEW_METHODS.has(String(piece.method || '').toLowerCase()) && (piece.html_len > 100 || (piece.html && piece.html.length > 100))) {
-      media = `<iframe src="/api/pieces/${esc(piece.id)}/view" loading="lazy" title="${esc(piece.title)}" sandbox="allow-scripts"></iframe>`;
+      media = `<iframe src="/api/pieces/${esc(piece.id)}/view" loading="lazy" title="${esc(formatArtworkTitle(piece.title))}" sandbox="allow-scripts"></iframe>`;
     } else if (previewImage) {
       media = buildArtistPreviewImageTag(piece, previewImage);
     } else {
       media = buildArtistPreviewImageTag(piece, '');
     }
 
-    const partnerNames = collabPartnersForProfilePiece(piece, agent.id, agent.name);
-    const latestLine = partnerNames.length > 0
-      ? `with ${partnerNames.map(name => esc(name)).join(', ')} · ${esc(String(piece.mode || 'duo'))}`
-      : `${esc(String(piece.mode || 'solo'))} · ${esc(String(piece.method || 'art'))}`;
-
     return `
       <div class="artist-card-preview">
         ${media}
         ${superRareIcon}
-        <div class="artist-card-preview-shade"></div>
-        <div class="artist-card-preview-copy">
-          <div class="artist-card-preview-kicker">Latest Piece</div>
-          <div class="artist-card-preview-title">${esc(piece.title || 'Untitled')}</div>
-          <div class="artist-card-preview-sub">${latestLine}</div>
-        </div>
       </div>`;
   }
 
@@ -5376,7 +5441,6 @@ async function renderArtists(db) {
     const latestPiece = latestPieceByAgent.get(a.id) || null;
     const bio = String(a.bio || a.soul_excerpt || a.soul || a.role || '').trim();
     const truncBio = bio.length > 150 ? bio.slice(0, 150) + '…' : bio;
-    const latestBadge = latestPiece ? pieceStatusBadge(latestPiece) : '<span class="status-badge status-draft">Quiet</span>';
     const statsLine = [
       `${stats.total} piece${stats.total !== 1 ? 's' : ''}`,
       stats.collabs > 0 ? `${stats.collabs} collab${stats.collabs !== 1 ? 's' : ''}` : '',
@@ -5397,7 +5461,6 @@ async function renderArtists(db) {
           <div class="artist-info">
             <div class="artist-title-row">
               <div class="artist-name">${esc(a.name)}</div>
-              ${latestBadge}
             </div>
             ${a.mood ? `<div class="artist-mood">${esc(a.mood)}</div>` : ''}
           </div>
@@ -5728,6 +5791,7 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
   if (!piece) {
     return htmlResponse(page('Not Found', '', '<div class="container"><div class="empty-state">Piece not found.</div></div>'), 404);
   }
+  const pieceTitle = formatArtworkTitle(piece.title || 'Untitled');
 
   try {
     const img = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
@@ -6043,9 +6107,9 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
     frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
   } else if (hasStoredImage) {
     // Venice image pieces: show the actual stored image
-    frameContent = `<img src="/api/pieces/${esc(piece.id)}/image" alt="${esc(piece.title)}" />`;
+    frameContent = `<img src="/api/pieces/${esc(piece.id)}/image" alt="${esc(pieceTitle)}" />`;
   } else if (hasImageUrl) {
-    frameContent = `<img src="${esc(piece.image_url)}" alt="${esc(piece.title)}" />`;
+    frameContent = `<img src="${esc(piece.image_url)}" alt="${esc(pieceTitle)}" />`;
   } else if (piece.html && piece.html.length > 100) {
     frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
   } else {
@@ -6069,7 +6133,7 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
   </div>
   <div class="piece-header">
     <div class="piece-fullscreen-row"><a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">⛶ Fullscreen</a></div>
-    <div class="piece-title-row"><h1 class="piece-title">${esc(piece.title)}</h1>${pieceSuperRareIcon}${badge}</div>
+    <div class="piece-title-row"><h1 class="piece-title">${esc(pieceTitle)}</h1>${pieceSuperRareIcon}${badge}</div>
     <div class="piece-artists">${artistsHTML}</div>
     <div class="piece-date">${(piece.created_at || '').slice(0, 10)} · ${esc(piece.mode || 'solo')}</div>
   </div>
@@ -6079,12 +6143,12 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
 
   const pieceImage = absoluteUrl(origin, piecePreviewImagePath(piece)) || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg';
   const pieceMeta = {
-    title: `${piece.title} · DeviantClaw`,
+    title: `${pieceTitle} · DeviantClaw`,
     description: piece.description || `${piece.mode || 'solo'} piece on DeviantClaw`,
     image: pieceImage,
     url: `https://deviantclaw.art/piece/${id}`
   };
-  return htmlResponse(page(piece.title, PIECE_CSS + STATUS_CSS, body, pieceMeta));
+  return htmlResponse(page(pieceTitle, PIECE_CSS + STATUS_CSS, body, pieceMeta));
 }
 
 async function renderAgent(db, agentId, env, url) {
@@ -6158,20 +6222,20 @@ async function renderAgent(db, agentId, env, url) {
     const demoRoutes = { 'collage-demo-001': '/collage-demo', 'split-demo-001': '/split-demo' };
     const previewImage = piecePreviewImagePath(p);
     if (demoRoutes[p.id]) {
-      agentPreview = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
+      agentPreview = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(formatArtworkTitle(p.title))}" sandbox="allow-scripts"></iframe>`;
     } else if (previewImage) {
-      agentPreview = `<img src="${esc(previewImage)}" alt="${esc(p.title)}" loading="lazy" />`;
+      agentPreview = `<img src="${esc(previewImage)}" alt="${esc(formatArtworkTitle(p.title))}" loading="lazy" />`;
     } else if (p.html_len > 100 || (p.html && p.html.length > 100)) {
-      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(p.title)}" sandbox="allow-scripts"></iframe>`;
+      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(formatArtworkTitle(p.title))}" sandbox="allow-scripts"></iframe>`;
     } else {
-      agentPreview = `<img src="${generateThumbnail(p)}" alt="${esc(p.title)}" loading="lazy" />`;
+      agentPreview = `<img src="${generateThumbnail(p)}" alt="${esc(formatArtworkTitle(p.title))}" loading="lazy" />`;
     }
     const badge = pieceStatusBadge(p);
     const legacyBadge = isLegacyMainnetPiece(p) ? '<span class="card-note-badge card-note-legacy" title="Legacy test piece. This will not show up on the live Base contract.">Legacy Test</span>' : '';
     const superRareIcon = effectivePieceStatus(p) === 'minted' ? `<div class="card-sr${foilIconClass(p)}" title="Minted on SuperRare"><img src="/assets/brands/superrare-symbol-white.svg" alt="Minted on SuperRare" loading="lazy"/></div>` : '';
     return `<a href="/piece/${esc(p.id)}" class="card${foilCardClass(p)}">
       <div class="card-preview">${agentPreview}</div>
-      <div class="card-title">${esc(p.title)}</div>
+      <div class="card-title">${esc(formatArtworkTitle(p.title))}</div>
       <div class="card-agents">${artistsDisplay}</div>
       <div class="card-status-row">${badge}${legacyBadge}</div>
       <div class="card-footer">
@@ -6935,6 +6999,13 @@ export default {
   #create-wrap #c-memory-file::-webkit-file-upload-button{margin-right:12px;border:1px solid rgba(122,155,171,0.56);background:rgba(122,155,171,0.18);color:#edf6f9;border-radius:999px;padding:9px 14px;font:inherit;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;cursor:pointer;transition:background 0.2s,border-color 0.2s,color 0.2s}
   #create-wrap #c-memory-file:hover::file-selector-button,#create-wrap #c-memory-file:hover::-webkit-file-upload-button{background:rgba(122,155,171,0.24);border-color:rgba(122,155,171,0.6);color:#d8e7ec}
   #create-wrap #c-status{font-size:13px!important;color:#d8e5eb!important}
+  #create-wrap .create-loading{display:none;align-items:center;gap:12px;margin-top:14px;padding:12px 14px;border:1px solid rgba(122,155,171,0.32);border-radius:14px;background:linear-gradient(135deg,rgba(122,155,171,0.12),rgba(184,150,168,0.08));color:#edf6f9}
+  #create-wrap .create-loading.show{display:flex}
+  #create-wrap .create-spinner{width:18px;height:18px;border-radius:999px;border:2px solid rgba(237,246,249,0.2);border-top-color:#edf6f9;animation:createSpin .9s linear infinite;flex:0 0 auto}
+  #create-wrap .create-loading-copy{display:grid;gap:2px;min-width:0}
+  #create-wrap .create-loading-title{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:#f3fbff}
+  #create-wrap .create-loading-note{font-size:12px;color:#d5e3e9;line-height:1.55}
+  @keyframes createSpin{to{transform:rotate(360deg)}}
   @media (max-width:640px){
     #create-wrap{padding:0 12px}
     #create-wrap .create-card{padding:16px}
@@ -7032,6 +7103,13 @@ export default {
     </div>
 
     <button id="c-btn" onclick="createArt()" style="margin-top:20px;width:100%;border:none;border-radius:999px;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);color:#050507;font:inherit;font-size:13px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;padding:13px;cursor:pointer;transition:filter 0.2s,transform 0.2s;box-shadow:0 10px 26px rgba(0,0,0,0.24)">Create →</button>
+    <div id="c-loading" class="create-loading" aria-live="polite">
+      <div class="create-spinner"></div>
+      <div class="create-loading-copy">
+        <div id="c-loading-title" class="create-loading-title">Generating</div>
+        <div id="c-loading-note" class="create-loading-note">Submitting your intent to DeviantClaw.</div>
+      </div>
+    </div>
     <div id="c-status" style="margin-top:12px;font-size:12px"></div>
   </div>
 
@@ -7110,6 +7188,41 @@ function createArt(){
   var method=document.getElementById('c-method').value||'auto';
   var st=document.getElementById('c-status');
   var btn=document.getElementById('c-btn');
+  var loading=document.getElementById('c-loading');
+  var loadingTitle=document.getElementById('c-loading-title');
+  var loadingNote=document.getElementById('c-loading-note');
+  if(window._createLoaderTimer){clearInterval(window._createLoaderTimer);window._createLoaderTimer=null}
+  function setLoading(active){
+    if(!loading||!loadingTitle||!loadingNote)return;
+    if(!active){
+      loading.classList.remove('show');
+      return;
+    }
+    var stages = method==='code'
+      ? [
+          ['Generating code art','Sending the concept through the Venice coder path.'],
+          ['Compiling the world','Building the lobster contract theatre and browser scene.'],
+          ['Still cooking','Longer code pieces can take a little while. Keep this page open.']
+        ]
+      : [
+          ['Generating artwork','Submitting your intent to DeviantClaw.'],
+          ['Rendering with Venice','The image pipeline is still working.'],
+          ['Still cooking','This can take a little while. Keep this page open.']
+        ];
+    var stageIndex = 0;
+    loadingTitle.textContent = stages[0][0];
+    loadingNote.textContent = stages[0][1];
+    loading.classList.add('show');
+    window._createLoaderTimer = setInterval(function(){
+      stageIndex = Math.min(stageIndex + 1, stages.length - 1);
+      loadingTitle.textContent = stages[stageIndex][0];
+      loadingNote.textContent = stages[stageIndex][1];
+      if(stageIndex === stages.length - 1 && window._createLoaderTimer){
+        clearInterval(window._createLoaderTimer);
+        window._createLoaderTimer = null;
+      }
+    }, 5000);
+  }
   if(!agent){st.innerHTML='<span style="color:var(--danger)">Enter your agent ID</span>';return}
   if(!creativeIntent&&!statement&&!memoryText){st.innerHTML='<span style="color:var(--danger)">Add creative intent, a statement, or a memory file</span>';return}
   if(creativeIntent&&creativeIntent.match(/^https?:\\/\\//)){st.innerHTML='<span style="color:var(--danger)">Describe your art in words, not a URL. What mood, form, visual, or scene do you want?</span>';return}
@@ -7129,6 +7242,7 @@ function createArt(){
   if(method&&method!=='auto')payload.method=method;
   if(collab)payload.preferredPartner=collab.toLowerCase().replace(/[^a-z0-9-]/g,'-');
   btn.disabled=true;btn.textContent='Creating...';
+  setLoading(true);
   st.innerHTML='<span style="color:var(--primary)">Submitting creative intent...</span>';
   fetch('/api/match',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
     body:JSON.stringify(payload)
@@ -7138,8 +7252,9 @@ function createArt(){
       else if(r.data.requestId)st.innerHTML='<span style="color:var(--primary)">In the queue. Waiting for '+(mode==='duo'?'1 more agent':mode==='trio'?'2 more agents':'3 more agents')+'. <a href="/queue" style="color:var(--primary)">View queue →</a></span>';
       else st.innerHTML='<span style="color:var(--primary)">Submitted.</span>';
     }else{st.innerHTML='<span style="color:var(--danger)">'+(r.data.error||'Failed')+'</span>'}
+    setLoading(false);
     btn.disabled=false;btn.textContent='Create →';
-  }).catch(function(e){st.innerHTML='<span style="color:var(--danger)">'+e.message+'</span>';btn.disabled=false;btn.textContent='Create →';});
+  }).catch(function(e){st.innerHTML='<span style="color:var(--danger)">'+e.message+'</span>';setLoading(false);btn.disabled=false;btn.textContent='Create →';});
 }
 pickMode(document.getElementById('c-mode').value||'duo');
 </script>`;
@@ -8950,7 +9065,7 @@ Content-Type: application/json
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/view$/)) {
         const id = path.split('/')[3];
         const piece = await db.prepare(
-          'SELECT id, title, html, method, created_at, agent_a_name, agent_b_name FROM pieces WHERE id = ?'
+          'SELECT id, title, html, method, created_at, agent_a_name, agent_b_name, legacy_mainnet FROM pieces WHERE id = ?'
         ).bind(id).first();
         if (!piece) return htmlResponse('<h1>Not found</h1>', 404);
         const adminFoilTier = ADMIN_FOIL_OVERRIDES[id];
@@ -8973,7 +9088,13 @@ Content-Type: application/json
           if (names.length > 0) artists = names;
         } catch { /* optional table */ }
 
-        html = syncLegacyPieceHtml(html, piece, artists);
+        if (String(piece.method || '').toLowerCase() === 'split') {
+          html = buildSplitHTML(`/api/pieces/${id}/image`, `/api/pieces/${id}/image-b`, piece.title, artists, String(piece.created_at || '').slice(0, 10));
+        } else if (String(piece.method || '').toLowerCase() === 'collage' && Number(piece.legacy_mainnet || 0) === 1 && artists.length === 2) {
+          html = buildLegacyOverlapCollageHTML([`/api/pieces/${id}/image`, `/api/pieces/${id}/image-b`], piece.title, artists, String(piece.created_at || '').slice(0, 10));
+        } else {
+          html = syncLegacyPieceHtml(html, piece, artists);
+        }
 
         if (html.includes('{{PIECE_IMAGE_URL')) {
           const imgA = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
