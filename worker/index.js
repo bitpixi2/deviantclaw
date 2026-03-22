@@ -1799,6 +1799,42 @@ function pieceFoilTier(piece) {
   return '';
 }
 
+function buildAdminFoilStaticView(piece, tier = 'gold') {
+  const id = encodeURIComponent(String(piece?.id || '').trim());
+  const safeTitle = esc(String(piece?.title || 'DeviantClaw'));
+  const imageSrc = `/api/pieces/${id}/image`;
+  const fallbackSrc = `/api/pieces/${id}/thumbnail`;
+  const isGold = tier === 'gold';
+  const frameBefore = isGold
+    ? 'linear-gradient(135deg,rgba(255,221,154,0.28),rgba(246,205,106,0.98) 26%,rgba(138,96,32,0.42) 58%,rgba(255,236,168,0.92) 84%,rgba(255,221,154,0.28))'
+    : 'linear-gradient(135deg,rgba(255,255,255,0.22),rgba(224,247,255,0.96) 24%,rgba(193,181,255,0.34) 56%,rgba(214,255,250,0.9) 84%,rgba(255,255,255,0.22))';
+  const frameAfter = isGold
+    ? 'linear-gradient(112deg,transparent 28%,rgba(255,245,210,0.04) 42%,rgba(255,233,156,0.92) 49%,rgba(255,249,228,0.82) 52%,rgba(214,164,67,0.16) 57%,transparent 70%)'
+    : 'linear-gradient(120deg,transparent 18%,rgba(255,255,255,0.02) 32%,rgba(255,255,255,0.84) 45%,rgba(207,236,255,0.32) 49%,rgba(255,214,241,0.26) 53%,transparent 72%)';
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${safeTitle} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%}
+body{background:#000;overflow:hidden}
+.stage{position:fixed;inset:0;display:grid;place-items:center;background:#000}
+.stage img{display:block;width:100vw;height:100vh;object-fit:contain;background:#000}
+.foil-frame{position:fixed;inset:12px;border-radius:2px;pointer-events:none}
+.foil-frame::before,.foil-frame::after{content:'';position:absolute;inset:0;pointer-events:none}
+.foil-frame::before{border-radius:inherit;padding:2px;background:${frameBefore};-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.9;animation:dcFoilPulse 4.8s ease-in-out infinite}
+.foil-frame::after{inset:-2px;border-radius:inherit;padding:4px;background:${frameAfter};-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;mix-blend-mode:screen;filter:blur(4px);opacity:.52;animation:dcGoldGlint 3.8s ease-in-out infinite}
+@keyframes dcFoilPulse{0%,100%{opacity:.62}50%{opacity:.96}}
+@keyframes dcGoldGlint{0%{transform:translateX(-72%) translateY(-4%) rotate(8deg);opacity:0}18%{opacity:.18}46%{opacity:.72}54%{opacity:.86}68%{opacity:.26}100%{transform:translateX(68%) translateY(8%) rotate(8deg);opacity:0}}
+</style></head><body>
+<div class="stage">
+  <img src="${imageSrc}" alt="${safeTitle}" onerror="if(this.src.indexOf('/thumbnail')===-1)this.src='${fallbackSrc}'" />
+</div>
+<div class="foil-frame" aria-hidden="true"></div>
+</body></html>`;
+}
+
 async function ensurePieceIsMainnetEligible(piece) {
   if (isLegacyMainnetPiece(piece)) {
     const reason = piece?.legacy_reason || 'This piece predates the Base mainnet proposal bridge.';
@@ -2348,13 +2384,14 @@ nav .links a.make-art-btn:hover{color:#050507;filter:brightness(1.05)}
 .card-foil::after,.piece-frame-foil::after{content:'';position:absolute;inset:-2px;border-radius:inherit;padding:3px;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;mix-blend-mode:screen;filter:blur(4px);opacity:.48;z-index:4;animation:dcFoilSweep 4.4s ease-in-out infinite}
 .card-foil-silver::before,.piece-frame-foil-silver::before{background:conic-gradient(from 0deg,rgba(255,255,255,0.18),rgba(196,210,224,0.95),rgba(116,134,152,0.32),rgba(240,246,255,0.82),rgba(255,255,255,0.18))}
 .card-foil-silver::after,.piece-frame-foil-silver::after{background:linear-gradient(120deg,transparent 18%,rgba(242,247,255,0.02) 32%,rgba(241,248,255,0.8) 49%,rgba(180,198,214,0.18) 54%,transparent 72%)}
-.card-foil-gold::before,.piece-frame-foil-gold::before{background:conic-gradient(from 0deg,rgba(255,220,151,0.18),rgba(246,205,106,0.94),rgba(138,96,32,0.34),rgba(255,236,168,0.92),rgba(255,220,151,0.18))}
-.card-foil-gold::after,.piece-frame-foil-gold::after{background:linear-gradient(120deg,transparent 18%,rgba(255,233,175,0.02) 32%,rgba(255,223,122,0.86) 49%,rgba(214,164,67,0.18) 54%,transparent 72%)}
+.card-foil-gold::before,.piece-frame-foil-gold::before{background:linear-gradient(135deg,rgba(255,221,154,0.24),rgba(246,205,106,0.96) 26%,rgba(138,96,32,0.38) 58%,rgba(255,236,168,0.9) 84%,rgba(255,221,154,0.24));animation:dcFoilPulse 4.8s ease-in-out infinite}
+.card-foil-gold::after,.piece-frame-foil-gold::after{background:linear-gradient(112deg,transparent 28%,rgba(255,245,210,0.04) 42%,rgba(255,233,156,0.92) 49%,rgba(255,249,228,0.78) 52%,rgba(214,164,67,0.16) 57%,transparent 70%);animation:dcGoldGlint 3.8s ease-in-out infinite}
 .card-foil-diamond::before,.piece-frame-foil-diamond::before{background:conic-gradient(from 0deg,rgba(255,255,255,0.18),rgba(224,247,255,0.96),rgba(193,181,255,0.34),rgba(255,205,241,0.34),rgba(214,255,250,0.92),rgba(255,255,255,0.18))}
 .card-foil-diamond::after,.piece-frame-foil-diamond::after{background:linear-gradient(120deg,transparent 18%,rgba(255,255,255,0.02) 32%,rgba(255,255,255,0.84) 45%,rgba(207,236,255,0.32) 49%,rgba(255,214,241,0.26) 53%,transparent 72%)}
 @keyframes dcFoilRotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes dcFoilPulse{0%,100%{opacity:.62}50%{opacity:.96}}
 @keyframes dcFoilSweep{0%{transform:translateX(-40%) translateY(-8%) rotate(8deg)}50%{transform:translateX(24%) translateY(4%) rotate(8deg)}100%{transform:translateX(82%) translateY(10%) rotate(8deg)}}
+@keyframes dcGoldGlint{0%{transform:translateX(-72%) translateY(-4%) rotate(8deg);opacity:0}18%{opacity:.18}46%{opacity:.72}54%{opacity:.86}68%{opacity:.26}100%{transform:translateX(68%) translateY(8%) rotate(8deg);opacity:0}}
 .card .card-agents{font-size:14px;color:var(--secondary);margin-top:4px}
 .card .card-preview{height:240px;background:var(--bg);border-radius:4px;margin-bottom:12px;overflow:hidden;position:relative}
 .card .card-preview img{width:100%;height:100%;object-fit:cover}
@@ -2453,9 +2490,9 @@ const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 .filter-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .filter-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);min-width:90px;flex-shrink:0}
 .filter-pills{display:flex;gap:6px;flex-wrap:wrap}
-.filter-pill{display:inline-block;padding:5px 12px;font-size:11px;letter-spacing:1px;border:1px solid var(--border);border-radius:20px;color:var(--dim);text-decoration:none;text-transform:uppercase;transition:all 0.15s}
-.filter-pill:hover{border-color:var(--primary);color:var(--primary)}
-.filter-pill.active{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+.filter-pill{display:inline-block;padding:6px 14px;font-size:11px;letter-spacing:1px;border:none;border-radius:999px;color:#050507;text-decoration:none;text-transform:uppercase;transition:filter 0.15s,transform 0.15s,box-shadow 0.15s;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);font-weight:700;box-shadow:0 8px 22px rgba(0,0,0,0.22)}
+.filter-pill:hover{filter:brightness(1.05);transform:translateY(-1px);color:#050507}
+.filter-pill.active{background:linear-gradient(90deg,#ffffff 0%,#c7e6ef 26%,#dcb7c6 62%,#efd9a2 100%);color:#050507;box-shadow:0 10px 26px rgba(0,0,0,0.28),0 0 0 1px rgba(255,255,255,0.32) inset}
 .gallery-pagination{display:flex;justify-content:center;gap:8px;margin-top:32px;padding-bottom:24px}
 .gallery-pagination a,.gallery-pagination span{display:inline-block;padding:8px 16px;font-size:12px;letter-spacing:1px;border:1px solid var(--border);border-radius:4px;color:var(--dim);text-decoration:none}
 .gallery-pagination a:hover{border-color:var(--primary);color:var(--primary)}
@@ -2504,11 +2541,16 @@ const AGENT_CSS = `
 .agent-role{font-size:15px;color:var(--secondary);letter-spacing:1px;margin-top:4px}
 
 /* Stats row */
-.agent-stats-row{display:flex;gap:24px;padding:16px 24px;border-bottom:1px solid var(--border);margin-bottom:20px;max-width:1400px;margin-left:auto;margin-right:auto}
+.agent-stats-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;padding:16px 24px;border-bottom:1px solid var(--border);margin-bottom:20px;max-width:1400px;margin-left:auto;margin-right:auto}
 @media(min-width:1100px){.agent-stats-row{padding:16px 32px}}
+.agent-stats-grid{display:flex;flex-wrap:wrap;gap:24px}
 .stat-item{text-align:center}
 .stat-number{font-size:20px;color:var(--agent-color,#6ee7b7);font-weight:400;display:block}
 .stat-label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+.agent-action-row{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px}
+.agent-action-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border:1px solid rgba(122,155,171,.45);border-radius:999px;background:rgba(122,155,171,.08);color:var(--primary);font-size:12px;letter-spacing:1.4px;text-transform:uppercase;text-decoration:none;transition:background .2s,color .2s,border-color .2s}
+.agent-action-btn:hover{background:rgba(122,155,171,.14);color:#cde2ea;border-color:rgba(122,155,171,.68)}
+@media(max-width:768px){.agent-stats-grid{gap:18px}.agent-action-row{width:100%;justify-content:flex-start}.agent-action-btn{width:100%}}
 
 /* Two-column layout */
 .agent-layout{display:grid;grid-template-columns:260px 1fr;gap:28px;padding:0 24px;max-width:1400px;margin:0 auto}
@@ -2537,13 +2579,15 @@ const AGENT_CSS = `
 .agent-guardian-info{font-size:12px;color:var(--dim);line-height:1.6}
 .agent-guardian-info a{color:var(--agent-color,#6ee7b7)}
 .agent-guardian-info .guardian-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:4px}
-.guardian-ens-link{display:inline-flex;align-items:center;gap:10px;color:var(--text);font-size:13px;letter-spacing:0.5px;line-height:1.4}
-.guardian-ens-link img{display:block;width:46px;height:auto;flex-shrink:0}
-.guardian-ens-note{max-width:22ch;font-size:12px;color:var(--dim);line-height:1.7}
+.guardian-ens-link{color:var(--agent-color,#6ee7b7)}
+.guardian-ens-cta{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:8px 12px;border:1px solid rgba(255,255,255,0.12);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--text);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;text-decoration:none;transition:border-color .2s,background .2s,color .2s}
+.guardian-ens-cta:hover{border-color:rgba(255,255,255,0.28);background:rgba(255,255,255,0.06);color:#fff}
+.guardian-ens-cta img{display:block;width:28px;height:auto;flex-shrink:0;filter:brightness(0) invert(1)}
 .agent-joined{font-size:13px;color:var(--dim);margin-top:8px}
 .agent-delete-link{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#7b8794;text-decoration:none}
 .agent-delete-link svg{width:14px;height:14px;flex-shrink:0}
 .agent-delete-link:hover{color:#a6b1bb}
+#delegation-section{scroll-margin-top:96px}
 
 /* Gallery section */
 .agent-gallery h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim);margin-bottom:16px}
@@ -2556,14 +2600,14 @@ const AGENT_CSS = `
 .section-header h2{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
 `;
 
-const STATUS_CSS = `.status-badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.035);color:#d6dae1;font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap;vertical-align:middle}
-.status-wip{color:#e1bf7a;border-color:rgba(204,154,67,0.32);background:rgba(148,105,34,0.18)}
-.status-proposed{color:#d4c6ef;border-color:rgba(145,123,209,0.3);background:rgba(98,78,151,0.18)}
-.status-approved{color:#cce6c7;border-color:rgba(108,158,97,0.3);background:rgba(68,102,61,0.18)}
-.status-minted{color:#c8ecf5;border-color:rgba(98,172,194,0.3);background:rgba(50,108,126,0.18)}
-.status-rejected{color:#e2b9bf;border-color:rgba(177,91,105,0.3);background:rgba(110,52,61,0.18)}
-.status-draft{color:#c3cad4;border-color:rgba(171,178,189,0.18);background:rgba(255,255,255,0.04)}
-.status-deleted{color:#8f97a2;border-color:rgba(126,133,144,0.2);background:rgba(72,78,88,0.14);text-decoration:line-through}
+const STATUS_CSS = `.status-badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.055);color:#eef3f8;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap;vertical-align:middle}
+.status-wip{color:#ffd78d;border-color:rgba(255,193,88,0.52);background:rgba(182,122,18,0.28)}
+.status-proposed{color:#eedbff;border-color:rgba(184,151,255,0.5);background:rgba(115,79,184,0.3)}
+.status-approved{color:#dcffd5;border-color:rgba(126,214,110,0.5);background:rgba(58,127,48,0.3)}
+.status-minted{color:#d8f7ff;border-color:rgba(110,215,245,0.52);background:rgba(32,126,154,0.3)}
+.status-rejected{color:#ffd2d8;border-color:rgba(228,110,132,0.48);background:rgba(134,44,60,0.28)}
+.status-draft{color:#dde6f0;border-color:rgba(199,208,221,0.28);background:rgba(255,255,255,0.08)}
+.status-deleted{color:#aeb8c4;border-color:rgba(153,163,176,0.28);background:rgba(91,101,116,0.18);text-decoration:line-through}
 .filter-tabs{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
 .filter-tab{font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:6px 14px;border:1px solid var(--border);border-radius:16px;color:var(--dim);background:transparent;cursor:pointer;text-decoration:none;transition:all 0.2s}
 .filter-tab:hover,.filter-tab.active{color:var(--primary);border-color:var(--primary);background:var(--primary)11}
@@ -5435,6 +5479,10 @@ async function renderAgent(db, agentId, env) {
   const guardianIdentity = String(agent.guardian_address || '').trim();
   const guardianEnsName = /\.(?:base\.)?eth$/i.test(guardianIdentity) ? guardianIdentity : '';
   const guardianEnsHref = guardianEnsName ? `https://app.ens.domains/${encodeURIComponent(guardianEnsName)}` : '';
+  const guardianDisplay = guardianIdentity
+    ? (guardianEnsName || (guardianIdentity.length > 20 ? guardianIdentity.slice(0, 10) + '...' + guardianIdentity.slice(-6) : guardianIdentity))
+    : '';
+  const ensClaimHref = 'https://app.ens.domains/';
 
   // Banner — fall back to cover.jpg if no custom banner
   const bannerContent = `<img class="banner-image" src="${esc(agent.banner_url || LOGO)}" alt="banner" loading="eager" fetchpriority="high" decoding="async" />`;
@@ -5494,12 +5542,12 @@ async function renderAgent(db, agentId, env) {
     <div class="sidebar-section">
       <h3>Guardian</h3>
       <div class="agent-guardian-info">
-        ${guardianEnsName ? `
-          <a href="${esc(guardianEnsHref)}" target="_blank" rel="noreferrer" class="guardian-ens-link">
-            <img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" />
-            <span>${esc(guardianEnsName)}</span>
-          </a>
-        ` : `<div class="guardian-ens-note">0x hashes are easy to mistype. ENS keeps guardian identity readable.</div>`}
+        ${guardianXHandle ? `<div><a href="https://x.com/${esc(guardianXHandle)}" target="_blank" rel="noreferrer">@${esc(guardianXHandle)}</a></div>` : ''}
+        ${guardianDisplay ? `<div style="margin-top:${guardianXHandle ? '4px' : '0'};font-size:11px;color:var(--dim)">${guardianEnsName ? `<a href="${esc(guardianEnsHref)}" target="_blank" rel="noreferrer" class="guardian-ens-link">${esc(guardianDisplay)}</a>` : esc(guardianDisplay)}</div>` : ''}
+        <a href="${ensClaimHref}" target="_blank" rel="noreferrer" class="guardian-ens-cta">
+          <img src="/assets/brands/ens.svg" alt="ENS" loading="lazy" />
+          <span>Get ENS</span>
+        </a>
       </div>
     </div>` : '';
 
@@ -5512,10 +5560,6 @@ async function renderAgent(db, agentId, env) {
       <div style="margin-top:10px;font-size:11px;color:var(--dim);line-height:1.6">
         The guardian wallet can sign a MetaMask function-call delegation for this agent.
         DeviantClaw only treats delegation as active when the grant is stored and the Base contract toggle is on.
-      </div>
-      <div style="margin-top:12px;font-size:11px;line-height:1.6">
-        <a href="/Heartbeat.md" style="color:var(--agent-color);text-decoration:none">Add Daily Heartbeat</a>
-        <span style="color:var(--dim)"> for agents that already run a cron or heartbeat loop.</span>
       </div>
     </div>
     <script type="module">
@@ -5880,10 +5924,16 @@ async function renderAgent(db, agentId, env) {
   </div>
 </div>
 <div class="agent-stats-row">
-  <div class="stat-item"><span class="stat-number">${count}</span><span class="stat-label">Pieces</span></div>
-  <div class="stat-item"><span class="stat-number">${collabCount}</span><span class="stat-label">Collabs</span></div>
-  <div class="stat-item"><span class="stat-number">${soloCount}</span><span class="stat-label">Solo</span></div>
-  <div class="stat-item"><span class="stat-number">${Object.keys(collabPartners).length}</span><span class="stat-label">Partners</span></div>
+  <div class="agent-stats-grid">
+    <div class="stat-item"><span class="stat-number">${count}</span><span class="stat-label">Pieces</span></div>
+    <div class="stat-item"><span class="stat-number">${collabCount}</span><span class="stat-label">Collabs</span></div>
+    <div class="stat-item"><span class="stat-number">${soloCount}</span><span class="stat-label">Solo</span></div>
+    <div class="stat-item"><span class="stat-number">${Object.keys(collabPartners).length}</span><span class="stat-label">Partners</span></div>
+  </div>
+  <div class="agent-action-row">
+    <a href="#delegation-section" class="agent-action-btn">MetaMask Delegate</a>
+    <a href="/Heartbeat.md" class="agent-action-btn" target="_blank" rel="noreferrer">Download Heartbeat</a>
+  </div>
 </div>
 <div class="container">
   <div class="agent-layout">
@@ -7995,6 +8045,10 @@ Content-Type: application/json
           'SELECT id, title, html, method, created_at, agent_a_name, agent_b_name FROM pieces WHERE id = ?'
         ).bind(id).first();
         if (!piece) return htmlResponse('<h1>Not found</h1>', 404);
+        const adminFoilTier = ADMIN_FOIL_OVERRIDES[id];
+        if (adminFoilTier) {
+          return htmlResponse(buildAdminFoilStaticView(piece, adminFoilTier));
+        }
         // D1 may return html as blob (ArrayBuffer/Uint8Array) — decode to string
         let html = piece.html;
         if (html instanceof ArrayBuffer) html = new TextDecoder().decode(html);
