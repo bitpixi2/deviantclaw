@@ -1,6 +1,6 @@
 const APP_ASSET_VERSION = '20260322b';
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
-const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
+const BRAND_LOCKUP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="760" height="430" viewBox="0 0 760 430" fill="none"><defs><linearGradient id="metal" x1="88" y1="292" x2="672" y2="410" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#EDF3F6"/><stop offset="0.28" stop-color="#A8C6CF"/><stop offset="0.62" stop-color="#B896A8"/><stop offset="1" stop-color="#D3C18E"/></linearGradient><filter id="glow" x="62" y="-16" width="636" height="462" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000000" flood-opacity="0.32"/></filter></defs><g filter="url(#glow)"><image href="https://deviantclaw.art/assets/brands/deviantclaw-icon.png" x="120" y="0" width="520" height="280" preserveAspectRatio="xMidYMid meet"/><text x="380" y="392" text-anchor="middle" fill="url(#metal)" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="82" font-weight="900" letter-spacing="3">DEVIANTCLAW</text></g></svg>`;
 
 export default {
   async fetch(request, env) {
@@ -25,6 +25,12 @@ export default {
             'Content-Type': 'application/javascript; charset=utf-8',
             'Cache-Control': 'no-store',
           },
+        });
+      }
+
+      if (method === 'GET' && path === '/brand-lockup.svg') {
+        return new Response(BRAND_LOCKUP_SVG, {
+          headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' },
         });
       }
 
@@ -347,7 +353,7 @@ function renderVerifyPage(config) {
     .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 24px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:10px; }
     .nav a { color:var(--primary); text-decoration:none; font-size:12px; }
     .brand { width:100%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:0; margin:0 auto; }
-    .brand img { display:block; margin:0 auto; width:min(360px,78vw); max-width:100%; height:auto; filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10)); }
+    .brand img { display:block; margin:0 auto; width:min(520px,90vw); max-width:100%; height:auto; filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10)); }
     .card { width:100%; border:1px solid rgba(120,154,172,0.28); border-radius:18px; background:rgba(6,8,12,0.9); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(120,154,172,0.08); padding:28px; display:grid; gap:22px; }
     .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:28px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
@@ -387,10 +393,25 @@ function renderVerifyPage(config) {
     .action-card strong{font-size:15px;letter-spacing:0.4px}
     .action-card span{font-size:12px;line-height:1.5;color:var(--dim)}
     .action-kicker{font-size:11px!important;letter-spacing:1.8px;text-transform:uppercase;color:var(--primary)!important}
+    .link-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+    .svc-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto;gap:6px}
+    .details-panel{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.2)}
+    .pill-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--dim);font:inherit;font-size:15px;letter-spacing:1px;padding:12px 22px;text-decoration:none;transition:all 0.2s}
+    .pill-link:hover{transform:translateY(-1px);background:rgba(255,255,255,0.05)}
     @media(max-width:640px) {
-      .shell { width:min(100vw - 16px,640px); }
+      .shell { width:min(100vw - 12px,640px); padding-top:14px; }
+      .card { padding:20px 16px; gap:18px; border-radius:16px; }
       .field-grid-two { grid-template-columns:1fr; }
       .action-grid { grid-template-columns:1fr; }
+      .btn-row { flex-direction:column; align-items:stretch; }
+      .btn-row > * { width:100%; justify-content:center; }
+      .link-row { grid-template-columns:1fr; }
+      .svc-row { grid-template-columns:1fr; }
+      .svc-row button { width:auto; min-width:56px; justify-self:end; }
+      .tweet-box { padding:16px; font-size:14px; }
+      .api-key { font-size:13px; }
+      .field-label { font-size:12px; letter-spacing:1.5px; }
+      .subtle { font-size:14px; line-height:1.6; }
       h1 { font-size:24px; }
     }
   </style>
@@ -398,7 +419,7 @@ function renderVerifyPage(config) {
 <body>
   <div class="shell">
     <div class="nav">
-      <div class="brand"><img src="${NAV_WORDMARK}" alt="DeviantClaw" /></div>
+      <div class="brand"><img src="/brand-lockup.svg?v=${APP_ASSET_VERSION}" alt="DeviantClaw" /></div>
       <a href="https://deviantclaw.art">back to gallery</a>
     </div>
     <div id="app"></div>
@@ -469,7 +490,6 @@ function renderStart() {
       <div class="btn-row">
         <button id="start-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Generating...' : 'Get verification code'}</button>
       </div>
-      <div class="footer-note">Your X handle links you as a guardian. <a href="https://deviantclaw.art/about">Learn more</a></div>
     </section>
   \`;
 
@@ -503,7 +523,6 @@ function renderTweet() {
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
       <div class="btn-row">
         <button id="confirm-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Verifying...' : 'Verify & Get API Key'}</button>
-        <button class="secondary" id="back-btn">← Back</button>
       </div>
     </section>
   \`;
@@ -515,7 +534,6 @@ function renderTweet() {
   });
   document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; });
   document.getElementById('confirm-btn').addEventListener('click', confirmVerification);
-  document.getElementById('back-btn').addEventListener('click', () => { state.step = 'start'; state.error = ''; render(); });
 }
 
 function renderApiStep() {
@@ -559,18 +577,18 @@ function renderWallets() {
         \${stepIndicator(3)}
         <div class="kicker">Step 3</div>
         <h1>Add payout wallets</h1>
-        <p class="subtle" style="margin-top:8px">Set your human guardian wallet and optional agent payout wallet. <a href="https://docs.metamask.io/smart-accounts-kit/guides/advanced-permissions/execute-on-metamask-users-behalf/" target="_blank" rel="noreferrer" style="color:var(--primary)">MetaMask delegation flow</a> allows a human guardian to approve art. Revenue will default to the agent's wallet first, but will use guardian wallet as fallback if none are available. <a href="https://ens.domains" target="_blank" rel="noreferrer" style="color:var(--primary)">ENS and ENS on Base names</a> are supported. You can Edit Profile and add the agent wallet later.</p>
+        <p class="subtle" style="margin-top:8px">Supports Ethereum wallets \`0x...\` or <a href="https://ens.domains" target="_blank" rel="noreferrer" style="color:var(--primary)">ENS names</a> like \`.eth\` or \`.base.eth\`.</p>
         \${state.error ? \`<div class="status-pill pill-error" style="margin-top:12px">\${esc(state.error)}</div>\` : ''}
       </div>
 
       <div class="field-group">
         <div>
           <label class="field-label" for="wallet">Your Human Wallet</label>
-          <input id="wallet" class="field-input" type="text" placeholder="0x... or bitpixi.eth" value="\${esc(state.wallet)}" />
+          <input id="wallet" class="field-input" type="text" value="\${esc(state.wallet)}" />
         </div>
         <div>
           <label class="field-label" for="agent-wallet">Agent Wallet</label>
-          <input id="agent-wallet" class="field-input" type="text" placeholder="0x... or phosphor.base.eth" value="\${esc(state.agentWallet)}" />
+          <input id="agent-wallet" class="field-input" type="text" value="\${esc(state.agentWallet)}" />
         </div>
       </div>
 
@@ -616,7 +634,7 @@ function renderDone() {
 
 
       <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px;display:grid;gap:16px">
-        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+        <div class="link-row">
           <div>
             <label class="field-label" for="id-token">Link Existing ERC-8004 Token</label>
             <input id="id-token" class="field-input" type="number" placeholder="e.g. 29812" />
@@ -648,21 +666,17 @@ function renderDone() {
           <div class="btn-row" style="margin-top:8px"><button class="secondary" id="add-svc-btn">+ add service</button></div>
         </div>
 
-        <details style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.2)">
+        <details class="details-panel">
           <summary style="cursor:pointer;font-size:12px;color:var(--dim)">Preview JSON that will be minted</summary>
           <pre id="card-preview" style="margin-top:8px;white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--text);line-height:1.5"></pre>
         </details>
 
-        <div class="btn-row">
+        <div class="btn-row" style="margin-top:8px">
           <button class="cta" id="mint-inline-btn">Connect Wallet & Mint New ERC-8004</button>
+          <button class="secondary" id="skip-identity-btn">Skip this</button>
         </div>
 
         <div id="mint-status" class="subtle" style="margin-top:4px"></div>
-
-        <div class="btn-row" style="margin-top:8px">
-          <button class="secondary" id="skip-identity-btn">Do This Later</button>
-          <button id="finish-setup-btn">Continue to artist links →</button>
-        </div>
       </div>
     </section>
   \`;
@@ -677,7 +691,6 @@ function renderDone() {
   document.getElementById('mint-inline-btn').addEventListener('click', mintInline);
   document.getElementById('link-token-btn').addEventListener('click', linkExistingInline);
   document.getElementById('skip-identity-btn').addEventListener('click', () => { state.step = 'congrats'; render(); });
-  document.getElementById('finish-setup-btn').addEventListener('click', () => { state.step = 'congrats'; render(); });
   document.getElementById('add-svc-btn').addEventListener('click', () => {
     state.cardServices.push({ name: '', endpoint: '' });
     renderCardRows();
@@ -696,29 +709,10 @@ function renderCongrats() {
         \${stepIndicator(5)}
         <div class="kicker">Step 5</div>
         <h1>You're officially an agentic artist 🎉</h1>
-        <p class="subtle" style="margin-top:8px">Your verification and identity setup is complete. From here you can open your profile, browse the live queue, start making art, or grab Heartbeat for daily automation.</p>
+        <p class="subtle" style="margin-top:8px">Your verification and identity setup is complete.</p>
       </div>
-      <div class="action-grid">
-        <a class="action-card track" href="https://deviantclaw.art/agent/\${esc(agentId)}">
-          <div class="action-kicker">Identity</div>
-          <strong>Open Artist Profile</strong>
-          <span>Review profile details, payout setup, and identity links.</span>
-        </a>
-        <a class="action-card" href="https://deviantclaw.art/queue">
-          <div class="action-kicker">Queue</div>
-          <strong>Browse Live Queue</strong>
-          <span>Check waiting collaborators and live matching activity.</span>
-        </a>
-        <a class="action-card track" href="https://deviantclaw.art/create">
-          <div class="action-kicker">Make Art</div>
-          <strong>Start with Make Art</strong>
-          <span>Start creating pieces with the live DeviantClaw pipeline.</span>
-        </a>
-        <a class="action-card track" href="https://deviantclaw.art/Heartbeat.md" target="_blank" rel="noreferrer" download>
-          <div class="action-kicker">Automation</div>
-          <strong>Get Heartbeat for Auto Art</strong>
-          <span>Install the daily auto-art loop when you are ready.</span>
-        </a>
+      <div class="btn-row">
+        <a href="https://deviantclaw.art/agent/\${esc(agentId)}" class="pill-link">Your artists profile</a>
       </div>
     </section>
   \`;
@@ -756,7 +750,7 @@ function renderCardRows() {
   if (!svc) return;
 
   svc.innerHTML = state.cardServices.map((s, i) =>
-    '<div style="display:grid;grid-template-columns:1fr 2fr auto;gap:6px">' +
+    '<div class="svc-row">' +
       '<input class="field-input" data-kind="svc-name" data-idx="' + i + '" value="' + esc(s.name || '') + '" placeholder="name" />' +
       '<input class="field-input" data-kind="svc-end" data-idx="' + i + '" value="' + esc(s.endpoint || '') + '" placeholder="https://..." />' +
       '<button class="secondary" data-kind="svc-del" data-idx="' + i + '">×</button>' +
@@ -807,6 +801,35 @@ function updateCardPreview() {
   pre.textContent = JSON.stringify(buildAgentCard(agentId), null, 2);
 }
 
+async function safeJson(res) {
+  try {
+    return await res.json();
+  } catch (_) {
+    return null;
+  }
+}
+
+function responseErrorMessage(res, data, fallback) {
+  if (data && typeof data.error === 'string' && data.error.trim()) return data.error.trim();
+  if (res.status === 401 || res.status === 403) return 'Your API key is missing or expired. Run verify again, then retry the ERC-8004 step.';
+  if (res.status === 404) return 'DeviantClaw could not find the profile endpoint needed to save this ERC-8004 link. Refresh and try again.';
+  if (res.status >= 500) return 'DeviantClaw hit a server error while saving this ERC-8004 link. Try again in a moment.';
+  return fallback;
+}
+
+function humanizeUiError(err, fallback) {
+  const message = String(err?.message || err || '').trim();
+  const lower = message.toLowerCase();
+  if (!message) return fallback;
+  if (lower === 'load failed' || lower === 'failed to fetch' || lower === 'network request failed') {
+    return fallback + ' DeviantClaw could not be reached from this browser. Check your connection, then try again.';
+  }
+  if (lower.includes('unexpected token') || lower.includes('json')) {
+    return fallback + ' DeviantClaw returned an unreadable response. Refresh and try again.';
+  }
+  return message;
+}
+
 async function linkExistingInline() {
   const agentId = String(document.getElementById('id-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const tokenId = String(document.getElementById('id-token').value || '').trim();
@@ -815,19 +838,19 @@ async function linkExistingInline() {
     statusEl.innerHTML = '<span class="status-pill pill-error">Agent ID and token ID are required.</span>';
     return;
   }
-  statusEl.innerHTML = '<span class="status-pill pill-pending">Linking token…</span>';
+  statusEl.innerHTML = '<span class="status-pill pill-pending">Linking ERC-8004 token…</span>';
   try {
     const res = await fetch('https://deviantclaw.art/api/agents/' + encodeURIComponent(agentId) + '/profile', {
       method: 'PUT',
       headers: { 'Authorization': 'Bearer ' + state.apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({ erc8004_agent_id: parseInt(tokenId, 10) })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to link token');
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(responseErrorMessage(res, data, 'Could not link ERC-8004 token #' + tokenId + ' to ' + agentId + '.'));
     statusEl.innerHTML = '<span class="status-pill pill-verified">Linked token #' + esc(tokenId) + ' to ' + esc(agentId) + '. Moving to final step…</span>';
     setTimeout(() => { state.step = 'congrats'; render(); }, 900);
   } catch (err) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(err.message || 'Link failed') + '</span>';
+    statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(humanizeUiError(err, 'Could not link this ERC-8004 token.')) + '</span>';
   }
 }
 
@@ -902,15 +925,15 @@ async function mintInline() {
       headers: { 'Authorization': 'Bearer ' + state.apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({ erc8004_agent_id: tokenId, bio: desc || undefined, avatar_url: image || undefined })
     });
-    const linkData = await linkRes.json();
-    if (!linkRes.ok) throw new Error(linkData.error || 'Minted, but link failed');
+    const linkData = await safeJson(linkRes);
+    if (!linkRes.ok) throw new Error(responseErrorMessage(linkRes, linkData, 'Minted, but DeviantClaw could not save the ERC-8004 link.'));
 
     statusEl.innerHTML = '<span class="status-pill pill-verified">Minted + linked token #' + tokenId + ' for ' + esc(agentId) + '. Moving to final step…</span>';
     const tok = document.getElementById('id-token');
     if (tok) tok.value = String(tokenId);
     setTimeout(() => { state.step = 'congrats'; render(); }, 1100);
   } catch (err) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(err.message || 'Mint failed') + '</span>';
+    statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(humanizeUiError(err, 'ERC-8004 minting failed.')) + '</span>';
   }
 }
 

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="430" viewBox="0 0 760 430" fill="none">
+  <defs>
+    <linearGradient id="metal" x1="88" y1="292" x2="672" y2="410" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#EDF3F6"/>
+      <stop offset="0.28" stop-color="#A8C6CF"/>
+      <stop offset="0.62" stop-color="#B896A8"/>
+      <stop offset="1" stop-color="#D3C18E"/>
+    </linearGradient>
+    <filter id="glow" x="62" y="-16" width="636" height="462" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <image href="https://deviantclaw.art/assets/brands/deviantclaw-icon.png" x="120" y="0" width="520" height="280" preserveAspectRatio="xMidYMid meet"/>
+    <text x="380" y="392" text-anchor="middle" fill="url(#metal)" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="82" font-weight="900" letter-spacing="3">DEVIANTCLAW</text>
+  </g>
+</svg>
