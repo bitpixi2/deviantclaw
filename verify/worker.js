@@ -1,6 +1,6 @@
+import { LOGO } from '../worker/logo.js';
+
 const APP_ASSET_VERSION = '20260322b';
-const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><rect width="256" height="256" rx="48" fill="#050507"/><path d="M58 173C77 115 112 79 154 65C146 84 142 103 144 121C163 102 185 92 206 89C190 116 182 144 181 172" stroke="#7A9BAB" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M86 192L110 138" stroke="#C9B17A" stroke-width="14" stroke-linecap="round"/><path d="M125 198L141 150" stroke="#8A6878" stroke-width="14" stroke-linecap="round"/><path d="M165 192L173 158" stroke="#A0B8C0" stroke-width="14" stroke-linecap="round"/></svg>`;
-const BRAND_LOCKUP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="760" height="430" viewBox="0 0 760 430" fill="none"><defs><linearGradient id="metal" x1="88" y1="292" x2="672" y2="410" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#EDF3F6"/><stop offset="0.28" stop-color="#A8C6CF"/><stop offset="0.62" stop-color="#B896A8"/><stop offset="1" stop-color="#D3C18E"/></linearGradient><filter id="glow" x="62" y="-16" width="636" height="462" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000000" flood-opacity="0.32"/></filter></defs><g filter="url(#glow)"><image href="https://deviantclaw.art/assets/brands/deviantclaw-icon.png" x="120" y="0" width="520" height="280" preserveAspectRatio="xMidYMid meet"/><text x="380" y="392" text-anchor="middle" fill="url(#metal)" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="82" font-weight="900" letter-spacing="3">DEVIANTCLAW</text></g></svg>`;
 
 export default {
   async fetch(request, env) {
@@ -25,18 +25,6 @@ export default {
             'Content-Type': 'application/javascript; charset=utf-8',
             'Cache-Control': 'no-store',
           },
-        });
-      }
-
-      if (method === 'GET' && path === '/brand-lockup.svg') {
-        return new Response(BRAND_LOCKUP_SVG, {
-          headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' },
-        });
-      }
-
-      if (method === 'GET' && path === '/logo.svg') {
-        return new Response(LOGO_SVG, {
-          headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400' },
         });
       }
 
@@ -345,18 +333,18 @@ function renderVerifyPage(config) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verify · DeviantClaw</title>
   <style>
-    :root { --bg:#000; --surface:rgba(13,16,22,0.96); --border:#4e6270; --text:#F4F8FA; --dim:#D0DCE1; --primary:#D0ECF4; --secondary:#E6C7D5; --danger:#ff7b7b; --success:#58e08a; }
+    :root { --bg:#050507; --surface:rgba(13,16,22,0.96); --border:#4e6270; --text:#F4F8FA; --dim:#D0DCE1; --primary:#D0ECF4; --secondary:#E6C7D5; --danger:#ff7b7b; --success:#58e08a; }
     * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%); color:var(--text); font-family:'Courier New',monospace; }
-    .bg-canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; opacity:0.55; mix-blend-mode:screen; filter:saturate(1.06) contrast(1.04); }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at top left,rgba(122,155,171,0.15),transparent 34%),radial-gradient(circle at 82% 12%,rgba(214,179,194,0.08),transparent 26%),radial-gradient(circle at bottom right,rgba(122,155,171,0.12),transparent 30%),linear-gradient(180deg,#050507 0%,#05060a 46%,#000 100%); color:var(--text); font-family:'Courier New',monospace; }
+    .bg-canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; opacity:0.34; mix-blend-mode:screen; filter:saturate(0.96) contrast(1.02); }
     .shell { width:min(780px,calc(100vw - 32px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
     .shell { position:relative; z-index:1; }
     @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
     .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 18px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:10px; }
     .nav a { color:var(--primary); text-decoration:none; font-size:12px; }
-    .brand { display:flex; align-items:center; justify-content:center; }
-    .brand img { width:76px; height:76px; display:block; filter:drop-shadow(0 10px 24px rgba(0,0,0,0.35)); }
-    .card { width:100%; border:1px solid rgba(120,154,172,0.28); border-radius:18px; background:rgba(6,8,12,0.9); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(120,154,172,0.08); padding:28px; display:grid; gap:22px; }
+    .brand { width:min(360px,78vw); display:flex; align-items:center; justify-content:center; margin:0 auto 2px; overflow:visible; }
+    .brand img { width:100%; height:auto; display:block; filter:drop-shadow(0 12px 28px rgba(0,0,0,0.44)); transform:translateX(clamp(8px,1.4vw,14px)); }
+    .card { width:100%; border:1px solid rgba(120,154,172,0.24); border-radius:18px; background:linear-gradient(180deg,rgba(7,9,13,0.94),rgba(10,12,16,0.92)); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.62),0 0 0 1px rgba(120,154,172,0.06); padding:28px; display:grid; gap:22px; }
     .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:28px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
     .subtle { color:var(--dim); font-size:15px; line-height:1.65; }
@@ -402,6 +390,7 @@ function renderVerifyPage(config) {
     .pill-link:hover{transform:translateY(-1px);background:rgba(255,255,255,0.05)}
     @media(max-width:640px) {
       .shell { width:min(100vw - 12px,640px); padding-top:14px; }
+      .brand { width:min(320px,84vw); }
       .card { padding:20px 16px; gap:18px; border-radius:16px; }
       .field-grid-two { grid-template-columns:1fr; }
       .action-grid { grid-template-columns:1fr; }
@@ -422,7 +411,7 @@ function renderVerifyPage(config) {
   <canvas id="bg-canvas" class="bg-canvas" aria-hidden="true"></canvas>
   <div class="shell">
     <div class="nav">
-      <div class="brand"><img src="/logo.svg?v=${APP_ASSET_VERSION}" alt="DeviantClaw" /></div>
+      <div class="brand"><img src="${LOGO}" alt="DeviantClaw" /></div>
       <a href="https://deviantclaw.art">back to gallery</a>
     </div>
     <div id="app"></div>
