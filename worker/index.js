@@ -2117,6 +2117,45 @@ function buildAdminFoilStaticView(piece, tier = 'gold') {
     ? 'linear-gradient(112deg,transparent 28%,rgba(255,245,210,0.04) 42%,rgba(255,233,156,0.92) 49%,rgba(255,249,228,0.82) 52%,rgba(214,164,67,0.16) 57%,transparent 70%)'
     : 'linear-gradient(120deg,transparent 18%,rgba(255,255,255,0.02) 32%,rgba(255,255,255,0.84) 45%,rgba(207,236,255,0.32) 49%,rgba(255,214,241,0.26) 53%,transparent 72%)';
 
+  if (method === 'collage') {
+    const artistLine = [piece?.agent_a_name, piece?.agent_b_name].filter(Boolean).map(a => esc(a)).join(' × ');
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${safeTitle} · DeviantClaw</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%}
+body{background:#05060a;overflow:hidden;font-family:'Courier New',monospace}
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+.collage-stage{position:relative;width:min(90vw,860px);height:min(88vh,760px)}
+.cutout{position:absolute;overflow:hidden;border:2px solid rgba(255,255,255,0.08);background:#05060a;box-shadow:0 24px 70px rgba(0,0,0,0.56)}
+.cutout img{width:100%;height:100%;object-fit:cover;display:block}
+.cutout-a{top:4%;left:6%;width:58%;height:72%;border-radius:18px 6px 20px 8px;transform:rotate(-3.2deg)}
+.cutout-b{right:6%;bottom:4%;width:56%;height:68%;border-radius:8px 20px 10px 18px;transform:rotate(2.8deg);z-index:3}
+.sig{position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity .8s}
+.sig.v{opacity:1}
+.sig-t{font-size:14px;color:rgba(255,255,255,.72);letter-spacing:2px;margin-bottom:4px}
+.sig-a{font-size:11px;color:rgba(255,255,255,.45);letter-spacing:1.5px}
+.sig-g{font-size:10px;color:rgba(255,255,255,.25);letter-spacing:1px;margin-top:6px}
+.foil-frame{position:fixed;inset:12px;border-radius:2px;pointer-events:none}
+.foil-frame::before,.foil-frame::after{content:'';position:absolute;inset:0;pointer-events:none}
+.foil-frame::before{border-radius:inherit;padding:2px;background:${frameBefore};-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.9;animation:dcFoilPulse 4.8s ease-in-out infinite}
+.foil-frame::after{background:${frameAfter};mix-blend-mode:screen;opacity:.46;animation:dcFoilSweep 6.6s linear infinite}
+@keyframes dcFoilPulse{0%,100%{opacity:.62}50%{opacity:.96}}
+@keyframes dcFoilSweep{0%{transform:translateX(-58%) skewX(-18deg)}100%{transform:translateX(62%) skewX(-18deg)}}
+</style></head><body>
+<div class="stage">
+  <div class="collage-stage">
+    <div class="cutout cutout-a"><img src="/api/pieces/${id}/image" alt="${esc(piece?.agent_a_name || '')}"/></div>
+    <div class="cutout cutout-b"><img src="/api/pieces/${id}/image-b" alt="${esc(piece?.agent_b_name || '')}" onerror="this.src='/api/pieces/${id}/image'"/></div>
+  </div>
+</div>
+<div class="sig" id="sig"><div class="sig-t">${safeTitle}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(String(piece?.created_at || '').slice(0, 10))}</div></div>
+<div class="foil-frame" aria-hidden="true"></div>
+<script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
+</body></html>`;
+  }
+
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${safeTitle} · DeviantClaw</title>
@@ -8964,7 +9003,7 @@ Content-Type: application/json
       // GET /api/pieces/:id/image-[b|c|d] — serve additional Venice images for collabs
       if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/thumbnail$/)) {
         const id = path.split('/')[3];
-        const piece = await db.prepare('SELECT id, title, method, composition, agent_a_name, agent_b_name FROM pieces WHERE id = ?').bind(id).first();
+        const piece = await db.prepare('SELECT id, title, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return new Response('Not found', { status: 404 });
         const pieceMethod = String(piece.method || '').toLowerCase();
 
@@ -8980,6 +9019,10 @@ Content-Type: application/json
         }
 
         if (!prefersStaticFullViewThumbnail(piece)) {
+          return Response.redirect(new URL(`/api/pieces/${id}/image`, url.origin).toString(), 302);
+        }
+
+        if (pieceMethod === 'collage' && Number(piece.legacy_mainnet || 0) === 1) {
           return Response.redirect(new URL(`/api/pieces/${id}/image`, url.origin).toString(), 302);
         }
 
