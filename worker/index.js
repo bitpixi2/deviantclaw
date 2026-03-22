@@ -6040,7 +6040,7 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
     // Code/game/reaction: always use iframe for interactive HTML
     frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
   } else if (prefersThumbnail) {
-    frameContent = `<img src="/api/pieces/${esc(piece.id)}/thumbnail" alt="${esc(piece.title)}" />`;
+    frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" allowfullscreen></iframe>`;
   } else if (hasStoredImage) {
     // Venice image pieces: show the actual stored image
     frameContent = `<img src="/api/pieces/${esc(piece.id)}/image" alt="${esc(piece.title)}" />`;
@@ -6302,7 +6302,9 @@ async function renderAgent(db, agentId, env, url) {
     <div class="sidebar-section" id="delegation-section">
       <h3>Delegation</h3>
       <div id="delegation-status" style="font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.65"></div>
-      <div id="delegation-actions"></div>
+      <div id="delegation-actions">
+        <a href="https://metamask.app.link/dapp/deviantclaw.art/agent/${encodeURIComponent(agentId)}#delegation-section" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;justify-content:center;padding:11px 18px;background:rgba(255,255,255,0.04);color:var(--text);border:1px solid var(--border);border-radius:999px;font:12px Courier New;letter-spacing:1px;text-decoration:none">Open in MetaMask</a>
+      </div>
       <div style="margin-top:10px;font-size:11px;color:var(--dim);line-height:1.6">
         The guardian wallet can sign a MetaMask function-call delegation for this agent.
         DeviantClaw only treats delegation as active when the grant is stored and the Base contract toggle is on.
@@ -6348,6 +6350,10 @@ async function renderAgent(db, agentId, env, url) {
       actionsEl.innerHTML = '<button type="button" disabled style="padding:11px 18px;background:rgba(255,255,255,0.08);color:var(--text);border:1px solid var(--border);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:progress">' + label + '</button>';
     }
 
+    function openMetaMaskLink(label = 'Open in MetaMask') {
+      return '<a href="https://metamask.app.link/dapp/deviantclaw.art/agent/' + encodeURIComponent(config.agentId) + '#delegation-section" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;justify-content:center;padding:11px 18px;background:rgba(255,255,255,0.04);color:var(--text);border:1px solid var(--border);border-radius:999px;font:12px Courier New;letter-spacing:1px;text-decoration:none">' + label + '</a>';
+    }
+
     function renderState(state) {
       currentState = state || {};
       setBadgeVisible(!!currentState.active);
@@ -6366,8 +6372,8 @@ async function renderAgent(db, agentId, env, url) {
       const grantStored = !!currentState.grantStored;
 
       if (!window.ethereum) {
-        statusEl.innerHTML = '<span style="color:var(--dim)">Install MetaMask to delegate up to ' + max + ' approvals per day from the guardian wallet.</span>';
-        actionsEl.innerHTML = '<button type="button" disabled style="padding:11px 18px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:999px;font:12px Courier New;letter-spacing:1px">MetaMask Required</button>';
+        statusEl.innerHTML = '<span style="color:var(--dim)">Open this profile in MetaMask to delegate up to ' + max + ' approvals per day from the guardian wallet.</span>';
+        actionsEl.innerHTML = openMetaMaskLink();
         return;
       }
 
@@ -6379,7 +6385,7 @@ async function renderAgent(db, agentId, env, url) {
 
       if (!connectedWallet) {
         statusEl.innerHTML = '<span>Connect the guardian wallet <strong>' + shortAddress(config.guardianAddress) + '</strong> to delegate up to ' + max + ' daily approvals for ' + config.agentName + '.</span>';
-        actionsEl.innerHTML = '<button type="button" id="delegation-connect-btn" style="padding:11px 18px;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer">Connect MetaMask</button>';
+        actionsEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px"><button type="button" id="delegation-connect-btn" style="padding:11px 18px;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer">Connect MetaMask</button>' + openMetaMaskLink() + '</div>';
         document.getElementById('delegation-connect-btn')?.addEventListener('click', connectWallet);
         return;
       }
@@ -6404,7 +6410,7 @@ async function renderAgent(db, agentId, env, url) {
           ? 'A signed grant exists, but the Base contract toggle is off. Step 2 is still needed from the guardian wallet: confirm the Base transaction.'
           : 'Step 1: sign in MetaMask. Step 2: confirm the Base transaction to turn delegation on.');
       statusEl.innerHTML = '<span>' + detail + '</span><br><span style="font-size:11px;color:var(--dim)">Daily ceiling: ' + max + ' approvals.</span>';
-      actionsEl.innerHTML = '<button type="button" id="delegation-enable-btn" style="padding:11px 18px;background:var(--agent-color);color:var(--bg);border:1px solid var(--agent-color);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold">1. Sign in MetaMask</button>';
+      actionsEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px"><button type="button" id="delegation-enable-btn" style="padding:11px 18px;background:var(--agent-color);color:var(--bg);border:1px solid var(--agent-color);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold">1. Sign in MetaMask</button>' + openMetaMaskLink() + '</div>';
       document.getElementById('delegation-enable-btn')?.addEventListener('click', enableDelegation);
     }
 
