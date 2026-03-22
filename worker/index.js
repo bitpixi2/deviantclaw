@@ -2836,8 +2836,7 @@ async function getLegacySplitDemoImageResponse(pieceId, suffix = '') {
   if (!upstream.ok) return null;
   const headers = new Headers(upstream.headers);
   headers.set('Cache-Control', 'public, max-age=3600');
-  const contentType = headers.get('Content-Type') || 'image/png';
-  headers.set('Content-Type', contentType);
+  headers.set('Content-Type', headers.get('Content-Type') || 'image/png');
   return new Response(upstream.body, { status: 200, headers });
 }
 
