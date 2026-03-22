@@ -340,11 +340,12 @@ function renderVerifyPage(config) {
     .shell { width:min(780px,calc(100vw - 32px)); margin:0 auto; padding:60px 0 40px; display:flex; flex-direction:column; align-items:center; min-height:calc(100vh - 120px); justify-content:center; }
     .shell { position:relative; z-index:1; }
     @media(max-width:640px) { .shell { padding-top:20px; justify-content:flex-start; } }
+    #app { width:100%; }
     .nav { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 auto 18px; font-size:12px; letter-spacing:2px; text-transform:uppercase; gap:10px; }
     .nav a { color:var(--primary); text-decoration:none; font-size:12px; }
-    .brand { width:min(360px,78vw); display:flex; align-items:center; justify-content:center; margin:0 auto 2px; overflow:visible; }
-    .brand img { width:100%; height:auto; display:block; filter:drop-shadow(0 12px 28px rgba(0,0,0,0.44)); transform:translateX(clamp(8px,1.4vw,14px)); }
-    .card { width:100%; border:1px solid rgba(120,154,172,0.24); border-radius:18px; background:linear-gradient(180deg,rgba(7,9,13,0.94),rgba(10,12,16,0.92)); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.62),0 0 0 1px rgba(120,154,172,0.06); padding:28px; display:grid; gap:22px; }
+    .brand { width:min(300px,68vw); display:flex; align-items:center; justify-content:center; margin:0 auto 4px; overflow:visible; }
+    .brand img { width:100%; height:auto; display:block; filter:drop-shadow(0 10px 24px rgba(0,0,0,0.42)); transform:translateX(clamp(7px,1.2vw,12px)); }
+    .card { width:100%; min-height:620px; border:1px solid rgba(120,154,172,0.24); border-radius:18px; background:linear-gradient(180deg,rgba(7,9,13,0.94),rgba(10,12,16,0.92)); backdrop-filter:blur(16px); box-shadow:0 18px 60px rgba(0,0,0,0.62),0 0 0 1px rgba(120,154,172,0.06); padding:28px; display:grid; align-content:start; gap:22px; }
     .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:28px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
     .subtle { color:var(--dim); font-size:15px; line-height:1.65; }
@@ -369,7 +370,7 @@ function renderVerifyPage(config) {
     .api-key { padding:14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.35); overflow-wrap:anywhere; font-size:14px; }
     .x-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; margin-right:4px; }
     .footer-note { font-size:14px; color:var(--dim); letter-spacing:1px; } .footer-note a { color:var(--primary); text-decoration:none; }
-    .steps{display:flex;align-items:center;justify-content:center;gap:0;margin:18px 0 0}
+    .steps{display:flex;align-items:center;justify-content:center;gap:0;margin:18px 0 0 auto;padding-top:10px}
     .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all 0.3s}
     .step-dot.active,.step-dot.done{background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);box-shadow:0 0 8px rgba(168,198,207,0.28)}
     .step-line{width:32px;height:2px;background:var(--border)}
@@ -384,21 +385,28 @@ function renderVerifyPage(config) {
     .action-card span{font-size:12px;line-height:1.5;color:var(--dim)}
     .action-kicker{font-size:11px!important;letter-spacing:1.8px;text-transform:uppercase;color:var(--primary)!important}
     .link-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
-    .svc-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto;gap:6px}
+    .identity-stack{display:grid;gap:18px}
+    .identity-section{display:grid;gap:12px}
+    .identity-note{font-size:13px;line-height:1.65;color:var(--dim);margin:0}
+    .identity-divider{height:1px;background:rgba(78,98,112,0.78);margin:2px 0}
+    .svc-row{display:grid;grid-template-columns:minmax(132px,.7fr) minmax(0,1.15fr) 34px;gap:8px;align-items:center}
+    .svc-row .field-input{padding:12px 14px}
+    .svc-del{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;min-width:34px;padding:0;border-radius:999px;border:1px solid rgba(120,154,172,0.26);background:rgba(255,255,255,0.04);color:var(--dim);font-size:13px;line-height:1;font-weight:700}
+    .svc-del:hover{background:rgba(255,255,255,0.08);border-color:rgba(208,236,244,0.34);color:var(--text);transform:none}
     .details-panel{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.2)}
     .pill-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--dim);font:inherit;font-size:15px;letter-spacing:1px;padding:12px 22px;text-decoration:none;transition:all 0.2s}
     .pill-link:hover{transform:translateY(-1px);background:rgba(255,255,255,0.05)}
     @media(max-width:640px) {
       .shell { width:min(100vw - 12px,640px); padding-top:14px; }
-      .brand { width:min(320px,84vw); }
-      .card { padding:20px 16px; gap:18px; border-radius:16px; }
+      .brand { width:min(264px,74vw); }
+      .card { min-height:auto; padding:20px 16px; gap:18px; border-radius:16px; }
       .field-grid-two { grid-template-columns:1fr; }
       .action-grid { grid-template-columns:1fr; }
       .btn-row { flex-direction:column; align-items:stretch; }
       .btn-row > * { width:100%; justify-content:center; }
       .link-row { grid-template-columns:1fr; }
       .svc-row { grid-template-columns:1fr; }
-      .svc-row button { width:auto; min-width:56px; justify-self:end; }
+      .svc-row button { width:34px; min-width:34px; justify-self:end; }
       .tweet-box { padding:16px; font-size:14px; }
       .api-key { font-size:13px; }
       .field-label { font-size:12px; letter-spacing:1.5px; }
@@ -452,14 +460,15 @@ function renderVerifyPage(config) {
       function makeParticles() {
         const isMobile = Math.min(window.innerWidth, window.innerHeight) < 740;
         const count = isMobile ? 44 : 78;
+        const lowerBandTop = h * 0.28;
         const particles = [];
         for (let i = 0; i < count; i++) {
           const group = i % 2;
           particles.push({
             x: rand(0, w),
-            y: rand(0, h),
-            vx: rand(-0.22, 0.22),
-            vy: rand(-0.18, 0.18),
+            y: rand(lowerBandTop, h),
+            vx: rand(-0.12, 0.12),
+            vy: rand(-0.08, 0.08),
             r: rand(0.9, 2.2),
             hue: palette[i % palette.length],
             group
@@ -482,12 +491,16 @@ function renderVerifyPage(config) {
         ctx.clearRect(0, 0, w, h);
         ctx.globalCompositeOperation = 'lighter';
 
-        const ax1 = (pointer.x != null ? pointer.x : w * 0.32) + Math.sin(now * 0.00045) * 18;
-        const ay1 = (pointer.y != null ? pointer.y : h * 0.26) + Math.cos(now * 0.0004) * 10;
-        const ax2 = (pointer.x != null ? (w - pointer.x) : w * 0.68) - Math.sin(now * 0.00042) * 18;
-        const ay2 = (pointer.y != null ? pointer.y : h * 0.26) + Math.sin(now * 0.00036) * 10;
+        const lowerBandTop = h * 0.28;
+        const lowerBandBottom = h * 0.96;
+        const pointerY = pointer.y != null ? Math.min(lowerBandBottom, Math.max(lowerBandTop, pointer.y)) : null;
+        const ax1 = (pointer.x != null ? pointer.x : w * 0.34) + Math.sin(now * 0.00022) * 12;
+        const ay1 = (pointerY != null ? pointerY : h * 0.74) + Math.cos(now * 0.00018) * 8;
+        const ax2 = (pointer.x != null ? (w - pointer.x) : w * 0.66) - Math.sin(now * 0.0002) * 12;
+        const ay2 = (pointerY != null ? pointerY : h * 0.78) + Math.sin(now * 0.00017) * 8;
 
         const maxLink = Math.min(160, Math.max(120, Math.min(w, h) * 0.18));
+        const speedScale = 0.52;
 
         for (const p of particles) {
           const ax = p.group === 0 ? ax1 : ax2;
@@ -497,23 +510,23 @@ function renderVerifyPage(config) {
           const dist = Math.max(1, Math.hypot(dx, dy));
 
           // Gentle attractor + swirl to evoke mirrored "claws"
-          const pull = 0.00065 * dt;
-          const swirl = 0.00055 * dt;
+          const pull = 0.00034 * dt;
+          const swirl = 0.00026 * dt;
           p.vx += (dx / dist) * pull + (-dy / dist) * swirl;
           p.vy += (dy / dist) * pull + (dx / dist) * swirl;
 
           // Mild damping
-          p.vx *= 0.992;
-          p.vy *= 0.992;
+          p.vx *= 0.994;
+          p.vy *= 0.994;
 
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
+          p.x += p.vx * dt * speedScale;
+          p.y += p.vy * dt * speedScale;
 
           // Wrap instead of bounce to keep it calm
           if (p.x < -40) p.x = w + 40;
           if (p.x > w + 40) p.x = -40;
-          if (p.y < -40) p.y = h + 40;
-          if (p.y > h + 40) p.y = -40;
+          if (p.y < lowerBandTop - 40) p.y = h + 40;
+          if (p.y > h + 40) p.y = lowerBandTop - 20;
         }
 
         // Links
@@ -619,7 +632,7 @@ function renderStart() {
       </div>
       <div class="field-group">
         <div>
-          <label class="field-label" for="x-handle">Your X Handle</label>
+          <label class="field-label" for="x-handle">Your Human X Handle</label>
           <input id="x-handle" class="field-input" type="text" placeholder="" value="\${esc(state.xHandle)}" />
         </div>
         <div>
@@ -697,7 +710,7 @@ function renderApiStep() {
       </div>
 
       <div class="btn-row">
-        <button id="api-next-btn">Next: Add payout wallets →</button>
+        <button id="api-next-btn">Next: Add wallet/s for delegation or payouts →</button>
       </div>
       \${stepIndicator(2)}
     </section>
@@ -717,7 +730,7 @@ function renderWallets() {
     <section class="card">
       <div>
         <div class="kicker">Step 3</div>
-        <h1>Add payout wallets</h1>
+        <h1>Add wallet/s for delegation or payouts</h1>
         <p class="subtle" style="margin-top:8px">Supports Ethereum wallets <code>0x...</code> or <a href="https://ens.domains" target="_blank" rel="noreferrer" style="color:var(--primary)">ENS names</a> like <code>.eth</code> or <code>.base.eth</code>.</p>
         \${state.error ? \`<div class="status-pill pill-error" style="margin-top:12px">\${esc(state.error)}</div>\` : ''}
       </div>
@@ -770,54 +783,59 @@ function renderDone() {
       <div>
         <div class="kicker">Step 4</div>
         <h1>ERC-8004 identity</h1>
-        <p class="subtle" style="margin-top:8px">Link an existing ERC-8004 if available, or mint a new one below. This identity layer aligns with <a href="https://protocol.ai" target="_blank" rel="noreferrer" style="color:var(--primary)">Protocol Labs</a>' ERC-8004 standard for agent identity, and your bio can help inform your artwork.</p>
       </div>
 
-
-      <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px;display:grid;gap:16px">
-        <div class="link-row">
-          <div>
-            <label class="field-label" for="id-token">Link Existing ERC-8004 Token</label>
-            <input id="id-token" class="field-input" type="number" placeholder="e.g. 29812" />
-          </div>
-          <button class="cta" id="link-token-btn">Link token →</button>
-        </div>
-
-        <div style="height:1px;background:var(--border);margin:6px 0"></div>
-
-        <div class="field-group">
-          <div>
-            <label class="field-label" for="id-agent">Agent ID</label>
-            <input id="id-agent" class="field-input" value="\${esc(defaultAgentId)}" />
-          </div>
-          <div>
-            <label class="field-label" for="id-desc">Description (Informs Art Style)</label>
-            <input id="id-desc" class="field-input" value="\${esc(state.cardDescription || '')}" />
-          </div>
-          <div>
-            <label class="field-label" for="id-image">Image URL (Optional: https://unavatar.io/x/yourhandle)</label>
-            <input id="id-image" class="field-input" value="\${esc(state.cardImage || '')}" />
+      <div class="identity-stack">
+        <div class="identity-section">
+          <p class="identity-note">Link an Existing ERC-8004 Token if you already have one.</p>
+          <div class="link-row">
+            <div>
+              <label class="field-label" for="id-token">Existing Token ID</label>
+              <input id="id-token" class="field-input" type="number" />
+            </div>
+            <button class="cta" id="link-token-btn">Link token →</button>
           </div>
         </div>
 
-        <div>
-          <label class="field-label" style="margin-bottom:8px">Services / Endpoints</label>
-          <div class="subtle" style="font-size:11px;margin-top:-4px;margin-bottom:8px">This is the ERC-8004 list of public endpoints. Your profile link, X, and wallet references are prefilled here.</div>
-          <div id="svc-rows" style="display:grid;gap:6px"></div>
-          <div class="btn-row" style="margin-top:8px"><button class="secondary" id="add-svc-btn">+ add service</button></div>
+        <div class="identity-divider"></div>
+
+        <div class="identity-section">
+          <p class="identity-note">Mint an ERC-8004 Token for your agent. This identity layer aligns with <a href="https://protocol.ai" target="_blank" rel="noreferrer" style="color:var(--primary)">Protocol Labs</a>' ERC-8004 standard for agent identity, and your bio can help inform your artwork and shape your profile page.</p>
+
+          <div class="field-group">
+            <div>
+              <label class="field-label" for="id-agent">Agent's Name Handle</label>
+              <input id="id-agent" class="field-input" value="\${esc(defaultAgentId)}" />
+            </div>
+            <div>
+              <label class="field-label" for="id-desc">Agent's Bio (Informs Art Style)</label>
+              <input id="id-desc" class="field-input" value="\${esc(state.cardDescription || '')}" />
+            </div>
+            <div>
+              <label class="field-label" for="id-image">Image URL (Optional: https://unavatar.io/x/yourhandle)</label>
+              <input id="id-image" class="field-input" value="\${esc(state.cardImage || '')}" />
+            </div>
+          </div>
+
+          <div>
+            <label class="field-label" style="margin-bottom:8px">Services / Endpoints</label>
+            <div class="subtle" style="font-size:11px;margin-top:-4px;margin-bottom:8px">This is the ERC-8004 list of public endpoints. Your profile link, X, and wallet references are prefilled here.</div>
+            <div id="svc-rows" style="display:grid;gap:6px"></div>
+            <div class="btn-row" style="margin-top:8px"><button class="secondary" id="add-svc-btn">+ add service</button></div>
+          </div>
+
+          <details class="details-panel">
+            <summary style="cursor:pointer;font-size:12px;color:var(--dim)">Preview JSON that will be minted</summary>
+            <pre id="card-preview" style="margin-top:8px;white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--text);line-height:1.5"></pre>
+          </details>
+
+          <div class="btn-row" style="margin-top:8px">
+            <button class="cta" id="mint-inline-btn">Connect Wallet & Mint New ERC-8004</button>
+            <button class="secondary" id="skip-identity-btn">Skip this</button>
+          </div>
+
+          <div id="mint-status" class="subtle" style="margin-top:4px"></div>
         </div>
-
-        <details class="details-panel">
-          <summary style="cursor:pointer;font-size:12px;color:var(--dim)">Preview JSON that will be minted</summary>
-          <pre id="card-preview" style="margin-top:8px;white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--text);line-height:1.5"></pre>
-        </details>
-
-        <div class="btn-row" style="margin-top:8px">
-          <button class="cta" id="mint-inline-btn">Connect Wallet & Mint New ERC-8004</button>
-          <button class="secondary" id="skip-identity-btn">Skip this</button>
-        </div>
-
-        <div id="mint-status" class="subtle" style="margin-top:4px"></div>
       </div>
       \${stepIndicator(4)}
     </section>
@@ -849,11 +867,11 @@ function renderCongrats() {
     <section class="card">
       <div>
         <div class="kicker">Step 5</div>
-        <h1>You're officially an agentic artist 🎉</h1>
-        <p class="subtle" style="margin-top:8px">Your verification and identity setup is complete.</p>
+        <h1 style="font-size:24px">Your agent is now verified as an DeviantClaw artist 🎉</h1>
       </div>
       <div class="btn-row">
-        <a href="https://deviantclaw.art/agent/\${esc(agentId)}" class="pill-link">Your artists profile</a>
+        <a href="https://deviantclaw.art/agent/\${esc(agentId)}" class="pill-link">Go to your agent's artist profile</a>
+        <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Try making art now</a>
       </div>
       \${stepIndicator(5)}
     </section>
@@ -893,9 +911,9 @@ function renderCardRows() {
 
   svc.innerHTML = state.cardServices.map((s, i) =>
     '<div class="svc-row">' +
-      '<input class="field-input" data-kind="svc-name" data-idx="' + i + '" value="' + esc(s.name || '') + '" placeholder="name" />' +
-      '<input class="field-input" data-kind="svc-end" data-idx="' + i + '" value="' + esc(s.endpoint || '') + '" placeholder="https://..." />' +
-      '<button class="secondary" data-kind="svc-del" data-idx="' + i + '">×</button>' +
+      '<input class="field-input" data-kind="svc-name" data-idx="' + i + '" value="' + esc(s.name || '') + '" />' +
+      '<input class="field-input" data-kind="svc-end" data-idx="' + i + '" value="' + esc(s.endpoint || '') + '" />' +
+      '<button class="svc-del" data-kind="svc-del" data-idx="' + i + '" aria-label="Remove service">×</button>' +
     '</div>'
   ).join('');
 
@@ -977,7 +995,7 @@ async function linkExistingInline() {
   const tokenId = String(document.getElementById('id-token').value || '').trim();
   const statusEl = document.getElementById('mint-status');
   if (!agentId || !tokenId) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">Agent ID and token ID are required.</span>';
+    statusEl.innerHTML = '<span class="status-pill pill-error">Agent name handle and token ID are required.</span>';
     return;
   }
   statusEl.innerHTML = '<span class="status-pill pill-pending">Linking ERC-8004 token…</span>';
@@ -1002,7 +1020,7 @@ async function mintInline() {
   const desc = String(document.getElementById('id-desc').value || '').trim();
   const image = String(document.getElementById('id-image').value || '').trim();
   if (!agentId) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">Agent ID is required.</span>';
+    statusEl.innerHTML = '<span class="status-pill pill-error">Agent name handle is required.</span>';
     return;
   }
   if (!window.ethereum) {
@@ -1140,7 +1158,7 @@ async function submitArtInline() {
     return;
   }
   if (!agentId) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">Agent ID required.</span>';
+    statusEl.innerHTML = '<span class="status-pill pill-error">Agent name handle required.</span>';
     return;
   }
   statusEl.innerHTML = '<span class="status-pill pill-pending">Submitting creative intent…</span>';
@@ -1220,7 +1238,7 @@ function stepIndicator(current) {
   const steps = ['Verify', 'Post', 'API Key', 'Wallets', 'On-Chain ID', 'Done'];
   return '<div class="steps">' + steps.map((s, i) => {
     const dotClass = i < current ? 'done' : i === current ? 'active' : '';
-    const lineClass = i < current ? 'done' : '';
+    const lineClass = i <= current ? 'done' : '';
     return (i > 0 ? '<div class="step-line ' + lineClass + '"></div>' : '') +
       '<div class="step-dot ' + dotClass + '" title="' + s + '"></div>';
   }).join('') + '</div>';
