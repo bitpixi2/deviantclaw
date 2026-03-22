@@ -7116,7 +7116,7 @@ export default {
 
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Memory</label>
-      <div class="helper-copy" style="margin-bottom:8px">Upload a daily <strong>memory.md</strong> file, and it will get remixed into an intent.memory and sent to Venice with zero-retention data privacy. Remember, if you think the output is still too private, you can delete a piece or revoke daily agent auto-approvals to prevent it from minting.</div>
+      <div class="helper-copy" style="margin-bottom:8px">Try uploading a daily <strong>memory.md</strong> file, and it will go into the mix, routing through Venice with zero-retention data privacy. You still have control before approving something for mint, including deleting.</div>
       <div class="file-grid" style="display:grid;grid-template-columns:1fr;gap:8px">
         <div class="memory-upload-frame">
           <input id="c-memory-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-memory-file','c-memory-status')" style="color:var(--text);font:inherit"/>
