@@ -3511,6 +3511,12 @@ function buildMethodThumbnailSvg({ piece, imageUrls, labels }) {
   }
 }
 
+function shouldUseCardIframePreview(piece) {
+  const method = String(piece?.method || '').toLowerCase();
+  if (LIVE_IFRAME_PREVIEW_METHODS.has(method)) return true;
+  return Number(piece?.legacy_mainnet || 0) === 1 && (method === 'collage' || method === 'split');
+}
+
 // ========== PIECE CARD ==========
 
 function statusBadge(status, extra) {
@@ -3553,7 +3559,7 @@ function pieceCard(p) {
   const previewImage = piecePreviewImagePath(p);
   if (demoRoutes[p.id]) {
     previewContent = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(formatArtworkTitle(p.title))}" sandbox="allow-scripts"></iframe>`;
-  } else if (LIVE_IFRAME_PREVIEW_METHODS.has(String(p.method || '').toLowerCase()) && (p.html_len > 100 || (p.html && p.html.length > 100))) {
+  } else if (shouldUseCardIframePreview(p) && (p.html_len > 100 || (p.html && p.html.length > 100))) {
     previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(formatArtworkTitle(p.title))}" sandbox="allow-scripts"></iframe>`;
   } else if (previewImage) {
     previewContent = `<img src="${esc(previewImage)}" alt="${esc(formatArtworkTitle(p.title))}" loading="lazy" />`;
@@ -5419,7 +5425,7 @@ async function renderArtists(db) {
     let media;
     if (demoRoutes[piece.id]) {
       media = `<iframe src="${demoRoutes[piece.id]}" loading="lazy" title="${esc(formatArtworkTitle(piece.title))}" sandbox="allow-scripts"></iframe>`;
-    } else if (LIVE_IFRAME_PREVIEW_METHODS.has(String(piece.method || '').toLowerCase()) && (piece.html_len > 100 || (piece.html && piece.html.length > 100))) {
+    } else if (shouldUseCardIframePreview(piece) && (piece.html_len > 100 || (piece.html && piece.html.length > 100))) {
       media = `<iframe src="/api/pieces/${esc(piece.id)}/view" loading="lazy" title="${esc(formatArtworkTitle(piece.title))}" sandbox="allow-scripts"></iframe>`;
     } else if (previewImage) {
       media = buildArtistPreviewImageTag(piece, previewImage);
@@ -6223,6 +6229,8 @@ async function renderAgent(db, agentId, env, url) {
     const previewImage = piecePreviewImagePath(p);
     if (demoRoutes[p.id]) {
       agentPreview = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(formatArtworkTitle(p.title))}" sandbox="allow-scripts"></iframe>`;
+    } else if (shouldUseCardIframePreview(p) && (p.html_len > 100 || (p.html && p.html.length > 100))) {
+      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(formatArtworkTitle(p.title))}" sandbox="allow-scripts"></iframe>`;
     } else if (previewImage) {
       agentPreview = `<img src="${esc(previewImage)}" alt="${esc(formatArtworkTitle(p.title))}" loading="lazy" />`;
     } else if (p.html_len > 100 || (p.html && p.html.length > 100)) {
