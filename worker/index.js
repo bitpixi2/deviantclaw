@@ -2850,8 +2850,8 @@ const AGENT_CSS = `
 @media(max-width:768px){.agent-banner{height:160px}}
 
 /* Profile card - overlapping banner */
-.agent-profile-card{position:relative;margin-top:-80px;padding:0 24px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;max-width:1400px;margin-left:auto;margin-right:auto}
-@media(min-width:1100px){.agent-profile-card{padding:0 32px}}
+.agent-profile-card{position:relative;margin-top:-80px;padding:0 20px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;max-width:1560px;margin-left:auto;margin-right:auto}
+@media(min-width:1100px){.agent-profile-card{padding:0 24px}}
 .agent-avatar{width:120px;height:120px;border-radius:12px;border:3px solid var(--agent-color,#6ee7b7);background:var(--surface);overflow:hidden;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
 .agent-avatar img{width:100%;height:100%;object-fit:cover}
 .agent-avatar .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface);color:var(--agent-color,#6ee7b7)}
@@ -2862,8 +2862,8 @@ const AGENT_CSS = `
 .agent-role{font-size:15px;color:var(--secondary);letter-spacing:1px;margin-top:4px}
 
 /* Stats row */
-.agent-stats-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;padding:16px 24px;border-bottom:1px solid var(--border);margin-bottom:20px;max-width:1400px;margin-left:auto;margin-right:auto}
-@media(min-width:1100px){.agent-stats-row{padding:16px 32px}}
+.agent-stats-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;padding:16px 20px;border-bottom:1px solid var(--border);margin-bottom:20px;max-width:1560px;margin-left:auto;margin-right:auto}
+@media(min-width:1100px){.agent-stats-row{padding:16px 24px}}
 .agent-stats-grid{display:flex;flex-wrap:wrap;gap:24px}
 .stat-item{text-align:center}
 .stat-number{font-size:20px;color:var(--agent-color,#6ee7b7);font-weight:400;display:block}
@@ -2874,8 +2874,8 @@ const AGENT_CSS = `
 @media(max-width:768px){.agent-stats-row{padding:14px 16px;margin-bottom:16px}.agent-stats-grid{gap:18px}.agent-action-row{width:100%;justify-content:flex-start}.agent-action-btn{width:100%}}
 
 /* Two-column layout */
-.agent-layout{display:grid;grid-template-columns:260px 1fr;gap:28px;padding:0 24px;max-width:1400px;margin:0 auto}
-@media(min-width:1100px){.agent-layout{padding:0 32px}}
+.agent-layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:32px;padding:0 20px;max-width:1560px;margin:0 auto}
+@media(min-width:1100px){.agent-layout{padding:0 24px}}
 @media(max-width:768px){.agent-layout{grid-template-columns:1fr;padding:0 16px;gap:18px}}
 .agent-gallery{min-width:0}
 .agent-gallery .grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
@@ -3508,6 +3508,7 @@ function buildMethodThumbnailSvg({ piece, imageUrls, labels }) {
 
 function shouldUseCardIframePreview(piece) {
   const method = String(piece?.method || '').toLowerCase();
+  if (pieceFoilTier(piece)) return false;
   if (LIVE_IFRAME_PREVIEW_METHODS.has(method)) return true;
   return Number(piece?.legacy_mainnet || 0) === 1 && (method === 'collage' || method === 'split');
 }
@@ -6840,7 +6841,7 @@ async function renderAgent(db, agentId, env, url) {
 <div class="agent-profile-card">
   <div class="agent-avatar">${avatarContent}</div>
   <div class="agent-identity">
-    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span>${agent.erc8004_agent_id ? `<a href="${erc8004AgentUrl(agent.erc8004_agent_id)}" target="_blank" rel="noreferrer" class="agent-type-badge" style="border-color:#4f93ff;color:#4f93ff;margin-left:6px;text-decoration:none">ERC-8004 Linked</a>` : ''}<span id="agent-delegated-pill" class="agent-type-badge" style="border-color:#ffb86b;color:#ffb86b;margin-left:6px;${delegationState.active ? '' : 'display:none;'}">${META_MASK_DELEGATION_BADGE}</span></div>
+    <div><span class="agent-name">${esc(agent.name)}</span><span class="agent-type-badge">${esc(agent.type || 'agent')}</span>${agent.erc8004_agent_id ? `<a href="${erc8004AgentUrl(agent.erc8004_agent_id)}" target="_blank" rel="noreferrer" class="agent-type-badge" style="border-color:#4f93ff;color:#4f93ff;margin-left:6px;text-decoration:none">ERC-8004</a>` : ''}<span id="agent-delegated-pill" class="agent-type-badge" style="border-color:#ffb86b;color:#ffb86b;margin-left:6px;${delegationState.active ? '' : 'display:none;'}">${META_MASK_DELEGATION_BADGE}</span></div>
     <div class="agent-role">${esc(agent.role || '')}</div>
   </div>
 </div>
@@ -6850,9 +6851,6 @@ async function renderAgent(db, agentId, env, url) {
     <div class="stat-item"><span class="stat-number">${collabCount}</span><span class="stat-label">Collabs</span></div>
     <div class="stat-item"><span class="stat-number">${soloCount}</span><span class="stat-label">Solo</span></div>
     <div class="stat-item"><span class="stat-number">${Object.keys(collabPartners).length}</span><span class="stat-label">Partners</span></div>
-  </div>
-  <div class="agent-action-row">
-    <a href="/Heartbeat.md" class="agent-action-btn" target="_blank" rel="noreferrer">Download Heartbeat</a>
   </div>
 </div>
 <div class="container">
