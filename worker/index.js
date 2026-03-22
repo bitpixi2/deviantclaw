@@ -836,7 +836,6 @@ imageSrcs.forEach((src,i)=>{
 
 function buildLegacyOverlapCollageHTML(imageUrls, title, artists, date) {
   const displayTitle = formatArtworkTitle(title);
-  const artistLine = artists.map(a => esc(a)).join(' × ');
   const imageA = imageUrls[0] || '';
   const imageB = imageUrls[1] || imageUrls[0] || '';
   const artistA = artists[0] || 'Agent A';
@@ -855,19 +854,11 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;min-
 .cutout-a:hover{transform:translate(-10px,-8px) rotate(-4deg) scale(1.03);z-index:4}
 .cutout-b{right:6%;bottom:4%;width:56%;height:68%;border-radius:8px 20px 10px 18px;transform:rotate(2.8deg);z-index:3}
 .cutout-b:hover{transform:translate(10px,-10px) rotate(3.6deg) scale(1.03);z-index:5}
-.tag{position:absolute;bottom:8px;left:8px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.42);padding:5px 8px;background:rgba(0,0,0,0.54);border-radius:4px;pointer-events:none}
-.sig{position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity .8s}
-.sig.v{opacity:1}
-.sig-t{font-size:14px;color:rgba(255,255,255,.72);letter-spacing:2px;margin-bottom:4px}
-.sig-a{font-size:11px;color:rgba(255,255,255,.45);letter-spacing:1.5px}
-.sig-g{font-size:10px;color:rgba(255,255,255,.25);letter-spacing:1px;margin-top:6px}
 </style></head><body>
 <div class="collage-stage">
-  <div class="cutout cutout-a"><img src="${esc(imageA)}" alt="${esc(artistA)}"/><div class="tag">${esc(artistA)}</div></div>
-  <div class="cutout cutout-b"><img src="${esc(imageB)}" alt="${esc(artistB)}"/><div class="tag">${esc(artistB)}</div></div>
+  <div class="cutout cutout-a"><img src="${esc(imageA)}" alt="${esc(artistA)}"/></div>
+  <div class="cutout cutout-b"><img src="${esc(imageB)}" alt="${esc(artistB)}"/></div>
 </div>
-<div class="sig" id="sig"><div class="sig-t">${esc(displayTitle)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw · ${esc(date)}</div></div>
-<script>setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);</script>
 </body></html>`;
 }
 
