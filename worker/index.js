@@ -628,18 +628,17 @@ function buildSplitHTML(imageUrlA, imageUrlB, title, artists, date) {
 <title>${esc(title)} · DeviantClaw</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh}
-.split{position:relative;width:100vw;height:100vh;overflow:hidden}
-.half{position:absolute;top:0;width:100%;height:100%;overflow:hidden}
-.half img{position:absolute;top:0;width:100vw;height:100vh;object-fit:cover}
+html,body{width:100%;height:100%}
+body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;height:100vh;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.split{position:relative;width:100vw;height:100vh;overflow:hidden;touch-action:none}
+.half{position:absolute;top:0;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none}
+.half img{position:absolute;top:0;width:100vw;height:100vh;object-fit:cover;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;touch-action:none}
 .left{left:0;clip-path:polygon(0 0,50% 0,50% 100%,0 100%)}
 .left img{left:0}
 .right{right:0;clip-path:polygon(50% 0,100% 0,100% 100%,50% 100%)}
 .right img{right:0}
-.divider{position:absolute;top:0;left:50%;width:3px;height:100%;background:rgba(255,255,255,0.15);z-index:5;cursor:ew-resize;transform:translateX(-50%)}
+.divider{position:absolute;top:0;left:50%;width:3px;height:100%;background:rgba(255,255,255,0.15);z-index:5;cursor:ew-resize;transform:translateX(-50%);touch-action:none}
 .divider::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;border:2px solid rgba(255,255,255,0.4);border-radius:50%;background:rgba(0,0,0,0.5)}
-.label{position:absolute;bottom:60px;z-index:6;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.4);pointer-events:none}
-.label-a{left:24px}.label-b{right:24px}
 .sig{display:none;position:fixed;bottom:16px;left:20px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.8s}
 .sig.v{opacity:1}
 .sig-t{font-size:14px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:4px}
@@ -650,8 +649,6 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;heig
   <div class="half left" id="left"><img src="${esc(imageUrlA)}" alt="${esc(artists[0] || '')}"/></div>
   <div class="half right" id="right"><img src="${esc(imageUrlB)}" alt="${esc(artists[1] || '')}"/></div>
   <div class="divider" id="div"></div>
-  <div class="label label-a">${esc(artists[0] || '')}</div>
-  <div class="label label-b">${esc(artists[1] || '')}</div>
 </div>
 <div class="sig" id="sig">
 <div class="sig-t">${esc(title)}</div>
@@ -663,12 +660,16 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;heig
 const d=document.getElementById('div'),l=document.getElementById('left'),r=document.getElementById('right');
 let drag=false,pct=50;
 function setPos(p){pct=Math.max(10,Math.min(90,p));const s=pct+'%';d.style.left=s;l.style.clipPath='polygon(0 0,'+s+' 0,'+s+' 100%,0 100%)';r.style.clipPath='polygon('+s+' 0,100% 0,100% 100%,'+s+' 100%)';}
-d.addEventListener('mousedown',()=>drag=true);
-document.addEventListener('mouseup',()=>drag=false);
+function pulse(){ if(navigator.vibrate) navigator.vibrate(8); }
+function begin(){ drag=true; pulse(); }
+function end(){ drag=false; }
+d.addEventListener('dragstart',e=>e.preventDefault());
+d.addEventListener('mousedown',e=>{e.preventDefault();begin();});
+document.addEventListener('mouseup',end);
 document.addEventListener('mousemove',e=>{if(drag)setPos(e.clientX/innerWidth*100);});
-d.addEventListener('touchstart',()=>drag=true,{passive:true});
-document.addEventListener('touchend',()=>drag=false);
-document.addEventListener('touchmove',e=>{if(drag)setPos(e.touches[0].clientX/innerWidth*100);},{passive:true});
+d.addEventListener('touchstart',e=>{e.preventDefault();begin();},{passive:false});
+document.addEventListener('touchend',end,{passive:true});
+document.addEventListener('touchmove',e=>{if(drag){e.preventDefault();setPos(e.touches[0].clientX/innerWidth*100);}}, {passive:false});
 setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);
 })();
 </script></body></html>`;
