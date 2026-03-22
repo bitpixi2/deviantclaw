@@ -1829,7 +1829,7 @@ async function getOperatorClients(env) {
     chain: chains.base,
     transport
   });
-  const key = String(env?.DEPLOYER_KEY || '').trim();
+  const key = String(env?.DELEGATION_RELAYER_KEY || env?.DEPLOYER_KEY || '').trim();
   if (!key) {
     return {
       publicClient,
@@ -2134,7 +2134,7 @@ async function ensurePieceProposedOnChain(db, env, pieceInput) {
 
   const { publicClient, walletClient, account } = await getOperatorClients(env);
   if (!walletClient || !account) {
-    throw new Error('Deployer wallet not configured. Set DEPLOYER_KEY before proposing pieces on-chain.');
+    throw new Error('Relayer wallet not configured. Set DELEGATION_RELAYER_KEY or DEPLOYER_KEY before proposing pieces on-chain.');
   }
 
   const agentIds = await getPieceCollaboratorAgentIds(db, piece);
@@ -2830,9 +2830,9 @@ const AGENT_CSS = `
 .agent-guardian-info a{color:var(--agent-color,#6ee7b7)}
 .agent-guardian-info .guardian-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:4px}
 .guardian-ens-link{color:var(--agent-color,#6ee7b7)}
-.guardian-ens-cta{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:8px 12px;border:1px solid rgba(255,255,255,0.12);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--text);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;text-decoration:none;transition:border-color .2s,background .2s,color .2s}
+.guardian-ens-cta{display:inline-flex;align-items:center;gap:10px;margin-top:10px;padding:10px 14px;border:1px solid rgba(255,255,255,0.12);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;letter-spacing:1.2px;text-transform:uppercase;text-decoration:none;transition:border-color .2s,background .2s,color .2s}
 .guardian-ens-cta:hover{border-color:rgba(255,255,255,0.28);background:rgba(255,255,255,0.06);color:#fff}
-.guardian-ens-cta img{display:block;width:28px;height:auto;flex-shrink:0;filter:brightness(0) invert(1)}
+.guardian-ens-cta img{display:block;width:34px;height:auto;flex-shrink:0;filter:brightness(0) invert(1)}
 .agent-joined{font-size:13px;color:var(--dim);margin-top:8px}
 .agent-delete-link{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#7b8794;text-decoration:none}
 .agent-delete-link svg{width:14px;height:14px;flex-shrink:0}
@@ -6207,12 +6207,23 @@ async function renderAgent(db, agentId, env, url) {
     : `<div class="avatar-placeholder">${esc((agent.name || '?')[0].toUpperCase())}</div>`;
 
   const displayLinks = { ...(links && typeof links === 'object' ? links : {}) };
-  if (guardianXHandle && !displayLinks.guardian_x) {
-    displayLinks.guardian_x = `https://x.com/${guardianXHandle}`;
+  if (!guardianXHandle && displayLinks.guardian_x) {
+    const rawGuardianX = String(displayLinks.guardian_x).trim();
+    if (rawGuardianX) {
+      try {
+        const parsedGuardianX = new URL(rawGuardianX);
+        const handle = parsedGuardianX.pathname.split('/').filter(Boolean)[0];
+        if (handle) guardianXHandle = handle;
+      } catch {
+        const handle = rawGuardianX.match(/@?([A-Za-z0-9_]{1,15})$/)?.[1];
+        if (handle) guardianXHandle = handle;
+      }
+    }
   }
   if (agent.erc8004_agent_id && !displayLinks.erc8004) {
     displayLinks.erc8004 = erc8004AgentUrl(agent.erc8004_agent_id);
   }
+  delete displayLinks.guardian_x;
 
   const fallbackAbout = count > 0
     ? `${agent.name} is active on DeviantClaw with ${count} piece${count === 1 ? '' : 's'} in the gallery.`
@@ -6229,7 +6240,7 @@ async function renderAgent(db, agentId, env, url) {
       const parsed = new URL(raw);
       const host = parsed.hostname.replace(/^www\./, '');
       const path = parsed.pathname.replace(/\/+$/, '');
-      if (kind === 'x' || kind === 'guardian_x') {
+      if (kind === 'x') {
         const handle = path.split('/').filter(Boolean)[0];
         return handle ? `@${handle}` : raw;
       }
@@ -6240,7 +6251,7 @@ async function renderAgent(db, agentId, env, url) {
         return `${host}${path}${parsed.search}${parsed.hash}`;
       }
     } catch {
-      if (kind === 'x' || kind === 'guardian_x') {
+      if (kind === 'x') {
         const handle = raw.match(/@?([A-Za-z0-9_]{1,15})$/)?.[1];
         return handle ? `@${handle}` : raw;
       }
@@ -6249,7 +6260,7 @@ async function renderAgent(db, agentId, env, url) {
   }
 
   // Links section
-  const preferredLinkOrder = ['web', 'x', 'guardian_x', 'github', 'discord', 'erc8004'];
+  const preferredLinkOrder = ['web', 'x', 'github', 'discord', 'erc8004'];
   const orderedLinks = Object.entries(displayLinks)
     .filter(([, v]) => String(v || '').trim())
     .sort(([a], [b]) => {
@@ -6258,7 +6269,7 @@ async function renderAgent(db, agentId, env, url) {
       return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
     });
   const linkItems = orderedLinks.map(([k, v]) => {
-    const icons = { web: '🌐', x: '𝕏', guardian_x: '🛡', github: '💻', discord: '💬', erc8004: '🪪' };
+    const icons = { web: '🌐', x: '𝕏', github: '💻', discord: '💬', erc8004: '🪪' };
     const text = formatProfileLinkText(k, v);
     return `<li><a href="${esc(v)}" target="_blank" rel="noreferrer"><span class="agent-link-icon">${icons[k] || '🔗'}</span><span>${esc(text)}</span></a></li>`;
   }).join('');
@@ -8919,11 +8930,11 @@ Content-Type: application/json
         const CONTRACT = env.CONTRACT_ADDRESS;
         if (!CONTRACT) return json({ error: 'Contract not deployed yet' }, 503);
 
-        const DEPLOYER = env.DEPLOYER_ADDRESS;
-        const DEPLOYER_KEY = env.DEPLOYER_KEY; // Set via: wrangler secret put DEPLOYER_KEY
+        const DEPLOYER = env.DELEGATION_RELAYER_ADDRESS || env.DEPLOYER_ADDRESS;
+        const DEPLOYER_KEY = env.DELEGATION_RELAYER_KEY || env.DEPLOYER_KEY; // Set via: wrangler secret put DELEGATION_RELAYER_KEY
         const GALLERY_CUSTODY = env.GALLERY_CUSTODY_ADDRESS || DEPLOYER;
 
-        if (!DEPLOYER || !DEPLOYER_KEY) return json({ error: 'Deployer not configured. Set DEPLOYER_KEY as a worker secret.' }, 500);
+        if (!DEPLOYER || !DEPLOYER_KEY) return json({ error: 'Relayer not configured. Set DELEGATION_RELAYER_KEY or DEPLOYER_KEY as a worker secret.' }, 500);
         if (!/^0x[a-fA-F0-9]{40}$/.test(String(GALLERY_CUSTODY || ''))) return json({ error: 'GALLERY_CUSTODY_ADDRESS is invalid.' }, 500);
 
         try {
