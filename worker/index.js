@@ -3325,7 +3325,6 @@ function buildCollageThumbnailSvg({ imageUrls, labels }) {
     const count = Math.max(1, Math.min(imageUrls.length, 4));
     const layout = layoutsByCount[count][i] || layoutsByCount[1][0];
     const clipId = `thumb-clip-${i}`;
-    const label = String(labels[i] || '').trim().toUpperCase();
     return `
       <g transform="translate(${layout.x} ${layout.y}) rotate(${layout.r} ${layout.w / 2} ${layout.h / 2})" filter="url(#card-shadow)">
         <rect width="${layout.w}" height="${layout.h}" rx="24" fill="#0f0f16"/>
@@ -3334,11 +3333,6 @@ function buildCollageThumbnailSvg({ imageUrls, labels }) {
         </clipPath>
         <image href="${esc(url)}" width="${layout.w}" height="${layout.h}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})"/>
         <rect width="${layout.w}" height="${layout.h}" rx="24" fill="none" stroke="rgba(255,255,255,0.12)"/>
-        ${label ? `
-          <g transform="translate(16 ${layout.h - 44})">
-            <rect width="${Math.max(96, Math.min(210, label.length * 10 + 24))}" height="28" rx="8" fill="rgba(0,0,0,0.58)"/>
-            <text x="12" y="18" fill="rgba(255,255,255,0.55)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(label)}</text>
-          </g>` : ''}
       </g>`;
   }).join('');
 
@@ -3365,8 +3359,6 @@ function buildSplitThumbnailSvg({ imageUrls, labels }) {
   const height = 900;
   const left = imageUrls[0];
   const right = imageUrls[1] || imageUrls[0];
-  const labelA = String(labels[0] || '').trim().toUpperCase();
-  const labelB = String(labels[1] || '').trim().toUpperCase();
   const seamPath = Array.from({ length: 19 }, (_, i) => {
     const y = (height / 18) * i;
     const x = width * 0.5 + Math.sin(i * 0.9) * 32 + Math.cos(i * 0.35) * 18;
@@ -3391,8 +3383,6 @@ function buildSplitThumbnailSvg({ imageUrls, labels }) {
   <image href="${esc(right)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" clip-path="url(#right-split)"/>
   <path d="${seamPath}" fill="none" stroke="rgba(255,255,255,0.36)" stroke-width="3" filter="url(#split-glow)"/>
   <path d="${seamPath}" fill="none" stroke="rgba(130,214,255,0.18)" stroke-width="16"/>
-  ${labelA ? `<g transform="translate(54 790)"><rect width="${Math.max(120, Math.min(320, labelA.length * 12 + 28))}" height="34" rx="10" fill="rgba(0,0,0,0.55)"/><text x="14" y="22" fill="rgba(255,255,255,0.72)" font-family="'Courier New', monospace" font-size="14" letter-spacing="2">${esc(labelA)}</text></g>` : ''}
-  ${labelB ? `<g transform="translate(${width - Math.max(120, Math.min(320, labelB.length * 12 + 28)) - 54} 790)"><rect width="${Math.max(120, Math.min(320, labelB.length * 12 + 28))}" height="34" rx="10" fill="rgba(0,0,0,0.55)"/><text x="14" y="22" fill="rgba(255,255,255,0.72)" font-family="'Courier New', monospace" font-size="14" letter-spacing="2">${esc(labelB)}</text></g>` : ''}
 </svg>`;
 }
 
@@ -3409,14 +3399,12 @@ function buildSequenceThumbnailSvg({ imageUrls, labels }) {
     const h = 250;
     const x = 120 + i * 170;
     const y = 110 + (i % 2) * 120;
-    const label = String(labels[i] || '').trim().toUpperCase();
     const opacity = 0.38 + i * 0.16;
     return `
       <g opacity="${opacity.toFixed(2)}" transform="translate(${x} ${y}) rotate(${(i - 1.5) * 2.8} ${w / 2} ${h / 2})">
         <rect width="${w}" height="${h}" rx="20" fill="#0f1220"/>
         <image href="${esc(url)}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#seq-clip-${i})"/>
         <rect width="${w}" height="${h}" rx="20" fill="none" stroke="rgba(255,255,255,0.10)"/>
-        ${label ? `<text x="18" y="${h - 20}" fill="rgba(255,255,255,0.58)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(label)}</text>` : ''}
       </g>`;
   }).join('');
   const dots = imageUrls.slice(0, 4).map((_, i) => `<circle cx="${520 + i * 54}" cy="820" r="${i === imageUrls.length - 1 ? 11 : 8}" fill="${i === imageUrls.length - 1 ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.24)'}"/>`).join('');
@@ -3440,13 +3428,11 @@ function buildStitchThumbnailSvg({ imageUrls, labels }) {
       const row = Math.floor(i / 2);
       const x = 90 + col * 510;
       const y = 90 + row * 360;
-      const label = String(labels[i] || '').trim().toUpperCase();
       return `
         <g transform="translate(${x} ${y})">
           <rect width="510" height="360" rx="18" fill="#0f1120"/>
           <image href="${esc(url)}" width="510" height="360" preserveAspectRatio="xMidYMid slice" clip-path="url(#stitch-clip-${i})"/>
           <rect width="510" height="360" rx="18" fill="none" stroke="rgba(255,255,255,0.08)"/>
-          ${label ? `<text x="18" y="336" fill="rgba(255,255,255,0.55)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(label)}</text>` : ''}
         </g>`;
     }).join('');
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -3459,12 +3445,10 @@ function buildStitchThumbnailSvg({ imageUrls, labels }) {
   const strips = imageUrls.map((url, i) => {
     const h = height / imageUrls.length;
     const y = i * h;
-    const label = String(labels[i] || '').trim().toUpperCase();
     return `
       <g transform="translate(0 ${y})">
         <image href="${esc(url)}" x="0" y="${-y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice"/>
         <rect width="${width}" height="${h}" fill="none" stroke="rgba(255,255,255,0.08)"/>
-        ${label ? `<text x="${width - 30}" y="${h / 2}" fill="rgba(255,255,255,0.52)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2" text-anchor="end" dominant-baseline="middle">${esc(label)}</text>` : ''}
       </g>`;
   }).join('');
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -3483,13 +3467,11 @@ function buildParallaxThumbnailSvg({ imageUrls, labels }) {
   }).join('');
   const layers = imageUrls.slice(0, 4).map((url, i) => {
     const inset = 90 + i * 55;
-    const label = String(labels[i] || '').trim().toUpperCase();
     return `
       <g opacity="${(0.36 + i * 0.15).toFixed(2)}" transform="translate(${(i - 1.5) * 18} ${(i - 1.5) * 10})">
         <rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="26" fill="#0f1322"/>
         <image href="${esc(url)}" x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#parallax-clip-${i})"/>
         <rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="26" fill="none" stroke="rgba(255,255,255,0.08)"/>
-        ${label ? `<text x="${inset + 22}" y="${height - inset - 22}" fill="rgba(255,255,255,0.52)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(label)}</text>` : ''}
       </g>`;
   }).join('');
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -3518,17 +3500,12 @@ function buildGlitchThumbnailSvg({ imageUrls, labels }) {
       <image href="${esc(url)}" x="${shift}" y="${y}" width="${width}" height="${h}" preserveAspectRatio="xMidYMid slice"/>
     </g>`;
   }).join('');
-  const tags = labels.slice(0, 4).map((label, i) => {
-    if (!label) return '';
-    return `<text x="${84 + i * 250}" y="${820 - (i % 2) * 24}" fill="rgba(255,255,255,0.5)" font-family="'Courier New', monospace" font-size="12" letter-spacing="2">${esc(String(label).toUpperCase())}</text>`;
-  }).join('');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
   <rect width="${width}" height="${height}" fill="#09090f"/>
   <image href="${esc(base)}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" opacity="0.9"/>
   ${stripes}
   <rect x="0" y="0" width="${width}" height="${height}" fill="none" stroke="rgba(255,255,255,0.06)"/>
-  ${tags}
 </svg>`;
 }
 
