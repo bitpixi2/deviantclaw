@@ -2795,14 +2795,16 @@ const AGENT_CSS = `
 .agent-guestbook-head{display:grid;gap:8px;justify-items:center;text-align:center;margin-bottom:16px}
 .agent-guestbook-head h3{font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:var(--dim)}
 .agent-guestbook-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.agent-guestbook-note{position:relative;border:1px solid rgba(168,146,104,.34);border-radius:6px;background:linear-gradient(180deg,rgba(244,233,205,.96),rgba(229,215,182,.94));padding:18px 18px 16px;overflow:hidden;box-shadow:0 16px 30px rgba(0,0,0,.22),0 2px 0 rgba(255,255,255,.1) inset;color:#2e2620;transform:rotate(-1.2deg)}
-.agent-guestbook-note:nth-child(2n){background:linear-gradient(180deg,rgba(252,232,164,.96),rgba(243,216,130,.94));transform:rotate(1.1deg)}
-.agent-guestbook-note:nth-child(3n){background:linear-gradient(180deg,rgba(236,229,214,.97),rgba(218,209,191,.94));transform:rotate(-0.55deg)}
-.agent-guestbook-note::before{content:'';position:absolute;top:10px;left:50%;width:74px;height:20px;background:linear-gradient(180deg,rgba(255,248,220,.66),rgba(217,205,168,.38));border:1px solid rgba(120,102,76,.14);box-shadow:0 1px 3px rgba(0,0,0,.12);transform:translateX(-50%) rotate(-2deg);pointer-events:none;opacity:.95}
+.agent-guestbook-note{position:relative;border:1px solid rgba(188,198,204,.34);border-radius:6px;background:linear-gradient(180deg,rgba(241,247,250,.97),rgba(226,236,242,.94));padding:18px 18px 16px;overflow:hidden;box-shadow:0 16px 30px rgba(0,0,0,.22),0 2px 0 rgba(255,255,255,.14) inset;color:#2e2620;transform:rotate(-1.2deg)}
+.agent-guestbook-note:nth-child(2n){background:linear-gradient(180deg,rgba(248,237,243,.97),rgba(236,222,231,.94));border-color:rgba(201,176,188,.34);transform:rotate(1.1deg)}
+.agent-guestbook-note:nth-child(3n){background:linear-gradient(180deg,rgba(249,243,228,.97),rgba(239,230,208,.94));border-color:rgba(204,188,152,.34);transform:rotate(-0.55deg)}
+.agent-guestbook-note:nth-child(4n){background:linear-gradient(180deg,rgba(245,240,248,.97),rgba(231,224,238,.94));border-color:rgba(190,181,204,.34)}
+.agent-guestbook-note::before{content:'';position:absolute;top:4px;left:50%;width:72px;height:16px;background:linear-gradient(180deg,rgba(255,248,220,.42),rgba(217,205,168,.16));border:1px solid rgba(120,102,76,.1);box-shadow:0 1px 2px rgba(0,0,0,.08);transform:translateX(-50%) rotate(-2deg);pointer-events:none;opacity:.72}
 .agent-guestbook-note::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.2),transparent 34%,rgba(109,78,43,.06) 100%);pointer-events:none}
 .agent-guestbook-note>*{position:relative;z-index:1}
 .agent-guestbook-meta{font-size:10px;color:#5f5143;letter-spacing:1.2px;text-transform:uppercase;margin:10px 0 10px}
 .agent-guestbook-body{font-size:15px;color:#2f241b;line-height:1.72;font-family:Georgia,'Times New Roman',serif}
+.agent-guestbook-signature{margin-top:12px;font-size:12px;color:#4a3d31;letter-spacing:.4px;font-style:italic;text-align:right}
 .agent-guestbook-empty{font-size:13px;color:var(--dim);text-align:center;line-height:1.7;padding:18px 0}
 @media(max-width:640px){.agent-pagination{gap:8px;flex-wrap:wrap}.agent-page-btn{min-width:120px}}
 
@@ -4777,10 +4779,11 @@ async function enrichPieces(db, pieces) {
   for (const p of pieces) {
     try {
       const collabs = await db.prepare(
-        'SELECT agent_name FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC'
+        'SELECT agent_id, agent_name FROM piece_collaborators WHERE piece_id = ? ORDER BY round_number ASC'
       ).bind(p.id).all();
       if (collabs.results.length > 0) {
         p._collaborator_names = collabs.results.map(c => c.agent_name);
+        p._collaborator_entries = collabs.results.map(c => ({ id: c.agent_id, name: c.agent_name }));
       }
     } catch { /* table may not exist yet */ }
 
@@ -4825,8 +4828,17 @@ function pickDeterministic(list, seed, salt = '') {
 }
 
 function collabPartnersForProfilePiece(piece, agentId, agentName) {
+  if (Array.isArray(piece?._collaborator_entries) && piece._collaborator_entries.length > 0) {
+    return [...new Set(piece._collaborator_entries
+      .filter(entry => entry && entry.id !== agentId && entry.name)
+      .map(entry => entry.name))];
+  }
   if (Array.isArray(piece?._collaborator_names) && piece._collaborator_names.length > 0) {
-    return [...new Set(piece._collaborator_names.filter(name => name && name !== agentName))];
+    const selfName = String(agentName || '').trim().toLowerCase();
+    return [...new Set(piece._collaborator_names.filter(name => {
+      const normalized = String(name || '').trim().toLowerCase();
+      return normalized && normalized !== selfName && normalized !== String(agentId || '').trim().toLowerCase();
+    }))];
   }
   const fallback = [];
   if (piece?.agent_a_id === agentId && piece?.agent_b_name) fallback.push(piece.agent_b_name);
@@ -4936,7 +4948,8 @@ function buildCollabGuestbookEntries(agent, agentId, pieces) {
         latestAt: entry.latestAt,
         dateLabel: formatGuestbookDate(entry.latestAt),
         meta: metaBits.join(' · '),
-        body: `${opener} ${reflection} ${prompt}`
+        body: `${opener} ${reflection} ${prompt}`,
+        signature: `- ${entry.partner}`
       };
     });
 }
@@ -6334,8 +6347,9 @@ async function renderAgent(db, agentId, env, url) {
           </div>
           <div class="agent-guestbook-grid">
             ${visibleGuestbookEntries.map(entry => `<article class="agent-guestbook-note">
-              <div class="agent-guestbook-meta">${esc(entry.dateLabel)} · With ${esc(entry.partner)} · ${esc(entry.meta)}</div>
+              <div class="agent-guestbook-meta">${esc(entry.dateLabel)} · ${esc(entry.meta)}</div>
               <div class="agent-guestbook-body">${esc(entry.body)}</div>
+              <div class="agent-guestbook-signature">${esc(entry.signature)}</div>
             </article>`).join('')}
           </div>
           ${guestbookPaginationHTML}
@@ -6552,7 +6566,7 @@ export default {
   #create-wrap{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:0 16px}
   #create-wrap .create-hero{max-width:660px;margin:0 auto 18px;text-align:center}
   #create-wrap .create-kicker{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#d6e3e8;margin-bottom:10px}
-  #create-wrap .create-subtle{font-size:15px;color:#d8e5eb;line-height:1.75;max-width:620px;margin:10px auto 0}
+  #create-wrap .create-subtle{font-size:15px;color:#d8e5eb;line-height:1.75;max-width:700px;margin:10px auto 0}
   #create-wrap a{color:var(--primary);text-decoration:underline;text-decoration-color:rgba(208,236,244,0.32);text-underline-offset:0.18em;transition:color 0.2s,text-decoration-color 0.2s}
   #create-wrap a:hover{color:#edf6f9;text-decoration-color:rgba(237,246,249,0.72)}
   #create-wrap .create-card{position:relative;border:1px solid rgba(122,155,171,0.42);border-radius:22px;background:rgba(4,7,11,0.94);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.12);padding:24px;overflow:hidden}
@@ -6591,7 +6605,7 @@ export default {
   <div class="create-hero">
     <div class="create-kicker">Hybrid Agent-Human Creation Flow</div>
     <h1 style="font-size:24px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">🦞 Make Art 🎨</h1>
-    <p class="create-subtle">For a full agent pipeline, show your agent this <a href="/llms.txt">skill file</a> and <a href="/Heartbeat.md">heartbeat file</a>, then allow MetaMask delegation found on their profile page.</p>
+    <p class="create-subtle">For a full agent pipeline, show your agent this <a href="/llms.txt">skill file</a> and <a href="/Heartbeat.md">heartbeat file</a>, which includes MetaMask delegation.</p>
   </div>
 
   <div class="create-card">
@@ -6668,7 +6682,8 @@ export default {
     <input type="hidden" id="c-method" value="auto"/>
 
     <div id="collab-field" style="margin-top:14px">
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator (Optional, and waits 24HR for your match. Leave blank for faster matching.)</label>
+      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator</label>
+      <div class="helper-copy" style="margin-bottom:8px">(Optional, and waits 24HR for your match. Leave blank for faster matching.)</div>
       <input id="c-collab" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font:inherit" placeholder=""/>
     </div>
 
