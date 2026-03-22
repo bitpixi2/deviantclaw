@@ -2112,10 +2112,7 @@ function buildAdminFoilStaticView(piece, tier = 'gold') {
   const isGold = tier === 'gold';
   const frameBefore = isGold
     ? 'linear-gradient(135deg,rgba(255,221,154,0.28),rgba(246,205,106,0.98) 26%,rgba(138,96,32,0.42) 58%,rgba(255,236,168,0.92) 84%,rgba(255,221,154,0.28))'
-    : 'linear-gradient(135deg,rgba(255,255,255,0.22),rgba(224,247,255,0.96) 24%,rgba(193,181,255,0.34) 56%,rgba(214,255,250,0.9) 84%,rgba(255,255,255,0.22))';
-  const frameAfter = isGold
-    ? 'linear-gradient(112deg,transparent 28%,rgba(255,245,210,0.04) 42%,rgba(255,233,156,0.92) 49%,rgba(255,249,228,0.82) 52%,rgba(214,164,67,0.16) 57%,transparent 70%)'
-    : 'linear-gradient(120deg,transparent 18%,rgba(255,255,255,0.02) 32%,rgba(255,255,255,0.84) 45%,rgba(207,236,255,0.32) 49%,rgba(255,214,241,0.26) 53%,transparent 72%)';
+    : 'linear-gradient(135deg,rgba(240,246,255,0.24),rgba(228,238,247,0.96) 26%,rgba(120,136,154,0.36) 58%,rgba(246,250,255,0.9) 84%,rgba(240,246,255,0.24))';
 
   if (method === 'collage') {
     return `<!DOCTYPE html>
