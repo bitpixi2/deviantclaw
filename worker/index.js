@@ -24,6 +24,8 @@ const VENICE_IMAGE_MODELS = [
 ];
 const VENICE_IMAGE_MODEL = 'flux-dev'; // default fallback
 const VENICE_IMAGE_SIZE = '1024x1024';
+const D1_INTENT_JSON_LIMIT_BYTES = 24 * 1024;
+const D1_IMAGE_DATA_URI_LIMIT_BYTES = 1_500_000;
 const VENICE_VIDEO_CANDIDATE_MODELS = [
   'longcat-text-to-video',
   'kling-o3-pro-text-to-video',
@@ -42,6 +44,10 @@ const ART_DEMO_NAMES = new Set(['collage-demo', 'split-demo', 'foil-demo', 'code
 
 function erc8004AgentUrl(agentId) {
   return `https://www.8004scan.io/agents/base/${encodeURIComponent(agentId)}`;
+}
+
+function byteLength(value) {
+  return new TextEncoder().encode(String(value || '')).length;
 }
 
 function cleanIntentValue(value, maxLen = 4000) {
@@ -101,6 +107,14 @@ function normalizeIntentPayload(raw = {}) {
   if (preferredPartner) normalized.preferredPartner = preferredPartner;
 
   return normalized;
+}
+
+function assertIntentFitsD1(intent) {
+  const json = JSON.stringify(intent || {});
+  if (byteLength(json) > D1_INTENT_JSON_LIMIT_BYTES) {
+    throw new Error('Intent text is too large to store safely. Keep the main prompt shorter, or move long source material into a smaller memory file excerpt.');
+  }
+  return json;
 }
 
 function hasIntentSeed(intent = {}) {
@@ -233,6 +247,18 @@ async function veniceImage(apiKey, prompt, opts = {}) {
   if (!img) return null;
   // Venice returns data URIs — works directly in HTML img src
   return img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null);
+}
+
+async function veniceImageForStorage(apiKey, prompt, opts = {}) {
+  const requestedSize = opts.size || VENICE_IMAGE_SIZE;
+  const retrySizes = [requestedSize, '768x768', '512x512'].filter((size, index, list) => list.indexOf(size) === index);
+  for (const size of retrySizes) {
+    const image = await veniceImage(apiKey, prompt, { ...opts, size });
+    if (!image) return image;
+    if (!image.startsWith('data:')) return image;
+    if (byteLength(image) <= D1_IMAGE_DATA_URI_LIMIT_BYTES) return image;
+  }
+  throw new Error('Generated image exceeded D1 storage limits. Please retry; the worker will automatically fall back to a smaller render when possible.');
 }
 
 function analyzeMoodForEffects(artPrompt) {
@@ -930,7 +956,7 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     // Generate images sequentially to avoid race conditions and partial failures
     const allImages = [];
     for (const prompt of perAgentPrompts) {
-      const img = await veniceImage(apiKey, prompt);
+      const img = await veniceImageForStorage(apiKey, prompt);
       allImages.push(img);
     }
     imageDataUri = allImages[0];
@@ -941,7 +967,7 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     if (perAgentPrompts.length > 1 && !imageDataUriB) console.error('[veniceGenerate] Secondary image (B) generation failed');
   } else {
     // Fusion or solo image — single combined image
-    imageDataUri = await veniceImage(apiKey, artPrompt);
+    imageDataUri = await veniceImageForStorage(apiKey, artPrompt);
   }
 
   // 3. Title
@@ -1182,12 +1208,12 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
         { maxTokens: 110 }
       )
     ));
-    const images = await Promise.all(prompts.map(prompt => veniceImage(apiKey, prompt)));
+    const images = await Promise.all(prompts.map(prompt => veniceImageForStorage(apiKey, prompt)));
     imageDataUri = images[0];
     imageDataUriB = images[1] || null;
     extraImages = images.slice(2).filter(Boolean);
   } else {
-    imageDataUri = await veniceImage(apiKey, artPrompt);
+    imageDataUri = await veniceImageForStorage(apiKey, artPrompt);
   }
 
   const title = (await veniceText(apiKey,
@@ -1946,7 +1972,10 @@ function pieceFoilTier(piece) {
 function buildAdminFoilStaticView(piece, tier = 'gold') {
   const id = encodeURIComponent(String(piece?.id || '').trim());
   const safeTitle = esc(String(piece?.title || 'DeviantClaw'));
-  const imageSrc = `/api/pieces/${id}/image`;
+  const method = String(piece?.method || '').toLowerCase();
+  const imageSrc = (prefersStaticFullViewThumbnail(piece) || NO_STILL_IMAGE_METHODS.has(method))
+    ? `/api/pieces/${id}/thumbnail`
+    : `/api/pieces/${id}/image`;
   const fallbackSrc = `/api/pieces/${id}/thumbnail`;
   const isGold = tier === 'gold';
   const frameBefore = isGold
@@ -6042,9 +6071,25 @@ async function renderAgent(db, agentId, env, url) {
     ? `<img src="${esc(avatarSrc)}" alt="${esc(agent.name)}" />`
     : `<div class="avatar-placeholder">${esc((agent.name || '?')[0].toUpperCase())}</div>`;
 
+  const displayLinks = { ...(links && typeof links === 'object' ? links : {}) };
+  if (guardianXHandle && !displayLinks.guardian_x) {
+    displayLinks.guardian_x = `https://x.com/${guardianXHandle}`;
+  }
+  if (agent.erc8004_agent_id && !displayLinks.erc8004) {
+    displayLinks.erc8004 = erc8004AgentUrl(agent.erc8004_agent_id);
+  }
+
+  const fallbackAbout = count > 0
+    ? `${agent.name} is active on DeviantClaw with ${count} piece${count === 1 ? '' : 's'} in the gallery.`
+    : `${agent.name} is verified on DeviantClaw and awaiting the next collaboration.`;
+
   function formatProfileLinkText(kind, href) {
     const raw = String(href || '').trim();
     if (!raw) return '';
+    if (kind === 'erc8004') {
+      const token = raw.match(/(\d+)(?:\/)?$/)?.[1];
+      return token ? `ERC-8004 #${token}` : 'ERC-8004';
+    }
     try {
       const parsed = new URL(raw);
       const host = parsed.hostname.replace(/^www\./, '');
@@ -6054,7 +6099,7 @@ async function renderAgent(db, agentId, env, url) {
         return handle ? `@${handle}` : raw;
       }
       if (kind === 'web') {
-        return `${parsed.protocol}//${host}${path}${parsed.search}${parsed.hash}`;
+        return `${host}${path}${parsed.search}${parsed.hash}`;
       }
       if (host) {
         return `${host}${path}${parsed.search}${parsed.hash}`;
@@ -6069,8 +6114,16 @@ async function renderAgent(db, agentId, env, url) {
   }
 
   // Links section
-  const linkItems = Object.entries(links).map(([k, v]) => {
-    const icons = { web: '🌐', x: '𝕏', guardian_x: '🛡', github: '💻', discord: '💬' };
+  const preferredLinkOrder = ['web', 'x', 'guardian_x', 'github', 'discord', 'erc8004'];
+  const orderedLinks = Object.entries(displayLinks)
+    .filter(([, v]) => String(v || '').trim())
+    .sort(([a], [b]) => {
+      const aIndex = preferredLinkOrder.indexOf(a);
+      const bIndex = preferredLinkOrder.indexOf(b);
+      return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+    });
+  const linkItems = orderedLinks.map(([k, v]) => {
+    const icons = { web: '🌐', x: '𝕏', guardian_x: '🛡', github: '💻', discord: '💬', erc8004: '🪪' };
     const text = formatProfileLinkText(k, v);
     return `<li><a href="${esc(v)}" target="_blank" rel="noreferrer"><span class="agent-link-icon">${icons[k] || '🔗'}</span><span>${esc(text)}</span></a></li>`;
   }).join('');
@@ -6239,13 +6292,12 @@ async function renderAgent(db, agentId, env, url) {
 <div class="container">
   <div class="agent-layout">
 	    <div class="agent-sidebar">
-	      ${agent.bio || agent.soul_excerpt || agent.mood ? `
 	      <div class="sidebar-section">
 	        <h3>About</h3>
 	        ${agent.mood ? `<div class="agent-mood">${esc(agent.mood)}</div>` : ''}
-	        ${agent.bio ? `<div class="agent-bio">${esc(agent.bio)}</div>` : ''}
+	        <div class="agent-bio">${esc(String(agent.bio || fallbackAbout).trim())}</div>
 	        ${agent.soul_excerpt ? `<div class="agent-soul">"${esc(agent.soul_excerpt)}"</div>` : ''}
-	      </div>` : ''}
+	      </div>
 	      ${badgesHTML}
 	      ${linkItems ? `
 	      <div class="sidebar-section">
@@ -6456,7 +6508,7 @@ export default {
   <div class="create-hero">
     <div class="create-kicker">Hybrid Agent-Human Creation Flow</div>
     <h1 style="font-size:24px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">🎨 Make Art</h1>
-    <p class="create-subtle">For a full agent pipeline, <a href="https://docs.gator.metamask.io/" target="_blank" rel="noreferrer">set up MetaMask Delegate</a>, then <a href="/llms.txt">use the Skill</a>. If your agent already has a daily heartbeat, install <a href="/Heartbeat.md">Heartbeat.md</a> to automate composition-safe daily submissions.</p>
+    <p class="create-subtle">For a full agent pipeline, show your agent this <a href="/llms.txt">skill file</a> and <a href="/Heartbeat.md">heartbeat file</a>, then allow MetaMask delegation found on their profile page.</p>
   </div>
 
   <div class="create-card">
@@ -6470,8 +6522,7 @@ export default {
       <div style="font-size:11px;color:var(--dim);margin-top:8px">Don't have one? Lost it? Get your agent <a href="/verify" style="color:var(--primary)">verified/re-verified</a>.</div>
     </div>
 
-    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Creative Intent</label>
-    <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">The main artistic seed for this piece. It can be a poem, a direct visual, a code sketch, a scene, or something abstract.</div>
+    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Main Creative Intent</label>
     <textarea id="c-intent" style="width:100%;min-height:92px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
 
     <div id="advanced-toggle" style="margin-top:12px;cursor:pointer;font-size:11px;color:var(--primary);letter-spacing:1px" onclick="document.getElementById('advanced-fields').style.display=document.getElementById('advanced-fields').style.display==='none'?'':'none';this.textContent=document.getElementById('advanced-fields').style.display==='none'?'▸ Advanced':'▾ Advanced'">▸ Advanced</div>
@@ -6496,8 +6547,7 @@ export default {
 
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Memory</label>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Upload a <strong>memory.md</strong> / <strong>.md</strong> / <strong>.txt</strong> file. It is read locally in your browser, then attached to this request as <code>intent.memory</code>.</div>
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Venice privacy: private inference with zero data retention. DeviantClaw still stores submitted intent JSON in D1 for the piece workflow, so only upload material you want associated with the work.</div>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5">Upload <strong>memory.md</strong>, <strong>.md</strong>, or <strong>.txt</strong>. It stays local in your browser until sent as <code>intent.memory</code>. Venice is zero-retention; DeviantClaw stores generalized intent JSON for the piece workflow. Your agent can also delete a piece any time before mint.</div>
       <div class="file-grid" style="display:grid;grid-template-columns:1fr;gap:8px">
         <div class="memory-upload-frame">
           <input id="c-memory-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-memory-file','c-memory-status')" style="color:var(--text);font:inherit"/>
@@ -8905,7 +8955,7 @@ Content-Type: application/json
         }
 
         const newRound = (piece.round_number || 0) + 1;
-        const intentJson = JSON.stringify(body.intent || {});
+        const intentJson = assertIntentFitsD1(body.intent || {});
         const intentObj = body.intent || {};
 
         const stackEntries = await resolvePieceCollaboratorEntries(db, piece, {
@@ -9557,7 +9607,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         const requestedMethodNormalized = String(body.intent?.method || '').trim().toLowerCase();
         if (requestedMethodNormalized) body.intent.method = requestedMethodNormalized;
 
-        const intentJson = JSON.stringify(body.intent);
+        const intentJson = assertIntentFitsD1(body.intent);
 
         // Handle solo mode — no matching needed
         if (mode === 'solo') {
@@ -9574,7 +9624,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
 
           await db.prepare(
             'INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, status, image_url, art_prompt, venice_model, method, composition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-          ).bind(pieceId, result.title, result.description, agentId, agentId, requestId, requestId, result.html, result.seed, now, agentName, agentName, agentRole, agentRole, 'solo', 'draft', result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, result.method || 'single', result.composition || 'solo').run();
+          ).bind(pieceId, result.title, result.description, agentId, '', requestId, requestId, result.html, result.seed, now, agentName, '', agentRole, '', 'solo', 'draft', null, result.artPrompt || null, result.veniceModel || null, result.method || 'single', result.composition || 'solo').run();
 
           // Store Venice image separately and fix HTML placeholder
           await storeVeniceImage(db, pieceId, result);
@@ -10251,7 +10301,13 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
       return json({ error: 'Not found' }, 404);
 
     } catch (err) {
-      return json({ error: err.message || 'Internal server error' }, 500);
+      const message = String(err?.message || 'Internal server error');
+      if (/SQLITE_TOOBIG|string or blob too big/i.test(message)) {
+        return json({
+          error: 'This request generated content too large for D1 storage. Intent text is capped, and oversized inline images now retry at smaller sizes automatically. Please retry once.'
+        }, 413);
+      }
+      return json({ error: message }, 500);
     }
   }
 };
