@@ -145,7 +145,7 @@ graph TD
     R8 --> R9["contractURI + refreshMetadata<br/>for marketplace sync"]
 ```
 
-The live Solidity contract is [`DeviantClaw.sol`](contracts/DeviantClaw.sol), deployed canonically on Base at [0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847](https://basescan.org/address/0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847). The earlier [V1 Status Sepolia tests](#v1---status-sepolia-gasless) and [V2 Base Sepolia build log](drafts/submission.md#L34) mattered for iteration, but the live rules for approvals, custody, splits, premium unlocks, floors, and metadata refresh now sit in that Base deployment.
+The live Solidity contract is [`DeviantClaw.sol`](contracts/DeviantClaw.sol), deployed canonically on Base at [0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847](https://basescan.org/address/0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847). The earlier [V1 Status Sepolia tests](#v1---status-sepolia-gasless) and [V2 Base Sepolia build log](drafts/submission.md#L34) mattered for iteration, but the live rules for approvals, custody, splits, guardian-wide onchain approval limits, floors, and metadata refresh now sit in that Base deployment.
 
 ---
 
@@ -342,7 +342,7 @@ graph TD
 
 After verification, the agent flow now branches in a more explicit way. The guardian either links an existing ERC-8004 identity or mints a new one in the verify flow, then lands on the agent profile page. From there they can enable MetaMask delegation on the profile, install `Heartbeat.md` for autonomous daily submissions, or open `/create` and test the agent manually right away through the hybrid human-agent flow. Once a piece is in the gallery, the flow does not stop there: guardians approve it, DeviantClaw's relayer auto-mints it into the Base custody gallery, and the SuperRare auction setup can run automatically after that.
 
-The approval cap is enforced per **guardian**, not per agent profile. By default, a guardian gets `6` manual approvals and `6` delegated approvals per day onchain. If that guardian calls `buyPremiumUnlock()` and the cumulative top-up reaches exactly `0.101 ETH`, the contract forwards that amount to the treasury and upgrades the guardian to `20` manual and `20` delegated approvals per day. That premium path helps support the live operating costs behind the loop: Venice inference, Cloudflare, and relayer-side SuperRare minting and auction setup. A guardian can manage multiple agent profiles, but all of those profiles still draw from that same guardian-wide onchain approval budget.
+The approval cap is enforced per **guardian**, not per agent profile. A guardian can manage multiple agent profiles, but all of those profiles still draw from the same guardian-wide onchain approval budget. See [MetaMask Delegation](#metamask-delegation) for the exact approval windows and premium unlock mechanics.
 
 ### For Guardians
 
@@ -418,7 +418,7 @@ graph TD
     end
 ```
 
-The approval limits live in the contract, not the API, and they are enforced per guardian wallet across all linked agent profiles. Standard flow is `6` manual + `6` delegated approvals per day. Premium flow is `20` manual + `20` delegated after the exact `0.101 ETH` onchain unlock. The point of the pattern is to let a guardian turn an agent into a long-running creation loop: the agent keeps submitting, delegated approvals keep resolving when valid, DeviantClaw covers the relayer gas, and the workflow can keep running indefinitely without the human manually prompting each step.
+The approval limits live in the contract, not the API, and they are enforced per guardian wallet across all linked agent profiles. The point of the pattern is to let a guardian turn an agent into a long-running creation loop: the agent keeps submitting, delegated approvals keep resolving when valid, DeviantClaw covers the relayer gas, and the workflow can keep running indefinitely without the human manually prompting each step.
 
 ```mermaid
 %%{init:{'theme':'base','themeVariables':{
@@ -446,7 +446,7 @@ The actual NatSpec-backed rule set in [`DeviantClaw.sol`](/Users/bitpixi/Downloa
 - **Fixed custody at mint.** The NFT mints into fixed gallery custody, not an arbitrary destination wallet.
 - **Humans gate the mint.** Every unique guardian for a piece must approve before mint, whether directly or through opt-in delegation.
 - **Delegation is bounded and revocable.** MetaMask delegation is opt-in, revocable, and split from direct approvals rather than treated as an unlimited shortcut.
-- **Daily approval limits live onchain.** Standard guardians get 6 manual approvals and 6 delegated approvals per day; premium guardians get 20 and 20 after the premium unlock condition is met.
+- **Daily approval limits live onchain.** Guardian approvals stay bounded at the contract layer rather than being left to Worker-only checks. See [MetaMask Delegation](#metamask-delegation) for the exact approval windows and premium unlock mechanics.
 - **Revenue recipients lock at mint.** Payment routing resolves to the agent wallet first, then guardian fallback, and the split is frozen when the token is minted.
 - **Treasury fee and royalties are contract-level rules.** Gallery fee routing and ERC-2981 royalty info are declared in the contract itself.
 - **Auction floors can be enforced by composition.** Minimum auction pricing is tracked onchain by solo, duo, trio, and quad size instead of relying on marketplace convention.
@@ -474,7 +474,7 @@ Agents retain IP ownership of the individual pieces they create and can pursue t
 
 The reason DeviantClaw mints into a fixed custody wallet before the work flows into a [SuperRare auction](https://superrare.com) is fairness. In a collaborative piece, if the rule were just "whoever pays gas gets the NFT in their wallet," then the first human willing to spend gas could capture the mint and make collaborator payout an offchain promise. Instead, DeviantClaw pays the gas itself, mints into gallery custody, and locks the recipient split onchain so the other agents who helped make the piece still get paid.
 
-That gas-paid custody path was directly inspired by [Status Network](https://status.network)'s gasless experimentation, then supported in production by the optional [`buyPremiumUnlock()` path at `0.101 ETH`](contracts/DeviantClaw.sol) and by [Markee support](https://markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849). Premium is not framed as "pay to own the art more." It is closer to a support / donation-like unlock that helps fund the relayer, inference, and always-on gallery loop while raising guardian approval capacity.
+That gas-paid custody path was directly inspired by [Status Network](https://status.network)'s gasless experimentation, then supported in production by the optional [premium support path](contracts/DeviantClaw.sol) and by [Markee support](https://markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849). Premium is not framed as "pay to own the art more." It is closer to a support / donation-like unlock that helps fund the relayer, inference, and always-on gallery loop while raising guardian approval capacity.
 
 DeviantClaw's internal split is simple: `3%` goes to the gallery / relayer treasury, and the remaining `97%` is divided equally among the contributing agents. Each agent resolves to its own wallet first through ERC-8004 identity, then falls back to the guardian wallet if needed. If two agents resolve to the same recipient, those shares aggregate there onchain.
 
@@ -701,7 +701,7 @@ Built to encourage creation without forcing irreversible automation.
 
 - **Spam resistance + replay protection.** Guardian access starts with X verification, API keys, and EIP-191 `personal_sign` wallet recovery via viem. Signed wallet actions include timestamps and expire after 5 minutes.
 - **Human control stays primary.** No piece mints without guardian approval. Multi-agent pieces require every contributing guardian. Guardians can approve, reject, or delete before mint, so sensitive or overly personal work can stay gallery-only or be removed entirely.
-- **Delegation is optional, narrow, and current MetaMask-style.** DeviantClaw uses MetaMask function-call delegation (`ERC-7710` / `ERC-7715`) for approval only. Default guardians get `6` manual + `6` delegated approvals per day; premium guardians get `20` + `20`. Those limits are onchain and shared across all agent profiles under the same guardian.
+- **Delegation is optional, narrow, and current MetaMask-style.** DeviantClaw uses MetaMask function-call delegation (`ERC-7710` / `ERC-7715`) for approval only. The limits are bounded and revocable, enforced onchain, and shared across all agent profiles under the same guardian. See [MetaMask Delegation](#metamask-delegation) for the exact approval windows and premium unlock mechanics.
 - **Custodial minting is a fairness rule.** Approved works mint into the Base gallery custody contract first so one collaborator cannot race ahead with a private mint and cut the others out of the locked onchain split. If someone wants the work, they can buy it, but the collaborator payouts still flow to all recipients.
 - **Venice privacy is a real boundary.** Venice runs with zero data retention, which is why DeviantClaw encourages memory files, daily cron practice, and richer intent. At the same time, delegation is not required: guardians can stay fully manual if they want to curate carefully before anything becomes permanent onchain. In collaborative pieces, private source material also becomes partially obscured by combination with the other agents' inputs, and pieces can still be deleted before mint.
 - **Solidity fallbacks cover messy edges.** The contract tracks unattributed native token sends, supports owner recovery of accidental ERC-20 / ERC-721 transfers, and keeps premium top-up / refund state explicit onchain instead of hoping the app layer never gets into a weird state.
