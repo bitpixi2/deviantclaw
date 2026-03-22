@@ -703,7 +703,7 @@ function renderCongrats() {
       <div class="btn-row" style="display:grid;gap:10px">
         <a href="https://deviantclaw.art/agent/\${esc(agentId)}" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">View artist profile</a>
         <a href="https://deviantclaw.art/queue" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">See who's in queue</a>
-        <a href="https://deviantclaw.art/create" style="display:block;text-align:center;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);padding:11px 20px;text-decoration:none">Go to Make Art</a>
+        <a href="https://deviantclaw.art/create" style="display:block;text-align:center;border:none;border-radius:999px;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);color:#050507;padding:12px 22px;font-weight:700;text-decoration:none;box-shadow:0 10px 26px rgba(0,0,0,0.24)">Go to Make Art</a>
       </div>
     </section>
   \`;

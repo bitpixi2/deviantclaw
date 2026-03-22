@@ -1786,6 +1786,19 @@ function isLegacyMainnetPiece(piece) {
   return Number(piece?.legacy_mainnet || 0) === 1;
 }
 
+const ADMIN_FOIL_OVERRIDES = Object.freeze({
+  n4xl8oqo4xhu: 'gold',
+});
+
+function pieceFoilTier(piece) {
+  const id = String(piece?.id || '').trim();
+  const override = ADMIN_FOIL_OVERRIDES[id];
+  if (override) return override;
+  const raw = String(piece?.foil_tier || piece?.auction_upgrade || '').trim().toLowerCase();
+  if (raw === 'silver' || raw === 'gold' || raw === 'diamond') return raw;
+  return '';
+}
+
 async function ensurePieceIsMainnetEligible(piece) {
   if (isLegacyMainnetPiece(piece)) {
     const reason = piece?.legacy_reason || 'This piece predates the Base mainnet proposal bridge.';
@@ -2287,8 +2300,8 @@ nav .brand img{display:block;width:272px;max-width:100%;height:auto;filter:drop-
 nav .links{grid-column:3;justify-self:end;display:flex;align-items:center;justify-content:flex-end;gap:26px;font-size:14px;letter-spacing:1px;text-transform:uppercase;line-height:1}
 nav .links a{color:var(--dim);display:inline-flex;align-items:center;justify-content:center;min-height:42px}
 nav .links a:hover{color:var(--primary)}
-nav .links a.make-art-btn{color:var(--primary);border:1px solid rgba(122,155,171,.45);border-radius:999px;padding:0 18px;background:rgba(122,155,171,.08);min-height:44px}
-nav .links a.make-art-btn:hover{color:#cde2ea;background:rgba(122,155,171,.14);transform:none}
+nav .links a.make-art-btn{color:#050507;border:none;border-radius:999px;padding:0 20px;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);min-height:44px;font-weight:700;box-shadow:0 10px 26px rgba(0,0,0,0.24)}
+nav .links a.make-art-btn:hover{color:#050507;filter:brightness(1.05);transform:translateY(-1px)}
 .mobile-only{display:none !important}
 .hamburger{grid-column:3;justify-self:end;display:none;cursor:pointer;z-index:20;background:none;border:none;padding:4px}
 .hamburger span{display:block;width:22px;height:2px;background:var(--text);margin:5px 0;transition:all 0.3s ease}
@@ -2306,28 +2319,42 @@ nav .brand img{width:222px;max-width:100%}
 nav .links{display:none;position:fixed;top:0;bottom:0;left:-16px;width:calc(100vw + 32px);min-width:calc(100vw + 32px);height:100dvh;min-height:100dvh;margin:0;padding:24px;box-sizing:border-box;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:30px;font-size:18px;z-index:9999;opacity:0;transition:opacity 0.25s ease;justify-self:stretch;align-self:stretch;grid-column:1 / -1;overflow:auto}
 nav .links.open{display:flex;opacity:1}
 nav .links a{color:var(--text);font-size:20px;letter-spacing:2px;min-height:auto}
-nav .links a.make-art-btn{padding:11px 20px;border:1px solid rgba(122,155,171,.45);border-radius:999px;background:rgba(122,155,171,.08);min-height:auto;font-size:16px;letter-spacing:2px;color:var(--primary)}
-nav .links a.make-art-btn:hover{background:rgba(122,155,171,.14);color:#cde2ea}
+nav .links a.make-art-btn{padding:11px 22px;border:none;border-radius:999px;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);min-height:auto;font-size:16px;letter-spacing:2px;color:#050507;font-weight:700;box-shadow:0 10px 26px rgba(0,0,0,0.24)}
+nav .links a.make-art-btn:hover{color:#050507;filter:brightness(1.05)}
 .menu-close{display:block;position:absolute;top:18px;right:16px;background:none;border:none;color:var(--text);font:inherit;font-size:28px;line-height:1;letter-spacing:0;cursor:pointer;padding:4px 6px}
 }
 .container{max-width:1400px;margin:0 auto;padding:24px}
 @media(min-width:1100px){.container{padding:24px 32px}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
 @media(min-width:1100px){.grid{grid-template-columns:repeat(4,1fr)}}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;transition:border-color 0.2s,transform 0.2s,background 0.2s,box-shadow 0.2s;display:block;color:inherit}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;transition:border-color 0.2s,transform 0.2s,background 0.2s,box-shadow 0.2s;display:block;color:inherit;position:relative;overflow:visible}
 .card:hover{border-color:rgba(180,213,223,0.58);transform:translateY(-2px);background:radial-gradient(circle at 16% 10%,rgba(180,213,223,0.14),transparent 30%),radial-gradient(circle at 88% 14%,rgba(214,179,194,0.14),transparent 30%),linear-gradient(155deg,rgba(10,15,20,0.98),rgba(17,18,28,0.96) 56%,rgba(21,18,28,0.94));box-shadow:0 18px 46px rgba(0,0,0,0.34)}
 .card .card-title{font-size:14px;color:var(--text);margin-bottom:6px;letter-spacing:1px}
 .card .card-meta{font-size:14px;color:var(--dim);letter-spacing:1px}
 .card .card-status-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .card .card-footer{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:12px}
 .card .card-footer .card-meta{margin:0}
-.card .card-footer-badges{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-height:30px}
+.card .card-footer-badges{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-height:40px}
 .card-preview{position:relative}
-.card-sr{display:flex;align-items:center;justify-content:center;width:30px;height:30px;opacity:0.82;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.34));transition:opacity 0.2s,transform 0.2s}
+.card-sr{display:flex;align-items:center;justify-content:center;width:38px;height:38px;opacity:0.88;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.34));transition:opacity 0.2s,transform 0.2s,filter 0.2s}
 .card-sr img{display:block;width:100%;height:100%}
 .card:hover .card-sr{opacity:1;transform:translateY(-1px)}
+.card-sr.sr-silver img{filter:brightness(0) saturate(100%) invert(88%) sepia(5%) saturate(366%) hue-rotate(178deg) brightness(102%) contrast(95%)}
+.card-sr.sr-gold img{filter:brightness(0) saturate(100%) invert(84%) sepia(30%) saturate(846%) hue-rotate(356deg) brightness(96%) contrast(96%)}
+.card-sr.sr-diamond img{filter:brightness(0) saturate(100%) invert(100%) sepia(24%) saturate(487%) hue-rotate(180deg) brightness(105%) contrast(101%) drop-shadow(0 0 10px rgba(168,210,255,0.24))}
 .card-note-badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;border:1px solid rgba(194,199,206,0.18);background:rgba(255,255,255,0.035);color:#b9c0c9;font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap}
 .card-note-badge.card-note-legacy{border-color:rgba(164,171,180,0.16);background:rgba(150,158,168,0.08);color:#d0d4db}
+.card-foil::before,.piece-frame-foil::before{content:'';position:absolute;inset:-1px;border-radius:inherit;padding:1.5px;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;z-index:3;animation:dcFoilRotate 8s linear infinite,dcFoilPulse 3.6s ease-in-out infinite}
+.card-foil::after,.piece-frame-foil::after{content:'';position:absolute;inset:-2px;border-radius:inherit;padding:3px;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;mix-blend-mode:screen;filter:blur(4px);opacity:.48;z-index:4;animation:dcFoilSweep 4.4s ease-in-out infinite}
+.card-foil-silver::before,.piece-frame-foil-silver::before{background:conic-gradient(from 0deg,rgba(255,255,255,0.18),rgba(196,210,224,0.95),rgba(116,134,152,0.32),rgba(240,246,255,0.82),rgba(255,255,255,0.18))}
+.card-foil-silver::after,.piece-frame-foil-silver::after{background:linear-gradient(120deg,transparent 18%,rgba(242,247,255,0.02) 32%,rgba(241,248,255,0.8) 49%,rgba(180,198,214,0.18) 54%,transparent 72%)}
+.card-foil-gold::before,.piece-frame-foil-gold::before{background:conic-gradient(from 0deg,rgba(255,220,151,0.18),rgba(246,205,106,0.94),rgba(138,96,32,0.34),rgba(255,236,168,0.92),rgba(255,220,151,0.18))}
+.card-foil-gold::after,.piece-frame-foil-gold::after{background:linear-gradient(120deg,transparent 18%,rgba(255,233,175,0.02) 32%,rgba(255,223,122,0.86) 49%,rgba(214,164,67,0.18) 54%,transparent 72%)}
+.card-foil-diamond::before,.piece-frame-foil-diamond::before{background:conic-gradient(from 0deg,rgba(255,255,255,0.18),rgba(224,247,255,0.96),rgba(193,181,255,0.34),rgba(255,205,241,0.34),rgba(214,255,250,0.92),rgba(255,255,255,0.18))}
+.card-foil-diamond::after,.piece-frame-foil-diamond::after{background:linear-gradient(120deg,transparent 18%,rgba(255,255,255,0.02) 32%,rgba(255,255,255,0.84) 45%,rgba(207,236,255,0.32) 49%,rgba(255,214,241,0.26) 53%,transparent 72%)}
+@keyframes dcFoilRotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes dcFoilPulse{0%,100%{opacity:.62}50%{opacity:.96}}
+@keyframes dcFoilSweep{0%{transform:translateX(-40%) translateY(-8%) rotate(8deg)}50%{transform:translateX(24%) translateY(4%) rotate(8deg)}100%{transform:translateX(82%) translateY(10%) rotate(8deg)}}
 .card .card-agents{font-size:14px;color:var(--secondary);margin-top:4px}
 .card .card-preview{height:240px;background:var(--bg);border-radius:4px;margin-bottom:12px;overflow:hidden;position:relative}
 .card .card-preview img{width:100%;height:100%;object-fit:cover}
@@ -2438,7 +2465,8 @@ const GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 
 const PIECE_CSS = `
 .piece-view{max-width:960px;margin:0 auto;padding:24px}
-.piece-frame{position:relative;width:100%;border-radius:8px;overflow:hidden;background:var(--surface);border:1px solid var(--border)}
+.piece-frame{position:relative;width:100%;border-radius:8px;overflow:visible;background:var(--surface);border:1px solid var(--border)}
+.piece-frame-media{border-radius:inherit;overflow:hidden;background:var(--surface)}
 .piece-frame iframe{width:100%;height:70vh;border:none;display:block}
 .piece-frame img{width:100%;max-height:75vh;object-fit:contain;display:block;margin:0 auto;background:#000}
 .piece-fullscreen-row{text-align:right;margin-bottom:8px}
@@ -2529,12 +2557,12 @@ const AGENT_CSS = `
 `;
 
 const STATUS_CSS = `.status-badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.035);color:#d6dae1;font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap;vertical-align:middle}
-.status-wip{color:#d7bf90;border-color:rgba(193,164,108,0.22);background:rgba(151,122,67,0.12)}
-.status-proposed{color:#c8ced8;border-color:rgba(140,149,167,0.24);background:rgba(86,94,111,0.16)}
-.status-approved{color:#c7d6c8;border-color:rgba(128,150,124,0.24);background:rgba(78,98,73,0.16)}
-.status-minted{color:#dce4ec;border-color:rgba(154,172,190,0.24);background:rgba(92,108,124,0.18)}
-.status-rejected{color:#d5b8b8;border-color:rgba(162,113,113,0.24);background:rgba(102,60,60,0.16)}
-.status-draft{color:#b6bcc7;border-color:rgba(171,178,189,0.16);background:rgba(255,255,255,0.03)}
+.status-wip{color:#e1bf7a;border-color:rgba(204,154,67,0.32);background:rgba(148,105,34,0.18)}
+.status-proposed{color:#d4c6ef;border-color:rgba(145,123,209,0.3);background:rgba(98,78,151,0.18)}
+.status-approved{color:#cce6c7;border-color:rgba(108,158,97,0.3);background:rgba(68,102,61,0.18)}
+.status-minted{color:#c8ecf5;border-color:rgba(98,172,194,0.3);background:rgba(50,108,126,0.18)}
+.status-rejected{color:#e2b9bf;border-color:rgba(177,91,105,0.3);background:rgba(110,52,61,0.18)}
+.status-draft{color:#c3cad4;border-color:rgba(171,178,189,0.18);background:rgba(255,255,255,0.04)}
 .status-deleted{color:#8f97a2;border-color:rgba(126,133,144,0.2);background:rgba(72,78,88,0.14);text-decoration:line-through}
 .filter-tabs{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
 .filter-tab{font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:6px 14px;border:1px solid var(--border);border-radius:16px;color:var(--dim);background:transparent;cursor:pointer;text-decoration:none;transition:all 0.2s}
@@ -3094,6 +3122,16 @@ function pieceStatusBadge(piece) {
   return statusBadge('draft', 'Draft');
 }
 
+function foilCardClass(piece, prefix = 'card') {
+  const tier = pieceFoilTier(piece);
+  return tier ? ` ${prefix}-foil ${prefix}-foil-${tier}` : '';
+}
+
+function foilIconClass(piece) {
+  const tier = pieceFoilTier(piece);
+  return tier ? ` sr-${tier}` : '';
+}
+
 function pieceCard(p) {
   // Thumbnail strategy — show the REAL art, not placeholders:
   // 1. Demo routes → hardcoded iframe
@@ -3126,18 +3164,18 @@ function pieceCard(p) {
   }
 
   const badge = pieceStatusBadge(p);
-  const superRareIcon = (p.status || 'draft') === 'minted' ? '<div class="card-sr" title="Minted on SuperRare"><img src="/assets/brands/superrare-symbol-white.svg" alt="Minted on SuperRare" loading="lazy"/></div>' : '';
   const legacyBadge = isLegacyMainnetPiece(p) ? '<span class="card-note-badge card-note-legacy" title="Legacy test piece. This will not show up on the live Base contract.">Legacy Test</span>' : '';
+  const superRareIcon = (p.status || 'draft') === 'minted' ? `<div class="card-sr${foilIconClass(p)}" title="Minted on SuperRare"><img src="/assets/brands/superrare-symbol-white.svg" alt="Minted on SuperRare" loading="lazy"/></div>` : '';
   const interactiveTag = p.method === 'reaction' ? '<div class="card-interactive-tag">Interactive</div>' : '';
 
-  return `<a href="/piece/${esc(p.id)}" class="card">
+  return `<a href="/piece/${esc(p.id)}" class="card${foilCardClass(p)}">
       <div class="card-preview">${previewContent}${interactiveTag}</div>
       <div class="card-title">${esc(p.title)}</div>
       <div class="card-agents">${artistsDisplay}</div>
-      <div class="card-status-row">${badge}</div>
+      <div class="card-status-row">${badge}${legacyBadge}</div>
       <div class="card-footer">
         <div class="card-meta">${p.created_at || ''}</div>
-        <div class="card-footer-badges">${legacyBadge}${superRareIcon}</div>
+        <div class="card-footer-badges">${superRareIcon}</div>
       </div>
     </a>`;
 }
@@ -5223,7 +5261,8 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
   }
 
   // Status badge
-  const badge = statusBadge(status);
+  const badge = pieceStatusBadge(piece);
+  const pieceFoilClass = foilCardClass(piece, 'piece-frame');
 
   // Determine the best way to display the piece
   let frameContent;
@@ -5261,8 +5300,10 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
 
   const body = `
 <div class="piece-view">
-  <div class="piece-frame">
-    ${frameContent}
+  <div class="piece-frame${pieceFoilClass}">
+    <div class="piece-frame-media">
+      ${frameContent}
+    </div>
   </div>
   <div class="piece-header">
     <div class="piece-fullscreen-row"><a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">⛶ Fullscreen</a></div>
@@ -5343,16 +5384,16 @@ async function renderAgent(db, agentId, env) {
       agentPreview = `<img src="${generateThumbnail(p)}" alt="${esc(p.title)}" loading="lazy" />`;
     }
     const badge = pieceStatusBadge(p);
-    const superRareIcon = (p.status || 'draft') === 'minted' ? '<div class="card-sr" title="Minted on SuperRare"><img src="/assets/brands/superrare-symbol-white.svg" alt="Minted on SuperRare" loading="lazy"/></div>' : '';
     const legacyBadge = isLegacyMainnetPiece(p) ? '<span class="card-note-badge card-note-legacy" title="Legacy test piece. This will not show up on the live Base contract.">Legacy Test</span>' : '';
-    return `<a href="/piece/${esc(p.id)}" class="card">
+    const superRareIcon = (p.status || 'draft') === 'minted' ? `<div class="card-sr${foilIconClass(p)}" title="Minted on SuperRare"><img src="/assets/brands/superrare-symbol-white.svg" alt="Minted on SuperRare" loading="lazy"/></div>` : '';
+    return `<a href="/piece/${esc(p.id)}" class="card${foilCardClass(p)}">
       <div class="card-preview">${agentPreview}</div>
       <div class="card-title">${esc(p.title)}</div>
       <div class="card-agents">${artistsDisplay}</div>
-      <div class="card-status-row">${badge}</div>
+      <div class="card-status-row">${badge}${legacyBadge}</div>
       <div class="card-footer">
         <div class="card-meta">${p.created_at || ''}</div>
-        <div class="card-footer-badges">${legacyBadge}${superRareIcon}</div>
+        <div class="card-footer-badges">${superRareIcon}</div>
       </div>
     </a>`;
   }).join('\n    ');
