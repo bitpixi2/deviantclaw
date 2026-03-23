@@ -9377,31 +9377,102 @@ For image work:
         if (agent && isDeletedAgent(agent)) {
           return { agent, error: json({ error: 'This agent has been deleted. Its name stays reserved to protect gallery and on-chain history.' }, 410) };
         }
-        if (agent && agent.guardian_address && !sameAddress(agent.guardian_address, guardianAddress)) {
+        if (agent && agent.guardian_address && !(await guardianOwnsAgent(agent, guardianAddress))) {
           return { agent, error: json({ error: 'Agent is already linked to a different guardian.' }, 403) };
         }
         return { agent, error: null };
       }
 
-      async function pieceAllowsGuardian(pieceId, piece, guardianAddress) {
+      async function guardianOwnsAgent(agent, guardianAddress) {
         const normalizedGuardian = normalizeAddress(guardianAddress);
-        if (!normalizedGuardian) return false;
-        const collaborator = await db.prepare(
-          `SELECT pc.agent_id
-           FROM piece_collaborators pc
-           JOIN agents a ON a.id = pc.agent_id
-           WHERE pc.piece_id = ? AND LOWER(a.guardian_address) = ?
-           LIMIT 1`
-        ).bind(pieceId, normalizedGuardian).first();
-        if (collaborator) return true;
-        const legacy = await db.prepare(
-          'SELECT id FROM agents WHERE id IN (?, ?) AND LOWER(guardian_address) = ? LIMIT 1'
-        ).bind(piece.agent_a_id, piece.agent_b_id, normalizedGuardian).first();
-        return !!legacy;
+        if (!agent || !normalizedGuardian) return false;
+        if (sameAddress(agent.guardian_address, normalizedGuardian)) return true;
+        if (sameAddress(agent.wallet_address, normalizedGuardian)) return true;
+        const resolvedGuardian = await resolveAgentGuardianWallet(db, agent);
+        return sameAddress(resolvedGuardian, normalizedGuardian);
+      }
+
+      async function getPieceAgents(pieceId, piece) {
+        const seen = new Set();
+        const agents = [];
+        try {
+          const collabs = await db.prepare(
+            `SELECT DISTINCT a.*
+             FROM piece_collaborators pc
+             JOIN agents a ON a.id = pc.agent_id
+             WHERE pc.piece_id = ?`
+          ).bind(pieceId).all();
+          for (const row of collabs.results || []) {
+            if (!row?.id || seen.has(row.id)) continue;
+            seen.add(row.id);
+            agents.push(row);
+          }
+        } catch {}
+
+        for (const legacyId of [piece?.agent_a_id, piece?.agent_b_id, piece?.agent_c_id, piece?.agent_d_id]) {
+          const id = String(legacyId || '').trim();
+          if (!id || seen.has(id)) continue;
+          const row = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(id).first().catch(() => null);
+          if (!row) continue;
+          seen.add(id);
+          agents.push(row);
+        }
+        return agents;
+      }
+
+      async function findGuardianAgentForPiece(pieceId, piece, guardianAddress) {
+        const normalizedGuardian = normalizeAddress(guardianAddress);
+        if (!normalizedGuardian) return null;
+        const agents = await getPieceAgents(pieceId, piece);
+        for (const agent of agents) {
+          if (await guardianOwnsAgent(agent, normalizedGuardian)) return agent;
+        }
+        return null;
+      }
+
+      async function pieceAllowsGuardian(pieceId, piece, guardianAddress) {
+        return !!(await findGuardianAgentForPiece(pieceId, piece, guardianAddress));
+      }
+
+      async function findGuardianApprovalRecord(pieceId, guardianAddress, humanXId = '', pendingOnly = false) {
+        const normalizedGuardian = normalizeAddress(guardianAddress);
+        const pendingSql = pendingOnly ? ' AND approved = 0 AND rejected = 0' : '';
+
+        if (normalizedGuardian) {
+          const direct = await db.prepare(
+            `SELECT * FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ?${pendingSql} LIMIT 1`
+          ).bind(pieceId, normalizedGuardian).first();
+          if (direct) return direct;
+        }
+
+        const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(pieceId).first();
+        if (piece && normalizedGuardian) {
+          const matchedAgent = await findGuardianAgentForPiece(pieceId, piece, normalizedGuardian);
+          if (matchedAgent) {
+            const byAgent = await db.prepare(
+              `SELECT * FROM mint_approvals WHERE piece_id = ? AND agent_id = ?${pendingSql} LIMIT 1`
+            ).bind(pieceId, matchedAgent.id).first();
+            if (byAgent) return byAgent;
+          }
+        }
+
+        if (humanXId) {
+          const byX = await db.prepare(
+            `SELECT * FROM mint_approvals WHERE piece_id = ? AND human_x_id = ?${pendingSql} LIMIT 1`
+          ).bind(pieceId, humanXId).first();
+          if (byX) return byX;
+        }
+
+        return null;
       }
 
       async function ensureGuardianApprovalRecord(pieceId, agentId, guardianAddress, humanXId, humanXHandle) {
-        const normalizedGuardian = normalizeAddress(guardianAddress);
+        let normalizedGuardian = '';
+        if (agentId) {
+          const agent = await db.prepare('SELECT * FROM agents WHERE id = ?').bind(agentId).first().catch(() => null);
+          if (agent) normalizedGuardian = await resolveAgentGuardianWallet(db, agent);
+        }
+        if (!normalizedGuardian) normalizedGuardian = normalizeAddress(guardianAddress);
         if (!normalizedGuardian && !humanXId) return false;
 
         let existing = null;
@@ -9421,6 +9492,52 @@ For image work:
           'INSERT OR IGNORE INTO mint_approvals (piece_id, agent_id, guardian_address, human_x_id, human_x_handle) VALUES (?, ?, ?, ?, ?)'
         ).bind(pieceId, agentId, normalizedGuardian || null, humanXId || null, humanXHandle || null).run();
         return true;
+      }
+
+      async function sanitizeMatchGroup(group) {
+        if (!group) return null;
+        const members = await db.prepare(
+          `SELECT mgm.agent_id, mgm.request_id, mgm.round_joined, mgm.joined_at, mr.status, mr.intent_json
+           FROM match_group_members mgm
+           LEFT JOIN match_requests mr ON mr.id = mgm.request_id
+           WHERE mgm.group_id = ?
+           ORDER BY mgm.round_joined ASC, mgm.joined_at ASC`
+        ).bind(group.id).all();
+
+        const validRows = [];
+        const invalidRows = [];
+        for (const row of members.results || []) {
+          const status = String(row.status || '').toLowerCase();
+          const valid = !!(row.agent_id && row.request_id && row.intent_json && ['waiting', 'matched', 'claimed'].includes(status));
+          if (valid) validRows.push(row);
+          else invalidRows.push(row);
+        }
+
+        if (invalidRows.length === 0 && Number(group.current_count || 0) === validRows.length) {
+          return group;
+        }
+
+        for (const row of invalidRows) {
+          if (row.request_id) {
+            await db.prepare(
+              `UPDATE match_requests
+               SET match_group_id = NULL,
+                   status = CASE WHEN status = 'matched' THEN 'waiting' ELSE status END
+               WHERE id = ? AND status != 'complete'`
+            ).bind(row.request_id).run();
+          }
+          await db.prepare(
+            'DELETE FROM match_group_members WHERE group_id = ? AND request_id = ?'
+          ).bind(group.id, row.request_id).run();
+        }
+
+        const validCount = validRows.length;
+        const nextStatus = validCount >= Number(group.required_count || 0) ? 'ready' : 'forming';
+        await db.prepare(
+          'UPDATE match_groups SET current_count = ?, status = ?, piece_id = CASE WHEN ? THEN piece_id ELSE NULL END WHERE id = ?'
+        ).bind(validCount, nextStatus, nextStatus === 'ready' ? 1 : 0, group.id).run();
+
+        return { ...group, current_count: validCount, status: nextStatus };
       }
 
       function requireAuth(guardian) {
@@ -9494,46 +9611,14 @@ For image work:
           } catch {}
         }
 
-        // Check if wallet is guardian for any collaborator on this piece
-        const collab = await db.prepare(
-          `SELECT pc.agent_id, a.name as agent_name
-           FROM piece_collaborators pc
-           JOIN agents a ON a.id = pc.agent_id
-           WHERE pc.piece_id = ? AND LOWER(a.guardian_address) = ?
-           LIMIT 1`
-        ).bind(id, normalizedWallet).first();
-
-        if (!collab) {
-          // Also check legacy agent_a/agent_b
-          const legacy = await db.prepare(
-            'SELECT id, name FROM agents WHERE id IN (?, ?) AND LOWER(guardian_address) = ? LIMIT 1'
-          ).bind(piece.agent_a_id || '', piece.agent_b_id || '', normalizedWallet).first();
-          if (!legacy) return json({ isGuardian: false, guardianHints });
-
-          // Check approval status
-          const approval = await db.prepare(
-            'SELECT approved, rejected FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ? LIMIT 1'
-          ).bind(id, normalizedWallet).first();
-
-          return json({
-            isGuardian: true,
-            agentId: legacy.id || null,
-            agentName: legacy.name || legacy.id,
-            alreadyApproved: !!(approval && approval.approved),
-            alreadyRejected: !!(approval && approval.rejected),
-            guardianHints
-          });
-        }
-
-        // Check approval status
-        const approval = await db.prepare(
-          'SELECT approved, rejected FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ? LIMIT 1'
-        ).bind(id, normalizedWallet).first();
+        const matchedAgent = await findGuardianAgentForPiece(id, piece, normalizedWallet);
+        if (!matchedAgent) return json({ isGuardian: false, guardianHints });
+        const approval = await findGuardianApprovalRecord(id, normalizedWallet);
 
         return json({
           isGuardian: true,
-          agentId: collab.agent_id || null,
-          agentName: collab.agent_name || collab.agent_id,
+          agentId: matchedAgent.id || null,
+          agentName: matchedAgent.name || matchedAgent.id,
           alreadyApproved: !!(approval && approval.approved),
           alreadyRejected: !!(approval && approval.rejected),
           guardianHints
@@ -9901,22 +9986,12 @@ For image work:
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const guardianAddress = normalizeAddress(g.address);
 
-        let approval;
-        if (guardianAddress) {
-          approval = await db.prepare(
-            'SELECT * FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ? AND approved = 0 AND rejected = 0'
-          ).bind(id, guardianAddress).first();
-        }
-        if (!approval && body.humanXId) {
-          approval = await db.prepare(
-            'SELECT * FROM mint_approvals WHERE piece_id = ? AND human_x_id = ? AND approved = 0 AND rejected = 0'
-          ).bind(id, body.humanXId).first();
-        }
+        const approval = await findGuardianApprovalRecord(id, guardianAddress, body.humanXId, true);
 
         if (!approval) return json({ error: 'No pending approval found for this guardian' }, 404);
 
         // Mark approved
-        if (guardianAddress && approval.guardian_address) {
+        if (guardianAddress && approval.guardian_address && sameAddress(approval.guardian_address, guardianAddress)) {
           await db.prepare(
             'UPDATE mint_approvals SET approved = 1, rejected = 0, approved_at = ? WHERE piece_id = ? AND LOWER(guardian_address) = ?'
           ).bind(now, id, guardianAddress).run();
@@ -9985,21 +10060,11 @@ For image work:
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const guardianAddress = normalizeAddress(g.address);
 
-        let approval;
-        if (guardianAddress) {
-          approval = await db.prepare(
-            'SELECT * FROM mint_approvals WHERE piece_id = ? AND LOWER(guardian_address) = ?'
-          ).bind(id, guardianAddress).first();
-        }
-        if (!approval && body.humanXId) {
-          approval = await db.prepare(
-            'SELECT * FROM mint_approvals WHERE piece_id = ? AND human_x_id = ?'
-          ).bind(id, body.humanXId).first();
-        }
+        const approval = await findGuardianApprovalRecord(id, guardianAddress, body.humanXId, false);
 
         if (!approval) return json({ error: 'No approval record found for this guardian' }, 404);
 
-        if (guardianAddress && approval.guardian_address) {
+        if (guardianAddress && approval.guardian_address && sameAddress(approval.guardian_address, guardianAddress)) {
           await db.prepare(
             'UPDATE mint_approvals SET rejected = 1, approved = 0, approved_at = ? WHERE piece_id = ? AND LOWER(guardian_address) = ?'
           ).bind(now, id, guardianAddress).run();
@@ -10489,12 +10554,10 @@ For image work:
 	        if (!agent) return json({ error: 'Agent not found' }, 404);
 	        if (isDeletedAgent(agent)) return json({ error: 'This agent has been deleted and cannot be edited.' }, 410);
 	        const gAddr = guardian.address || guardian.wallet_address;
-	        if (agent.guardian_address && !sameAddress(agent.guardian_address, gAddr)) {
-	          return json({ error: 'Not your agent' }, 403);
-	        }
+	        if (!(await guardianOwnsAgent(agent, gAddr))) return json({ error: 'Not your agent' }, 403);
 
         const body = await request.json();
-        const allowed = ['avatar_url', 'banner_url', 'bio', 'theme_color', 'theme_bg', 'links', 'mood', 'soul_excerpt', 'erc8004_agent_id'];
+        const allowed = ['avatar_url', 'banner_url', 'bio', 'theme_color', 'theme_bg', 'links', 'mood', 'soul_excerpt', 'erc8004_agent_id', 'wallet_address'];
         const updates = [];
         const values = [];
         for (const key of allowed) {
@@ -10519,9 +10582,7 @@ For image work:
 	        if (!agent) return json({ error: 'Agent not found' }, 404);
 	        if (isDeletedAgent(agent)) return json({ ok: true, redirect: '/artists', message: 'Agent already deleted' }, 200);
 	        const gAddr = guardian.address || guardian.wallet_address;
-	        if (agent.guardian_address && !sameAddress(agent.guardian_address, gAddr)) {
-	          return json({ error: 'Not your agent' }, 403);
-	        }
+	        if (!(await guardianOwnsAgent(agent, gAddr))) return json({ error: 'Not your agent' }, 403);
 
 	        const body = method === 'POST' ? await request.json().catch(() => ({})) : {};
 	        if (method === 'POST') {
@@ -10743,7 +10804,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         if (!agent) return json({ error: 'Agent not found' }, 404);
         const guardianAddr = normalizeAddress(body.guardianAddress);
         if (!guardianAddr) return json({ error: 'guardianAddress is required.' }, 400);
-        if (!sameAddress(agent.guardian_address, guardianAddr)) {
+        if (!(await guardianOwnsAgent(agent, guardianAddr))) {
           return json({ error: 'You do not own this agent.' }, 403);
         }
 
@@ -10824,7 +10885,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         if (!agent) return json({ error: 'Agent not found' }, 404);
         const guardianAddr = normalizeAddress(body.guardianAddress);
         if (!guardianAddr) return json({ error: 'guardianAddress is required.' }, 400);
-        if (!sameAddress(agent.guardian_address, guardianAddr)) {
+        if (!(await guardianOwnsAgent(agent, guardianAddr))) {
           return json({ error: 'You do not own this agent.' }, 403);
         }
 
@@ -11177,9 +11238,10 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           const required = modeCount[mode];
 
           // Look for existing forming group of matching mode
-          const formingGroup = await db.prepare(
-            "SELECT * FROM match_groups WHERE mode = ? AND status = 'forming' ORDER BY created_at ASC LIMIT 1"
+          let formingGroup = await db.prepare(
+            "SELECT * FROM match_groups WHERE mode = ? AND status IN ('forming', 'ready') AND piece_id IS NULL ORDER BY created_at ASC LIMIT 1"
           ).bind(mode).first();
+          formingGroup = await sanitizeMatchGroup(formingGroup);
 
           if (formingGroup) {
             // Join existing group
@@ -11270,7 +11332,16 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
                   }
                 }, 201);
               }
-              await db.prepare("UPDATE match_groups SET current_count = ?, status = 'ready' WHERE id = ?").bind(newCount, formingGroup.id).run();
+              const liveCount = Math.max(entries.length, 1);
+              await db.prepare("UPDATE match_groups SET current_count = ?, status = ? WHERE id = ?").bind(liveCount, liveCount >= required ? 'ready' : 'forming', formingGroup.id).run();
+              return json({
+                status: 'waiting',
+                requestId,
+                groupId: formingGroup.id,
+                message: `Joined forming group. ${liveCount}/${required} live agents are ready. Waiting for more...`,
+                queuePosition: 0,
+                tip: `Cancel anytime: DELETE /api/match/${requestId}`
+              }, 201);
             } else {
               await db.prepare('UPDATE match_groups SET current_count = ? WHERE id = ?').bind(newCount, formingGroup.id).run();
             }
