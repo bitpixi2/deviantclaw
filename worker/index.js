@@ -7699,34 +7699,8 @@ async function renderAgent(db, agentId, env, url) {
       return eth.isMetaMask ? eth : null;
     }
 
-    function getMetaMaskDeepLink() {
-      return 'https://link.metamask.io/dapp/deviantclaw.art/agent/' + encodeURIComponent(config.agentId) + '?delegation=1%23delegation-section';
-    }
-
-    function openMetaMaskButton(label = 'Open in MetaMask', id = 'delegation-open-metamask-btn') {
-      return '<button type="button" id="' + id + '" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:11px 18px;background:#fff;color:#111;border:1px solid rgba(255,255,255,0.16);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold"><img src="/assets/brands/metamask.svg" alt="" aria-hidden="true" style="display:block;width:18px;height:18px;flex-shrink:0" /><span>' + label + '</span></button>';
-    }
-
     function metaMaskPrimaryButton(label = 'Enable MetaMask Delegation', id = 'delegation-enable-btn') {
       return '<button type="button" id="' + id + '" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:11px 18px;background:#fff;color:#111;border:1px solid rgba(255,255,255,0.16);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold"><img src="/assets/brands/metamask.svg" alt="" aria-hidden="true" style="display:block;width:18px;height:18px;flex-shrink:0" /><span>' + label + '</span></button>';
-    }
-
-    async function openMetaMask() {
-      const provider = getMetaMaskProvider();
-      if (provider) {
-        await connectWallet();
-        return;
-      }
-      window.location.assign(getMetaMaskDeepLink());
-    }
-
-    function wireOpenMetaMaskButton(id = 'delegation-open-metamask-btn') {
-      document.getElementById(id)?.addEventListener('click', () => {
-        openMetaMask().catch((error) => {
-          const message = String(error?.message || error || 'Could not open MetaMask.');
-          statusEl.innerHTML = '<span style="color:var(--danger)">' + message + '</span><br>' + statusEl.innerHTML;
-        });
-      });
     }
 
     function renderState(state) {
@@ -7748,14 +7722,8 @@ async function renderAgent(db, agentId, env, url) {
       const grantStored = !!currentState.grantStored;
 
       if (!provider) {
-        statusEl.innerHTML = '<span style="color:var(--dim)">Open this profile in MetaMask to delegate up to ' + max + ' approvals per day from the guardian wallet.</span>';
-        actionsEl.innerHTML = metaMaskPrimaryButton('Enable MetaMask Delegation', 'delegation-enable-deeplink-btn');
-        document.getElementById('delegation-enable-deeplink-btn')?.addEventListener('click', () => {
-          enableDelegation().catch((error) => {
-            const message = String(error?.message || error || 'Could not open MetaMask.');
-            statusEl.innerHTML = '<span style="color:var(--danger)">' + message + '</span><br>' + statusEl.innerHTML;
-          });
-        });
+        statusEl.innerHTML = '<span style="color:var(--dim)">MetaMask needs to be available in this browser to enable delegation. Open this page with MetaMask active, then connect the guardian wallet to delegate up to ' + max + ' approvals per day.</span>';
+        actionsEl.innerHTML = '';
         return;
       }
 
@@ -7808,8 +7776,7 @@ async function renderAgent(db, agentId, env, url) {
     async function connectWallet() {
       const provider = getMetaMaskProvider();
       if (!provider) {
-        window.location.assign(getMetaMaskDeepLink());
-        return;
+        throw new Error('MetaMask is not available in this browser. Open this page with the MetaMask extension or in-app browser, then try again.');
       }
       try {
         await provider.request({
