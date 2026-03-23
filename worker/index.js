@@ -36,6 +36,7 @@ const VENICE_AUDIO_CANDIDATE_MODELS = [
   'ace-step-15'
 ];
 const DEFAULT_ERC8004_REGISTRY = 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
+const DEFAULT_DEVIANTCLAW_CONTRACT_ADDRESS = '0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847';
 const NO_STILL_IMAGE_METHODS = new Set(['code', 'game']);
 const LIVE_IFRAME_PREVIEW_METHODS = new Set(['code', 'game']);
 const STATIC_FULL_VIEW_METHODS = new Set(['collage', 'split', 'sequence', 'stitch', 'parallax', 'glitch']);
@@ -43,6 +44,14 @@ const ART_DEMO_NAMES = new Set(['collage-demo', 'split-demo', 'foil-demo', 'code
 
 function erc8004AgentUrl(agentId) {
   return `https://www.8004scan.io/agents/base/${encodeURIComponent(agentId)}`;
+}
+
+function pieceSuperRareArtworkUrl(piece, contractAddress = DEFAULT_DEVIANTCLAW_CONTRACT_ADDRESS) {
+  const tokenId = piece?.token_id ?? piece?.chain_piece_id;
+  const normalizedContract = String(contractAddress || DEFAULT_DEVIANTCLAW_CONTRACT_ADDRESS).trim() || DEFAULT_DEVIANTCLAW_CONTRACT_ADDRESS;
+  if (effectivePieceStatus(piece) !== 'minted') return '';
+  if (tokenId === null || tokenId === undefined || tokenId === '') return '';
+  return `https://superrare.com/artwork/base/${encodeURIComponent(normalizedContract)}/${encodeURIComponent(String(tokenId))}`;
 }
 
 function byteLength(value) {
@@ -1498,6 +1507,13 @@ function htmlResponse(body, status = 200) {
   });
 }
 
+function headLike(response) {
+  return new Response(null, {
+    status: response.status,
+    headers: response.headers
+  });
+}
+
 function cors() {
   return new Response(null, {
     status: 204,
@@ -2252,6 +2268,14 @@ function pieceFoilTier(piece) {
   const raw = String(piece?.foil_tier || piece?.auction_upgrade || '').trim().toLowerCase();
   if (raw === 'silver' || raw === 'gold' || raw === 'diamond') return raw;
   return '';
+}
+
+function pieceFoilLabel(piece) {
+  const tier = pieceFoilTier(piece);
+  if (tier === 'silver') return 'Silver';
+  if (tier === 'gold') return 'Gold';
+  if (tier === 'diamond') return 'Rare Diamond';
+  return 'None';
 }
 
 function buildAdminFoilStaticView(piece, tier = 'gold') {
@@ -3212,7 +3236,7 @@ const PIECE_CSS = `
 .piece-frame-media{border-radius:inherit;overflow:hidden;background:var(--surface)}
 .piece-frame iframe{width:100%;height:70vh;border:none;display:block}
 .piece-frame img{width:100%;max-height:75vh;object-fit:contain;display:block;margin:0 auto;background:#000}
-.piece-fullscreen-row{text-align:right;margin-bottom:8px}
+.piece-fullscreen-row{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
 .fullscreen-link{display:inline-block;padding:5px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:11px;letter-spacing:1px;color:var(--dim);text-decoration:none;transition:all 0.2s}
 .fullscreen-link:hover{border-color:var(--primary);color:var(--primary)}
 .piece-header{padding:20px 0 16px;text-align:center}
@@ -3240,20 +3264,18 @@ const AGENT_CSS = `
 @media(max-width:768px){.agent-banner{height:160px}}
 
 /* Profile card - overlapping banner */
-.agent-profile-card{position:relative;margin-top:-80px;padding:0 10px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;max-width:1680px;margin-left:auto;margin-right:auto}
-@media(min-width:1100px){.agent-profile-card{padding:0 14px}}
+.agent-profile-card{position:relative;margin-top:-80px;padding:0;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;width:min(1900px,calc(100vw - 30px));max-width:none;margin-left:auto;margin-right:auto}
 .agent-avatar{width:120px;height:120px;border-radius:12px;border:3px solid var(--agent-color,#6ee7b7);background:var(--surface);overflow:hidden;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
 .agent-avatar img{width:100%;height:100%;object-fit:cover}
 .agent-avatar .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface);color:var(--agent-color,#6ee7b7)}
 .agent-identity{flex:1;min-width:200px;padding-bottom:8px}
 .agent-name{font-size:28px;letter-spacing:4px;text-transform:uppercase;font-weight:normal;color:#fff;margin-bottom:2px}
-@media(max-width:768px){.agent-name{font-size:18px;letter-spacing:2px}.agent-avatar{width:80px;height:80px}.agent-profile-card{margin-top:-50px;gap:10px;padding:0 16px}}
+@media(max-width:768px){.agent-name{font-size:18px;letter-spacing:2px}.agent-avatar{width:80px;height:80px}.agent-profile-card{margin-top:-50px;gap:10px;padding:0 16px;width:auto}}
 .agent-type-badge{display:inline-block;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--agent-color,#6ee7b7);border:1px solid var(--agent-color,#6ee7b7);padding:2px 8px;border-radius:10px;margin-left:8px;vertical-align:middle}
 .agent-role{font-size:15px;color:var(--secondary);letter-spacing:1px;margin-top:4px}
 
 /* Stats row */
-.agent-stats-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;padding:16px 10px;border-bottom:1px solid var(--border);margin-bottom:20px;max-width:1680px;margin-left:auto;margin-right:auto}
-@media(min-width:1100px){.agent-stats-row{padding:16px 14px}}
+.agent-stats-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:20px;width:min(1900px,calc(100vw - 30px));max-width:none;margin-left:auto;margin-right:auto}
 .agent-stats-grid{display:flex;flex-wrap:wrap;gap:24px}
 .stat-item{text-align:center}
 .stat-number{font-size:20px;color:var(--agent-color,#6ee7b7);font-weight:400;display:block}
@@ -3264,8 +3286,7 @@ const AGENT_CSS = `
 @media(max-width:768px){.agent-stats-row{padding:14px 16px;margin-bottom:16px}.agent-stats-grid{gap:18px}.agent-action-row{width:100%;justify-content:flex-start}.agent-action-btn{width:100%}}
 
 /* Two-column layout */
-.agent-layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:28px;padding:0 10px;max-width:1680px;margin:0 auto}
-@media(min-width:1100px){.agent-layout{padding:0 14px}}
+.agent-layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:28px;padding:0;width:min(1900px,calc(100vw - 30px));max-width:none;margin:0 auto}
 @media(max-width:768px){.agent-layout{grid-template-columns:1fr;padding:0 16px;gap:18px}}
 .agent-gallery{min-width:0}
 .agent-gallery .grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
@@ -7065,6 +7086,7 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
   // Status badge
   const badge = pieceStatusBadge(piece);
   const pieceFoilClass = foilCardClass(piece, 'piece-frame');
+  const superRareUrl = pieceSuperRareArtworkUrl(piece, env?.CONTRACT_ADDRESS);
   const pieceSuperRareIcon = status === 'minted' ? `<div class="piece-header-sr${foilIconClass(piece)}" title="Minted on SuperRare"><img src="/assets/brands/superrare-symbol-white.svg" alt="Minted on SuperRare" loading="lazy"/></div>` : '';
 
   // Determine the best way to display the piece
@@ -7109,7 +7131,7 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
     </div>
   </div>
   <div class="piece-header">
-    <div class="piece-fullscreen-row"><a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">⛶ Fullscreen</a></div>
+    <div class="piece-fullscreen-row"><a href="/api/pieces/${esc(piece.id)}/view" class="fullscreen-link" target="_blank">⛶ Fullscreen</a>${superRareUrl ? `<a href="${esc(superRareUrl)}" class="fullscreen-link" target="_blank" rel="noreferrer">SuperRare ↗</a>` : ''}</div>
     <div class="piece-title-row"><h1 class="piece-title">${esc(pieceTitle)}</h1>${pieceSuperRareIcon}${badge}</div>
     <div class="piece-artists">${artistsHTML}</div>
     <div class="piece-date">${(piece.created_at || '').slice(0, 10)} · ${esc(piece.mode || 'solo')}</div>
@@ -10547,7 +10569,7 @@ For image work:
       }
 
       // GET /api/pieces/:id/metadata — ERC-721 metadata (JSON)
-      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/metadata$/)) {
+      if ((method === 'GET' || method === 'HEAD') && path.match(/^\/api\/pieces\/[^/]+\/metadata$/)) {
         const id = path.split('/')[3];
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Not found' }, 404);
@@ -10599,6 +10621,7 @@ For image work:
             ),
             { trait_type: 'Layers', value: Math.max(layers.results.length, collabs.results.length) },
             { trait_type: 'Status', value: piece.status },
+            { trait_type: 'Foil', value: pieceFoilLabel(piece) },
             { trait_type: 'Revenue Split', value: composition === 'solo' ? '97% artist / 3% gallery' : composition === 'duo' ? '48.5% each / 3% gallery' : composition === 'trio' ? '32.33% each / 3% gallery' : '24.25% each / 3% gallery' },
             { trait_type: 'Auction Upgrade', value: 'Silver 0.1 ETH → Gold 0.5 ETH → Rare Diamond 1 ETH' },
             { trait_type: 'Created', display_type: 'date', value: piece.created_at ? Math.floor(new Date(piece.created_at + 'Z').getTime() / 1000) : 0 },
@@ -10610,11 +10633,20 @@ For image work:
             contract: env.CONTRACT_ADDRESS || null
           }
         };
-        return json(metadata, 200, { 'Cache-Control': 'public, max-age=3600' });
+        return new Response(method === 'HEAD' ? null : JSON.stringify(metadata), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=3600',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS'
+          }
+        });
       }
 
       // GET /api/pieces/:id/image-[b|c|d] — serve additional Venice images for collabs
-      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/thumbnail$/)) {
+      if ((method === 'GET' || method === 'HEAD') && path.match(/^\/api\/pieces\/[^/]+\/thumbnail$/)) {
         const id = path.split('/')[3];
         const piece = await db.prepare('SELECT id, title, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return new Response('Not found', { status: 404 });
@@ -10623,7 +10655,7 @@ For image work:
         if (NO_STILL_IMAGE_METHODS.has(pieceMethod)) {
           const svgDataUri = generateThumbnail(piece);
           const svg = atob(svgDataUri.split(',')[1] || '');
-          return new Response(svg, {
+          return new Response(method === 'HEAD' ? null : svg, {
             headers: {
               'Content-Type': 'image/svg+xml; charset=utf-8',
               'Cache-Control': 'public, max-age=3600'
@@ -10651,7 +10683,7 @@ For image work:
         if (imageUrls.length === 0) {
           const svgDataUri = generateThumbnail(piece);
           const svg = atob(svgDataUri.split(',')[1] || '');
-          return new Response(svg, {
+          return new Response(method === 'HEAD' ? null : svg, {
             headers: {
               'Content-Type': 'image/svg+xml; charset=utf-8',
               'Cache-Control': 'public, max-age=3600'
@@ -10681,49 +10713,49 @@ For image work:
         });
       }
 
-      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image-[bcd]$/)) {
+      if ((method === 'GET' || method === 'HEAD') && path.match(/^\/api\/pieces\/[^/]+\/image-[bcd]$/)) {
         const parts = path.split('/');
         const id = parts[3];
         const suffix = parts[4].replace('image-', ''); // b, c, or d
         const imageResponse = await serveStoredPieceImage(db, env, id + '_' + suffix);
         if (!imageResponse) {
           const demoImage = await getLegacySplitDemoImageResponse(id, suffix);
-          if (demoImage) return demoImage;
+          if (demoImage) return method === 'HEAD' ? headLike(demoImage) : demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id, suffix);
           if (!fallbackSvg) return new Response('Not found', { status: 404 });
-          return new Response(fallbackSvg, {
+          return new Response(method === 'HEAD' ? null : fallbackSvg, {
             headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
           });
         }
-        return imageResponse;
+        return method === 'HEAD' ? headLike(imageResponse) : imageResponse;
       }
 
       // GET /api/pieces/:id/image-b — serve second Venice image (LEGACY — kept for existing pieces)
-      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image-b$/)) {
+      if ((method === 'GET' || method === 'HEAD') && path.match(/^\/api\/pieces\/[^/]+\/image-b$/)) {
         const id = path.split('/')[3];
         const imageResponse = await serveStoredPieceImage(db, env, id + '_b');
         if (!imageResponse) {
           const demoImage = await getLegacySplitDemoImageResponse(id, 'b');
-          if (demoImage) return demoImage;
+          if (demoImage) return method === 'HEAD' ? headLike(demoImage) : demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id, 'b');
           if (!fallbackSvg) return new Response('Not found', { status: 404 });
-          return new Response(fallbackSvg, {
+          return new Response(method === 'HEAD' ? null : fallbackSvg, {
             headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
           });
         }
-        return imageResponse;
+        return method === 'HEAD' ? headLike(imageResponse) : imageResponse;
       }
 
       // GET /api/pieces/:id/image — serve Venice-generated image
-      if (method === 'GET' && path.match(/^\/api\/pieces\/[^/]+\/image$/)) {
+      if ((method === 'GET' || method === 'HEAD') && path.match(/^\/api\/pieces\/[^/]+\/image$/)) {
         const id = path.split('/')[3];
         const imageResponse = await serveStoredPieceImage(db, env, id);
         if (!imageResponse) {
           const demoImage = await getLegacySplitDemoImageResponse(id, '');
-          if (demoImage) return demoImage;
+          if (demoImage) return method === 'HEAD' ? headLike(demoImage) : demoImage;
           return new Response('Not found', { status: 404 });
         }
-        return imageResponse;
+        return method === 'HEAD' ? headLike(imageResponse) : imageResponse;
       }
 
       // GET /api/pieces/:id/view — raw art HTML for iframe (must be before generic /api/pieces/:id)
