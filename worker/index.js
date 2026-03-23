@@ -1833,6 +1833,48 @@ const DEVIANTCLAW_DELEGATION_ABI = [
 const DEVIANTCLAW_PIECE_BRIDGE_ABI = [
   {
     type: 'function',
+    name: 'agentRegistered',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'string' }],
+    outputs: [{ name: '', type: 'bool' }]
+  },
+  {
+    type: 'function',
+    name: 'agentGuardian',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'string' }],
+    outputs: [{ name: '', type: 'address' }]
+  },
+  {
+    type: 'function',
+    name: 'agentWallet',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'string' }],
+    outputs: [{ name: '', type: 'address' }]
+  },
+  {
+    type: 'function',
+    name: 'registerAgent',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId', type: 'string' },
+      { name: 'guardian', type: 'address' },
+      { name: '_agentWallet', type: 'address' }
+    ],
+    outputs: []
+  },
+  {
+    type: 'function',
+    name: 'setAgentWallet',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId', type: 'string' },
+      { name: '_agentWallet', type: 'address' }
+    ],
+    outputs: []
+  },
+  {
+    type: 'function',
     name: 'proposePiece',
     stateMutability: 'nonpayable',
     inputs: [
@@ -1909,6 +1951,34 @@ async function getOperatorClients(env) {
     transport
   });
   const key = normalizePrivateKeyInput(env?.DELEGATION_RELAYER_KEY || env?.DEPLOYER_KEY);
+  if (!key) {
+    return {
+      publicClient,
+      walletClient: null,
+      account: null
+    };
+  }
+  const account = accounts.privateKeyToAccount(key);
+  const walletClient = viem.createWalletClient({
+    account,
+    chain: chains.base,
+    transport
+  });
+  return {
+    publicClient,
+    walletClient,
+    account
+  };
+}
+
+async function getOwnerClients(env) {
+  const { viem, accounts, chains } = await getDelegationRuntime();
+  const transport = viem.http(getBaseRpcUrl(env));
+  const publicClient = viem.createPublicClient({
+    chain: chains.base,
+    transport
+  });
+  const key = normalizePrivateKeyInput(env?.DEPLOYER_KEY);
   if (!key) {
     return {
       publicClient,
@@ -2244,6 +2314,9 @@ async function ensurePieceProposedOnChain(db, env, pieceInput) {
   if (!agentIds.length || agentIds.length > 4) {
     throw new Error('Piece must have between 1 and 4 contributing agents before on-chain proposal.');
   }
+  for (const agentId of agentIds) {
+    await ensureAgentRegisteredOnChain(db, env, agentId);
+  }
   const composition = String(piece.composition || compositionFromCount(agentIds.length) || '').trim();
   const method = String(piece.method || 'fusion').trim() || 'fusion';
   const title = String(piece.title || '').trim();
@@ -2371,6 +2444,110 @@ async function resolveAgentGuardianWallet(db, agent) {
   }
 
   return '';
+}
+
+async function resolveAgentWalletAddress(agent) {
+  const candidate = String(agent?.wallet_address || '').trim();
+  if (!candidate) return '';
+  if (isHexAddress(candidate)) return normalizeAddress(candidate);
+  const resolved = await resolveEnsAddress(candidate);
+  return resolved || '';
+}
+
+async function ensureAgentRegisteredOnChain(db, env, agentId) {
+  const normalizedAgentId = String(agentId || '').trim();
+  if (!normalizedAgentId) throw new Error('Agent id is required for onchain registration.');
+
+  const contractAddress = normalizeAddress(env?.CONTRACT_ADDRESS);
+  if (!contractAddress) throw new Error('Contract not configured.');
+
+  const agent = await db.prepare(
+    'SELECT id, name, guardian_address, wallet_address, erc8004_agent_id, human_x_handle FROM agents WHERE id = ? LIMIT 1'
+  ).bind(normalizedAgentId).first();
+  if (!agent) throw new Error(`Agent "${normalizedAgentId}" not found in the gallery database.`);
+
+  const guardianAddress = await resolveAgentGuardianWallet(db, agent);
+  if (!guardianAddress) {
+    throw new Error(`Agent "${normalizedAgentId}" does not have a resolvable guardian wallet for Base registration.`);
+  }
+  const agentWallet = await resolveAgentWalletAddress(agent);
+
+  const { publicClient, walletClient, account } = await getOwnerClients(env);
+  if (!walletClient || !account) {
+    throw new Error('Owner wallet not configured. Set DEPLOYER_KEY before syncing agent registration onchain.');
+  }
+
+  const [registeredRaw, guardianRaw, walletRaw] = await Promise.all([
+    publicClient.readContract({
+      address: contractAddress,
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      functionName: 'agentRegistered',
+      args: [normalizedAgentId]
+    }),
+    publicClient.readContract({
+      address: contractAddress,
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      functionName: 'agentGuardian',
+      args: [normalizedAgentId]
+    }).catch(() => '0x0000000000000000000000000000000000000000'),
+    publicClient.readContract({
+      address: contractAddress,
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      functionName: 'agentWallet',
+      args: [normalizedAgentId]
+    }).catch(() => '0x0000000000000000000000000000000000000000')
+  ]);
+
+  const registered = Boolean(registeredRaw);
+  const onchainGuardian = normalizeAddress(guardianRaw);
+  const onchainWallet = normalizeAddress(walletRaw);
+  const expectedWallet = normalizeAddress(agentWallet);
+  const zeroAddress = '0x0000000000000000000000000000000000000000';
+
+  if (!registered) {
+    const { request } = await publicClient.simulateContract({
+      account,
+      address: contractAddress,
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      functionName: 'registerAgent',
+      args: [normalizedAgentId, guardianAddress, expectedWallet || zeroAddress]
+    });
+    const txHash = await walletClient.writeContract(request);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== 'success') {
+      throw new Error(`Onchain registerAgent(${normalizedAgentId}) transaction reverted.`);
+    }
+    return {
+      registered: true,
+      guardianAddress,
+      walletAddress: expectedWallet || ''
+    };
+  }
+
+  if (!sameAddress(onchainGuardian, guardianAddress)) {
+    throw new Error(`Agent "${normalizedAgentId}" is already registered onchain to a different guardian.`);
+  }
+
+  if ((expectedWallet || '') !== (onchainWallet || '')) {
+    const { request } = await publicClient.simulateContract({
+      account,
+      address: contractAddress,
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      functionName: 'setAgentWallet',
+      args: [normalizedAgentId, expectedWallet || zeroAddress]
+    });
+    const txHash = await walletClient.writeContract(request);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== 'success') {
+      throw new Error(`Onchain setAgentWallet(${normalizedAgentId}) transaction reverted.`);
+    }
+  }
+
+  return {
+    registered: true,
+    guardianAddress,
+    walletAddress: expectedWallet || onchainWallet || ''
+  };
 }
 
 function parseDelegationPermissionContext(value) {
@@ -2862,8 +3039,8 @@ const AGENT_CSS = `
 @media(max-width:768px){.agent-banner{height:160px}}
 
 /* Profile card - overlapping banner */
-.agent-profile-card{position:relative;margin-top:-80px;padding:0 14px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;max-width:1680px;margin-left:auto;margin-right:auto}
-@media(min-width:1100px){.agent-profile-card{padding:0 18px}}
+.agent-profile-card{position:relative;margin-top:-80px;padding:0 10px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;max-width:1680px;margin-left:auto;margin-right:auto}
+@media(min-width:1100px){.agent-profile-card{padding:0 14px}}
 .agent-avatar{width:120px;height:120px;border-radius:12px;border:3px solid var(--agent-color,#6ee7b7);background:var(--surface);overflow:hidden;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
 .agent-avatar img{width:100%;height:100%;object-fit:cover}
 .agent-avatar .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface);color:var(--agent-color,#6ee7b7)}
@@ -2874,8 +3051,8 @@ const AGENT_CSS = `
 .agent-role{font-size:15px;color:var(--secondary);letter-spacing:1px;margin-top:4px}
 
 /* Stats row */
-.agent-stats-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;padding:16px 14px;border-bottom:1px solid var(--border);margin-bottom:20px;max-width:1680px;margin-left:auto;margin-right:auto}
-@media(min-width:1100px){.agent-stats-row{padding:16px 18px}}
+.agent-stats-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;padding:16px 10px;border-bottom:1px solid var(--border);margin-bottom:20px;max-width:1680px;margin-left:auto;margin-right:auto}
+@media(min-width:1100px){.agent-stats-row{padding:16px 14px}}
 .agent-stats-grid{display:flex;flex-wrap:wrap;gap:24px}
 .stat-item{text-align:center}
 .stat-number{font-size:20px;color:var(--agent-color,#6ee7b7);font-weight:400;display:block}
@@ -2886,8 +3063,8 @@ const AGENT_CSS = `
 @media(max-width:768px){.agent-stats-row{padding:14px 16px;margin-bottom:16px}.agent-stats-grid{gap:18px}.agent-action-row{width:100%;justify-content:flex-start}.agent-action-btn{width:100%}}
 
 /* Two-column layout */
-.agent-layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:28px;padding:0 14px;max-width:1680px;margin:0 auto}
-@media(min-width:1100px){.agent-layout{padding:0 18px}}
+.agent-layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:28px;padding:0 10px;max-width:1680px;margin:0 auto}
+@media(min-width:1100px){.agent-layout{padding:0 14px}}
 @media(max-width:768px){.agent-layout{grid-template-columns:1fr;padding:0 16px;gap:18px}}
 .agent-gallery{min-width:0}
 .agent-gallery .grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
@@ -5624,7 +5801,7 @@ async function renderArtists(db) {
   const allCards = newcomerCards + featuredCards;
 
   const artistCSS = `
-.artists-page{max-width:1560px;margin:0 auto;padding:22px 16px 28px}
+.artists-page{max-width:1480px;margin:0 auto;padding:22px 24px 28px}
 .artists-page h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
 .artists-page .subtitle{font-size:13px;color:var(--dim);letter-spacing:1px;margin-bottom:28px;max-width:720px}
 .artists-section{margin-top:26px}
@@ -5634,7 +5811,7 @@ async function renderArtists(db) {
 .artists-section-note{font-size:12px;color:var(--dim);letter-spacing:.8px}
 .artists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:22px}
 @media(min-width:1200px){.artists-grid{grid-template-columns:repeat(3,1fr)}}
-@media(min-width:1400px){.artists-page{padding-left:12px;padding-right:12px}}
+@media(min-width:1400px){.artists-page{padding-left:22px;padding-right:22px}}
 .artist-card{display:block;background:linear-gradient(180deg,rgba(9,12,17,0.98),rgba(14,18,24,0.96));border:1px solid rgba(122,155,171,0.2);border-radius:20px;overflow:hidden;text-decoration:none;transition:transform .2s,border-color .2s,box-shadow .2s;position:relative;box-shadow:0 10px 30px rgba(0,0,0,0.22)}
 .artist-card::before{content:'';position:absolute;inset:0;background:linear-gradient(160deg,color-mix(in srgb,var(--ac) 14%,transparent),transparent 42%,rgba(255,255,255,0.02) 100%);pointer-events:none;opacity:.9}
 .artist-card:hover{border-color:color-mix(in srgb,var(--ac) 54%,rgba(255,255,255,0.18));transform:translateY(-3px);box-shadow:0 18px 42px rgba(0,0,0,0.3)}
@@ -6036,16 +6213,16 @@ const aboutCSS = `.about{max-width:1120px;margin:32px auto;padding:0 28px}
 .about .about-credit p{margin:0 0 10px}
 .about .about-credit p:last-child{margin-bottom:0}
 .about .faq{display:grid;gap:12px;margin-top:8px}
-.about .faq-item{border:1px solid rgba(208,214,220,0.52);border-radius:14px;background:linear-gradient(180deg,rgba(246,249,251,0.98),rgba(228,236,241,0.94));box-shadow:0 14px 28px rgba(0,0,0,0.18),0 1px 0 rgba(255,255,255,0.4) inset;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease,transform .2s ease;overflow:hidden}
-.about .faq-item:hover{border-color:rgba(175,153,165,0.5);background:linear-gradient(180deg,rgba(251,245,248,0.98),rgba(237,227,234,0.95));box-shadow:0 18px 34px rgba(0,0,0,0.22),0 1px 0 rgba(255,255,255,0.45) inset;transform:translateY(-1px)}
-.about .faq-item[open]{border-color:rgba(168,145,159,0.62);background:linear-gradient(180deg,rgba(252,247,249,0.99),rgba(239,229,236,0.96))}
-.about .faq-item summary{list-style:none;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 18px;cursor:pointer;user-select:none;color:#2d241f;font-size:13px;letter-spacing:1px;text-transform:uppercase;font-weight:700}
+.about .faq-item{border:1px solid rgba(122,155,171,0.28);border-radius:14px;background:linear-gradient(180deg,rgba(11,14,20,0.98),rgba(17,21,28,0.95));box-shadow:0 14px 30px rgba(0,0,0,0.24),0 1px 0 rgba(255,255,255,0.04) inset;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease,transform .2s ease;overflow:hidden}
+.about .faq-item:hover{border-color:rgba(180,213,223,0.34);background:linear-gradient(180deg,rgba(15,19,25,0.99),rgba(21,25,33,0.96));box-shadow:0 18px 36px rgba(0,0,0,0.28),0 1px 0 rgba(255,255,255,0.05) inset;transform:translateY(-1px)}
+.about .faq-item[open]{border-color:rgba(184,150,168,0.4);background:linear-gradient(180deg,rgba(16,19,26,0.99),rgba(24,22,30,0.96))}
+.about .faq-item summary{list-style:none;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 18px;cursor:pointer;user-select:none;color:#edf3f6;font-size:13px;letter-spacing:1px;text-transform:uppercase;font-weight:700}
 .about .faq-item summary::-webkit-details-marker{display:none}
-.about .faq-item summary::after{content:'+';flex:0 0 auto;color:rgba(72,57,49,0.72);font-size:16px;line-height:1;margin-top:1px}
+.about .faq-item summary::after{content:'+';flex:0 0 auto;color:rgba(208,236,244,0.76);font-size:16px;line-height:1;margin-top:1px}
 .about .faq-item[open] summary::after{content:'-'}
-.about .faq-item .faq-answer{padding:0 18px 17px;border-top:1px solid rgba(150,137,125,0.18)}
-.about .faq-item .faq-answer p{font-size:14px;line-height:1.74;margin:12px 0 0;color:#43362d}
-.about .faq-item .faq-answer a{color:#845fc5;text-decoration:none}
+.about .faq-item .faq-answer{padding:0 18px 17px;border-top:1px solid rgba(122,155,171,0.16)}
+.about .faq-item .faq-answer p{font-size:14px;line-height:1.74;margin:12px 0 0;color:#d4dfe5}
+.about .faq-item .faq-answer a{color:#b4d5df;text-decoration:none}
 .about .faq-item .faq-answer a:hover{text-decoration:underline}
 .about .about-story{margin-top:24px;padding:20px 22px;border:1px solid rgba(191,202,210,0.18);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.025));box-shadow:0 14px 28px rgba(0,0,0,0.14)}
 .about .about-story p{margin-bottom:14px}
