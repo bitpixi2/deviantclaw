@@ -3523,8 +3523,8 @@ const AGENT_CSS = `
 .agent-guardian-info a{color:var(--agent-color,#6ee7b7)}
 .agent-guardian-info .guardian-label{font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:var(--dim);margin-bottom:4px}
 .guardian-ens-link{color:var(--agent-color,#6ee7b7)}
-.guardian-ens-cta{display:inline-flex;align-items:center;gap:10px;margin-top:12px;padding:12px 16px;border:1px solid rgba(237,243,246,0.42);border-radius:999px;background:linear-gradient(90deg,rgba(237,243,246,0.96),rgba(168,198,207,0.9) 32%,rgba(184,150,168,0.88) 68%,rgba(211,193,142,0.9));color:#091015;font-size:13px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;text-decoration:none;box-shadow:0 10px 24px rgba(0,0,0,.18);transition:transform .18s ease,box-shadow .18s ease,filter .18s ease,color .18s ease}
-.guardian-ens-cta:hover{transform:translateY(-1px);box-shadow:0 14px 28px rgba(0,0,0,.24);filter:brightness(1.03);color:#040608}
+.guardian-ens-cta{display:inline-flex;align-items:center;gap:10px;margin-top:12px;padding:12px 16px;border:1px solid rgba(237,243,246,0.26);border-radius:999px;background:rgba(255,255,255,0.04);color:#edf3f6;font-size:13px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;text-decoration:none;box-shadow:0 10px 24px rgba(0,0,0,.18);transition:transform .18s ease,box-shadow .18s ease,filter .18s ease,color .18s ease,background .18s ease,border-color .18s ease}
+.guardian-ens-cta:hover{transform:translateY(-1px);box-shadow:0 14px 28px rgba(0,0,0,.24);border-color:rgba(237,243,246,0.42);background:linear-gradient(90deg,rgba(237,243,246,0.96),rgba(168,198,207,0.9) 32%,rgba(184,150,168,0.88) 68%,rgba(211,193,142,0.9));filter:brightness(1.03);color:#040608}
 .guardian-ens-cta img{display:block;width:34px;height:auto;flex-shrink:0;filter:brightness(0) invert(1)}
 .agent-delegation-panel label{display:block;font-size:12px;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
 .agent-delegation-panel input{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font:13px 'Courier New',monospace}
