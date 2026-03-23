@@ -8326,7 +8326,8 @@ export default {
           'phosphor-profile.png',
           'phosphor-delegation-guestbook.png',
           'homepage.png',
-          'protocol-labs-erc8004-verify.png'
+          'protocol-labs-erc8004-verify.png',
+          'trailer-poster.jpg'
         ]);
         if (!allowed.has(file)) return new Response('Not found', { status: 404 });
         const raw = `https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/docs/images/readme/${file}`;
