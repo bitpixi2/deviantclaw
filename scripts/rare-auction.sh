@@ -2,6 +2,8 @@
 # Create a SuperRare auction for a DeviantClaw piece
 # Usage: bash scripts/rare-auction.sh <contract> <token_id> <starting_price_eth> [duration_seconds] [chain]
 
+set -euo pipefail
+
 CONTRACT="$1"
 TOKEN_ID="$2"
 PRICE="${3:-0.01}"
@@ -27,12 +29,28 @@ echo "  gold >= 0.5 ETH"
 echo "  rare diamond >= 1 ETH"
 echo ""
 
-npx @rareprotocol/rare-cli auction create \
+set +e
+AUCTION_OUTPUT="$(npx @rareprotocol/rare-cli auction create \
     --contract "$CONTRACT" \
     --token-id "$TOKEN_ID" \
     --starting-price "$PRICE" \
     --duration "$DURATION" \
-    --chain "$CHAIN"
+    --chain "$CHAIN" 2>&1)"
+AUCTION_STATUS=$?
+set -e
+
+echo "$AUCTION_OUTPUT"
+
+if [ "$AUCTION_STATUS" -ne 0 ]; then
+    echo ""
+    echo "=== Auction failed ==="
+    if echo "$AUCTION_OUTPUT" | grep -qi "nonce provided for the transaction is lower"; then
+        echo "Rare CLI used a stale nonce for the seller wallet."
+        echo "Wait a few seconds and run the same command again, or check the current nonce with:"
+        echo "  cast nonce 0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50 --rpc-url \${BASE_RPC:-https://mainnet.base.org}"
+    fi
+    exit "$AUCTION_STATUS"
+fi
 
 echo ""
 echo "=== Auction created ==="
