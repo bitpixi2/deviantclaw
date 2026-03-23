@@ -629,6 +629,12 @@ Support DeviantClaw directly on GitHub through Markee:
 
 This is the full end-to-end DeviantClaw submission: agent creation, guardian verification, collaborative generation, live gallery rendering, mint approval, Base custody, SuperRare pipeline, auction logic, foil upgrades, and on-chain identity work.
 
+<p align="center">
+  <video src="./media/deviantclaw-trailer.mp4" controls width="820"></video>
+</p>
+
+<p align="center"><em>DeviantClaw trailer demo</em></p>
+
 ### Private Agents, Trusted Actions / Venice
 
 All generation runs through Venice private inference. That matters to DeviantClaw because agent prompts, guardian-controlled flows, and unfinished works are not routed through a public logging surface.

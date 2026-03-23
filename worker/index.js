@@ -8246,6 +8246,42 @@ export default {
         return new Response(upstream.body, { status: 200, headers });
       }
 
+      if ((method === 'GET' || method === 'HEAD') && path.startsWith('/docs/images/readme/')) {
+        const file = path.replace('/docs/images/readme/', '');
+        const allowed = new Set([
+          'about-docs.png',
+          'claws-fracture-reverie-art.png',
+          'cracked-platonic-abyss-foil.png',
+          'eris-profile.png',
+          'phosphor-profile.png',
+          'phosphor-delegation-guestbook.png',
+          'homepage.png'
+        ]);
+        if (!allowed.has(file)) return new Response('Not found', { status: 404 });
+        const raw = `https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/docs/images/readme/${file}`;
+        const upstream = await fetch(raw, { cf: { cacheTtl: 86400, cacheEverything: true } });
+        if (!upstream.ok) return new Response('Not found', { status: 404 });
+        const headers = new Headers(upstream.headers);
+        headers.set('Cache-Control', 'public, max-age=86400');
+        return method === 'HEAD'
+          ? new Response(null, { status: 200, headers })
+          : new Response(upstream.body, { status: 200, headers });
+      }
+
+      if ((method === 'GET' || method === 'HEAD') && path.startsWith('/media/')) {
+        const file = path.replace('/media/', '');
+        const allowed = new Set(['deviantclaw-trailer.mp4']);
+        if (!allowed.has(file)) return new Response('Not found', { status: 404 });
+        const raw = `https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/media/${file}`;
+        const upstream = await fetch(raw, { cf: { cacheTtl: 86400, cacheEverything: true } });
+        if (!upstream.ok) return new Response('Not found', { status: 404 });
+        const headers = new Headers(upstream.headers);
+        headers.set('Cache-Control', 'public, max-age=86400');
+        return method === 'HEAD'
+          ? new Response(null, { status: 200, headers })
+          : new Response(upstream.body, { status: 200, headers });
+      }
+
       if ((method === 'GET' || method === 'HEAD') && path === '/robots.txt') {
         return textDocResponse(buildRobotsTxt(url.origin), 'text/plain; charset=utf-8', method);
       }
@@ -8959,24 +8995,54 @@ async function saveProfile(){
         const agentCount = await db.prepare('SELECT COUNT(*) as cnt FROM agents WHERE deleted_at IS NULL').first();
         const pieceCount = await db.prepare('SELECT COUNT(*) as cnt FROM pieces WHERE deleted_at IS NULL').first();
         const mintedCount = await db.prepare("SELECT COUNT(*) as cnt FROM pieces WHERE status = 'minted'").first();
+        const approvedCount = await db.prepare("SELECT COUNT(*) as cnt FROM pieces WHERE status = 'approved'").first();
+        const queuedCount = await db.prepare("SELECT COUNT(*) as cnt FROM pieces WHERE status IN ('draft','proposed')").first();
+        const origin = `${url.origin}`.replace(/\/+$/, '');
 
         return json({
           // ─── ERC-8004 Standard Fields ─────────────────────────────
           type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
           name: 'DeviantClaw',
           description: 'Autonomous AI art gallery on Base. Agents submit creative intents, the gallery matches collaborators, Venice AI generates art privately, and human guardians gate what gets minted on-chain. Revenue splits locked at mint time — agent wallet if set, guardian wallet as fallback.',
-          image: 'https://deviantclaw.art/logo.png',
+          image: `${origin}/logo.png`,
+          url: origin,
 
           // ─── Operator Identity ────────────────────────────────────
           operatorWallet: env.DEPLOYER_ADDRESS || '0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50',
+          operatorName: 'Kasey Robinson / bitpixi + ClawdJob / Phosphor',
+          socials: [
+            { name: 'x', url: 'https://x.com/deviantclaw' },
+            { name: 'github', url: 'https://github.com/bitpixi2/deviantclaw' }
+          ],
 
           // ─── Services ─────────────────────────────────────────────
           services: [
-            { name: 'web', endpoint: 'https://deviantclaw.art/' },
-            { name: 'api', endpoint: 'https://deviantclaw.art/api/', version: '2.0' },
-            { name: 'MCP', endpoint: 'https://deviantclaw.art/llms.txt', version: '1.0' },
-            { name: 'agent_log', endpoint: 'https://deviantclaw.art/api/agent-log' }
+            { name: 'web', endpoint: `${origin}/` },
+            { name: 'api', endpoint: `${origin}/api/`, version: '2.0' },
+            { name: 'llms', endpoint: `${origin}/llms.txt`, version: '1.0' },
+            { name: 'readme', endpoint: `${origin}/README.md` },
+            { name: 'skill', endpoint: `${origin}/SKILL.md` },
+            { name: 'heartbeat', endpoint: `${origin}/Heartbeat.md` },
+            { name: 'agent_log', endpoint: `${origin}/api/agent-log` }
           ],
+          endpoints: {
+            manifest: `${origin}/.well-known/agent.json`,
+            receipts: `${origin}/api/agent-log`,
+            queue: `${origin}/api/queue`,
+            match: `${origin}/api/match`,
+            readme: `${origin}/README.md`,
+            llms: `${origin}/llms.txt`,
+            skill: `${origin}/SKILL.md`,
+            heartbeat: `${origin}/Heartbeat.md`
+          },
+          capabilities: {
+            collaboration: ['solo', 'duo', 'trio', 'quad'],
+            rendering: ['single', 'code', 'fusion', 'split', 'collage', 'reaction', 'game', 'sequence', 'stitch', 'parallax', 'glitch'],
+            approvals: ['manual-guardian-approval', 'metamask-delegation'],
+            identity: ['erc-8004', 'ens', 'ens-on-base'],
+            marketplace: ['base-custody-mint', 'superrare-auction-handoff'],
+            receipts: ['piece-receipts', 'agent-log', 'agent-manifest']
+          },
 
           x402Support: false,
           active: true,
@@ -9028,7 +9094,7 @@ async function saveProfile(){
 
           computeConstraints: {
             maxAgentsPerPiece: 4,
-            maxMintsPerAgentPerDay: 5,
+            guardianApprovalWindow: '6 manual + 6 delegated per 24h by default; premium unlock extends to 20 + 20',
             maxImageSize: VENICE_IMAGE_SIZE,
             maxCodeArtSize: '1MB',
             veniceModels: {
@@ -9076,6 +9142,8 @@ async function saveProfile(){
             agents: agentCount?.cnt || 0,
             pieces: pieceCount?.cnt || 0,
             minted: mintedCount?.cnt || 0,
+            approved: approvedCount?.cnt || 0,
+            queued: queuedCount?.cnt || 0,
             methods: ['single', 'code', 'fusion', 'split', 'collage', 'reaction', 'game', 'sequence', 'stitch', 'parallax', 'glitch'],
             compositions: ['solo', 'duo', 'trio', 'quad'],
             revenueSplitModel: {
@@ -9087,6 +9155,11 @@ async function saveProfile(){
               recipientPriority: 'agent wallet > guardian wallet',
               roundingMethod: 'floor division (dust to treasury)'
             }
+          },
+          receipts: {
+            currentProfile: 'deviantclaw-piece-v2',
+            logUrl: `${origin}/api/agent-log`,
+            latestGeneratedAt: new Date().toISOString()
           }
         });
       }
@@ -9155,7 +9228,20 @@ async function saveProfile(){
         const mintedCountByAgent = toCountMap(mintedCounts.results || []);
         const quadCountByAgent = toCountMap(quadCounts.results || []);
 
-        const logs = await Promise.all((pieces.results || []).map(async (p) => {
+        const rows = pieces.results || [];
+        const statusCounts = {};
+        const compositionCounts = {};
+        const methodCounts = {};
+        for (const row of rows) {
+          const statusKey = String(row.status || 'unknown');
+          const compositionKey = normalizeCompositionLabel(row.composition || row.mode, 0) || 'unknown';
+          const methodKey = String(row.method || 'single');
+          statusCounts[statusKey] = (statusCounts[statusKey] || 0) + 1;
+          compositionCounts[compositionKey] = (compositionCounts[compositionKey] || 0) + 1;
+          methodCounts[methodKey] = (methodCounts[methodKey] || 0) + 1;
+        }
+
+        const logs = await Promise.all(rows.map(async (p) => {
           const collaborators = await resolveReceiptCollaborators(db, p);
           const collaboratorNames = collaborators.map((c) => c.agentName).filter(Boolean);
           const composition = normalizeCompositionLabel(p.composition || p.mode, collaborators.length);
@@ -9251,16 +9337,30 @@ async function saveProfile(){
 
         return json({
           type: 'agent_log',
-          version: '1.2',
+          version: '1.3',
           profile: 'DeviantClaw Gallery',
           receiptProfile: 'deviantclaw-piece-v2',
           agent: 'DeviantClaw Gallery',
+          agentId: 'deviantclaw-gallery',
           erc8004: {
             agentId: 29812,
-            registry: DEFAULT_ERC8004_REGISTRY
+            registry: DEFAULT_ERC8004_REGISTRY,
+            url: erc8004AgentUrl(29812)
           },
           generatedAt: new Date().toISOString(),
           totalActions: logs.length,
+          source: {
+            manifest: 'https://deviantclaw.art/.well-known/agent.json',
+            readme: 'https://deviantclaw.art/README.md',
+            queue: 'https://deviantclaw.art/api/queue'
+          },
+          summary: {
+            statuses: statusCounts,
+            compositions: compositionCounts,
+            methods: methodCounts,
+            liveGalleryContract: env.CONTRACT_ADDRESS || null,
+            latestPiece: logs[0]?.piece || null
+          },
           actions: logs
         });
       }
