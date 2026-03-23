@@ -1888,6 +1888,13 @@ const DEVIANTCLAW_PIECE_BRIDGE_ABI = [
     outputs: [{ name: '', type: 'uint256' }]
   },
   {
+    type: 'function',
+    name: 'getPieceIdByExternalId',
+    stateMutability: 'view',
+    inputs: [{ name: 'externalId', type: 'string' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
     type: 'event',
     name: 'PieceProposed',
     anonymous: false,
@@ -2287,6 +2294,40 @@ async function resolveExistingPieceProposalFromTx(db, env, piece) {
   };
 }
 
+async function resolveExistingPieceProposalByExternalId(db, env, piece) {
+  const contractAddress = String(env?.CONTRACT_ADDRESS || '').trim();
+  if (!contractAddress || !piece?.id) return null;
+  const { publicClient } = await getOperatorClients(env);
+  let chainPieceId;
+  try {
+    chainPieceId = await publicClient.readContract({
+      address: contractAddress,
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      functionName: 'getPieceIdByExternalId',
+      args: [String(piece.id)]
+    });
+  } catch {
+    return null;
+  }
+  if (chainPieceId === null || chainPieceId === undefined) return null;
+  const numericPieceId = Number(chainPieceId);
+  if (!Number.isFinite(numericPieceId) || numericPieceId < 0) return null;
+
+  const proposedAt = piece.proposed_at || new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const nextStatus = (piece.status === 'draft' || piece.status === 'wip') ? 'proposed' : piece.status;
+  await persistPieceProposalSync(db, piece.id, {
+    chain_piece_id: numericPieceId,
+    proposed_at: proposedAt,
+    status: nextStatus
+  });
+  return {
+    ...piece,
+    chain_piece_id: numericPieceId,
+    proposed_at: proposedAt,
+    status: nextStatus
+  };
+}
+
 async function ensurePieceProposedOnChain(db, env, pieceInput) {
   const piece = typeof pieceInput === 'string'
     ? await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(pieceInput).first()
@@ -2300,6 +2341,11 @@ async function ensurePieceProposedOnChain(db, env, pieceInput) {
   const recovered = await resolveExistingPieceProposalFromTx(db, env, piece);
   if (recovered?.chain_piece_id !== null && recovered?.chain_piece_id !== undefined && recovered?.chain_piece_id !== '') {
     return recovered;
+  }
+
+  const existing = await resolveExistingPieceProposalByExternalId(db, env, piece);
+  if (existing?.chain_piece_id !== null && existing?.chain_piece_id !== undefined && existing?.chain_piece_id !== '') {
+    return existing;
   }
 
   const contractAddress = String(env?.CONTRACT_ADDRESS || '').trim();
@@ -2324,14 +2370,38 @@ async function ensurePieceProposedOnChain(db, env, pieceInput) {
   if (!title) throw new Error('Piece title missing.');
 
   const args = [piece.id, agentIds, title, tokenURI, composition, method];
-  const { request } = await publicClient.simulateContract({
-    account,
-    address: contractAddress,
-    abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
-    functionName: 'proposePiece',
-    args
-  });
-  const txHash = await walletClient.writeContract(request);
+  let request;
+  try {
+    ({ request } = await publicClient.simulateContract({
+      account,
+      address: contractAddress,
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      functionName: 'proposePiece',
+      args
+    }));
+  } catch (error) {
+    const message = String(error?.shortMessage || error?.message || error || '');
+    if (/External ID already used/i.test(message)) {
+      const synced = await resolveExistingPieceProposalByExternalId(db, env, piece);
+      if (synced?.chain_piece_id !== null && synced?.chain_piece_id !== undefined && synced?.chain_piece_id !== '') {
+        return synced;
+      }
+    }
+    throw error;
+  }
+  let txHash;
+  try {
+    txHash = await walletClient.writeContract(request);
+  } catch (error) {
+    const message = String(error?.shortMessage || error?.message || error || '');
+    if (/External ID already used/i.test(message)) {
+      const synced = await resolveExistingPieceProposalByExternalId(db, env, piece);
+      if (synced?.chain_piece_id !== null && synced?.chain_piece_id !== undefined && synced?.chain_piece_id !== '') {
+        return synced;
+      }
+    }
+    throw error;
+  }
   await persistPieceProposalSync(db, piece.id, {
     proposal_tx: txHash
   });
