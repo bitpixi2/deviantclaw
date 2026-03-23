@@ -1623,6 +1623,124 @@ async function resolveReceiptCollaborators(db, piece) {
   return collaborators;
 }
 
+async function getTransactionCostSummary(publicClient, viem, txHash, cache = new Map()) {
+  const hash = String(txHash || '').trim();
+  if (!/^0x[0-9a-f]{64}$/i.test(hash)) return null;
+  if (cache.has(hash)) return cache.get(hash);
+  const task = (async () => {
+    try {
+      const receipt = await publicClient.getTransactionReceipt({ hash });
+      const gasUsed = BigInt(receipt?.gasUsed || 0n);
+      let gasPrice = BigInt(receipt?.effectiveGasPrice || 0n);
+      if (!gasPrice) {
+        const tx = await publicClient.getTransaction({ hash }).catch(() => null);
+        gasPrice = BigInt(tx?.gasPrice || tx?.maxFeePerGas || 0n);
+      }
+      const totalWei = gasUsed * gasPrice;
+      return {
+        txHash: hash,
+        gasUsed: gasUsed.toString(),
+        gasPriceWei: gasPrice.toString(),
+        costWei: totalWei.toString(),
+        costEth: viem.formatEther(totalWei)
+      };
+    } catch {
+      return null;
+    }
+  })();
+  cache.set(hash, task);
+  return task;
+}
+
+async function summarizePieceEconomics(env, piece, cache = new Map()) {
+  try {
+    const { publicClient } = await getOperatorClients(env);
+    const { viem } = await getDelegationRuntime();
+    const [proposalSpend, mintSpend] = await Promise.all([
+      getTransactionCostSummary(publicClient, viem, piece?.proposal_tx || '', cache),
+      getTransactionCostSummary(publicClient, viem, piece?.chain_tx || '', cache)
+    ]);
+    const totalWei = [proposalSpend, mintSpend].reduce((sum, item) => {
+      if (!item?.costWei) return sum;
+      try {
+        return sum + BigInt(item.costWei);
+      } catch {
+        return sum;
+      }
+    }, 0n);
+    const noteParts = [];
+    if (proposalSpend || mintSpend) {
+      noteParts.push('Base proposal and mint gas spend computed from recorded tx receipts.');
+    } else if (piece?.proposal_tx || piece?.chain_tx) {
+      noteParts.push('Base tx hashes are recorded for this piece, but spend could not be recovered from chain receipts.');
+    } else {
+      noteParts.push('No onchain proposal or mint tx is recorded for this piece yet.');
+    }
+    if (String(piece?.status || '') === 'minted') {
+      noteParts.push('No sale settlement is recorded for this piece yet.');
+    } else {
+      noteParts.push('This piece has not reached sale settlement.');
+    }
+    return {
+      realizedRevenueEth: null,
+      realizedSpendEth: totalWei > 0n ? viem.formatEther(totalWei) : null,
+      proposalSpendEth: proposalSpend?.costEth || null,
+      mintSpendEth: mintSpend?.costEth || null,
+      proposalTx: proposalSpend?.txHash || String(piece?.proposal_tx || '').trim() || null,
+      mintTx: mintSpend?.txHash || String(piece?.chain_tx || '').trim() || null,
+      note: noteParts.join(' ')
+    };
+  } catch {
+    return {
+      realizedRevenueEth: null,
+      realizedSpendEth: null,
+      proposalSpendEth: null,
+      mintSpendEth: null,
+      proposalTx: String(piece?.proposal_tx || '').trim() || null,
+      mintTx: String(piece?.chain_tx || '').trim() || null,
+      note: 'Could not resolve onchain spend for this piece right now.'
+    };
+  }
+}
+
+function summarizeDelegationAutomationStates(states = []) {
+  const resolved = states.filter(Boolean);
+  if (!resolved.length) {
+    return {
+      status: 'inactive',
+      note: 'No collaborator delegation records were resolved for this piece.',
+      participants: []
+    };
+  }
+  const participants = resolved.map((state) => ({
+    agentId: state.agentId,
+    agentName: state.agentName,
+    guardianAddress: state.guardianAddress || null,
+    active: !!state.active,
+    onchainEnabled: !!state.onchainEnabled,
+    grantStored: !!state.grantStored,
+    dailyUsed: Number(state.dailyUsed || 0),
+    dailyMax: Number(state.dailyMax || 0),
+    premium: !!state.premium,
+    status: state.status || (state.active ? 'active' : 'inactive')
+  }));
+  const activeCount = participants.filter((item) => item.active).length;
+  const linkedCount = participants.filter((item) => item.onchainEnabled || item.grantStored).length;
+  const status = activeCount === participants.length
+    ? 'active'
+    : activeCount > 0
+      ? 'partial'
+      : linkedCount > 0
+        ? 'pending_link'
+        : 'inactive';
+  const note = activeCount === participants.length
+    ? 'Resolved from stored MetaMask opt-ins plus the live Base toggle state.'
+    : linkedCount > 0
+      ? 'At least one collaborator has partial MetaMask delegation state recorded, but not every required opt-in is active yet.'
+      : 'No active MetaMask delegation opt-ins are currently recorded for this piece.';
+  return { status, note, participants };
+}
+
 function uniqueNonEmptyStrings(values = []) {
   return [...new Set(
     (values || [])
@@ -2802,6 +2920,20 @@ function parseDelegationPermissionContext(value) {
   try {
     const parsed = typeof value === 'string' ? JSON.parse(value) : value;
     if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  return [];
+}
+
+function extractDelegationContextHex(value) {
+  const candidate = String(value || '').trim();
+  return /^0x[0-9a-f]+$/i.test(candidate) ? candidate : '';
+}
+
+function parseGrantedExecutionPermissions(value) {
+  if (!value) return [];
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {}
   return [];
 }
@@ -7504,13 +7636,9 @@ async function renderAgent(db, agentId, env, url) {
           import('https://esm.sh/@metamask/smart-accounts-kit@0.4.0-beta.1')
         ]).then(([viem, chains, smartAccounts]) => ({
           createPublicClient: viem.createPublicClient,
-          createWalletClient: viem.createWalletClient,
-          custom: viem.custom,
           encodeFunctionData: viem.encodeFunctionData,
           http: viem.http,
-          padHex: viem.padHex,
           base: chains.base,
-          createDelegation: smartAccounts.createDelegation,
           getSmartAccountsEnvironment: smartAccounts.getSmartAccountsEnvironment
         }));
       }
@@ -7536,41 +7664,17 @@ async function renderAgent(db, agentId, env, url) {
       };
     }
 
-    function buildDelegationTypedData(delegation) {
-      const saltValue = String(delegation && delegation.salt ? delegation.salt : '0x');
-      const salt = saltValue === '0x' ? '0' : BigInt(saltValue).toString(10);
-      return {
-        domain: {
-          chainId: config.chainId,
-          name: 'DelegationManager',
-          version: '1',
-          verifyingContract: config.delegationManagerAddress
-        },
-        types: {
-          Caveat: [
-            { name: 'enforcer', type: 'address' },
-            { name: 'terms', type: 'bytes' }
-          ],
-          Delegation: [
-            { name: 'delegate', type: 'address' },
-            { name: 'delegator', type: 'address' },
-            { name: 'authority', type: 'bytes32' },
-            { name: 'caveats', type: 'Caveat[]' },
-            { name: 'salt', type: 'uint256' }
-          ]
-        },
-        primaryType: 'Delegation',
-        message: {
-          delegate: delegation.delegate,
-          delegator: delegation.delegator,
-          authority: delegation.authority,
-          caveats: (delegation.caveats || []).map((caveat) => ({
-            enforcer: caveat.enforcer,
-            terms: caveat.terms
-          })),
-          salt
-        }
-      };
+    async function getGrantedExecutionPermissions(provider) {
+      if (!provider) return [];
+      try {
+        const granted = await provider.request({
+          method: 'wallet_getGrantedExecutionPermissions',
+          params: []
+        });
+        return Array.isArray(granted) ? granted : [];
+      } catch {
+        return [];
+      }
     }
 
     function shortAddress(value) {
@@ -7683,9 +7787,9 @@ async function renderAgent(db, agentId, env, url) {
       }
 
       const detail = onchainEnabled && !grantStored
-        ? 'The Base contract toggle is on, but the signed grant is missing. Re-run delegation to restore auto-approvals.'
+        ? 'The Base contract toggle is already on, but DeviantClaw has not stored this MetaMask opt-in yet. Press Enable MetaMask Delegation to finish linking the profile.'
         : (!onchainEnabled && grantStored
-          ? 'A signed grant exists, but the Base contract toggle is off. Step 2 is still needed from the guardian wallet: confirm the Base transaction.'
+          ? 'A MetaMask opt-in is stored here, but the Base contract toggle is still off. Confirm the Base transaction from the guardian wallet to finish.'
           : 'Step 1: sign in MetaMask. Step 2: confirm the Base transaction to turn delegation on.');
       statusEl.innerHTML = '<span>' + detail + '</span><br><span style="font-size:11px;color:var(--dim)">Daily ceiling: ' + max + ' approvals.</span>';
       actionsEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' + metaMaskPrimaryButton('Enable MetaMask Delegation', 'delegation-enable-btn') + '</div>';
@@ -7748,70 +7852,54 @@ async function renderAgent(db, agentId, env, url) {
         if (!provider) throw new Error('MetaMask is not available for delegation.');
         const {
           createPublicClient,
-          createWalletClient,
-          custom,
           encodeFunctionData,
           http,
-          padHex,
-          base,
-          createDelegation,
-          getSmartAccountsEnvironment
+          base
         } = await getDelegationRuntimeModules();
         const smartAccountState = await getSmartAccountUpgradeState(connectedWallet);
         if (!smartAccountState.upgraded) {
           throw new Error('This guardian wallet is not upgraded to a MetaMask Smart Account on Base yet. Open MetaMask account details in MetaMask and switch this account to Smart Account first.');
         }
-        const walletClient = createWalletClient({ account: connectedWallet, chain: base, transport: custom(provider) });
+        const stateBefore = await fetchState().catch(() => currentState || {});
         const publicClient = createPublicClient({ chain: base, transport: http(config.baseRpc) });
-        const environment = getSmartAccountsEnvironment(config.chainId);
-        const delegation = createDelegation({
-          environment,
-          from: connectedWallet,
-          to: config.relayerAddress,
-          scope: {
-            type: 'functionCall',
-            targets: [config.contractAddress],
-            selectors: ['approvePieceViaDelegate(uint256,address)'],
-            allowedCalldata: [{ startIndex: 36, value: padHex(connectedWallet, { size: 32 }) }],
-            valueLte: { maxValue: 0n }
-          },
-          caveats: [
-            { type: 'redeemer', redeemers: [config.relayerAddress] }
-          ]
-        });
-        const signature = await provider.request({
-          method: 'eth_signTypedData_v4',
-          params: [connectedWallet, JSON.stringify(buildDelegationTypedData(delegation))]
-        });
-        const signedDelegation = { ...delegation, signature };
-        const txHash = await provider.request({
-          method: 'eth_sendTransaction',
-          params: [{
-            from: connectedWallet,
-            to: config.contractAddress,
-            data: encodeFunctionData({
-              abi: toggleAbi,
-              functionName: 'toggleDelegation',
-              args: [true]
-            })
-          }]
-        });
-        setBusy('2. Confirm Base transaction…');
-        await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1, timeout: 120000 });
+        let txHash = '';
+        if (!stateBefore.onchainEnabled) {
+          setBusy('2. Confirm Base transaction…');
+          txHash = await provider.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              from: connectedWallet,
+              to: config.contractAddress,
+              data: encodeFunctionData({
+                abi: toggleAbi,
+                functionName: 'toggleDelegation',
+                args: [true]
+              })
+            }]
+          });
+          await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1, timeout: 120000 });
+        }
+        const grantedPermissions = await getGrantedExecutionPermissions(provider);
+        const grantedContexts = grantedPermissions
+          .map((item) => String(item && item.context ? item.context : '').trim())
+          .filter((item) => /^0x[0-9a-f]+$/i.test(item));
         const res = await fetch('/api/agents/' + encodeURIComponent(config.agentId) + '/delegate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({
             guardianAddress: connectedWallet,
             delegateTarget: config.relayerAddress,
-            permissionContext: [signedDelegation],
             grantPayload: {
-              source: 'metamask-smart-accounts-kit',
+              source: 'metamask-smart-account-opt-in',
               version: '0.4.0-beta.1',
-              permissionContext: [signedDelegation]
+              optInConfirmed: true,
+              smartAccountUpgradeVerified: true,
+              onchainEnabled: true,
+              grantedPermissions,
+              permissionContexts: grantedContexts
             },
-            grantSignature: signature,
-            enableTxHash: txHash
+            permissionContext: grantedContexts[0] || '',
+            enableTxHash: txHash || undefined
           })
         });
         const data = await res.json();
@@ -7820,7 +7908,7 @@ async function renderAgent(db, agentId, env, url) {
       } catch (error) {
         let message = String(error?.message || error || 'Delegation failed.');
         if (/External signature requests cannot sign delegations for internal accounts/i.test(message)) {
-          message = 'MetaMask rejected this delegation request because Advanced Permissions require a MetaMask Smart Account upgrade. Normal guardian approvals on Base still work without delegation.';
+          message = 'MetaMask rejected an old-style delegation signature request. DeviantClaw now uses the Base toggle plus a stored MetaMask opt-in instead, so reload and try again.';
         }
         await fetchState().catch(() => renderState({ ...currentState, manageableByConnectedWallet: true }));
         statusEl.innerHTML = '<span style="color:var(--danger)">' + message + '</span><br>' + statusEl.innerHTML;
@@ -9179,7 +9267,7 @@ async function saveProfile(){
         const pieces = await db.prepare(
           `SELECT p.id, p.title, p.description, p.agent_a_id, p.agent_b_id, p.agent_a_name, p.agent_b_name,
                   p.mode, p.method, p.composition, p.status, p.created_at, p.seed, p.art_prompt, p.venice_model,
-                  p.token_id, p.chain_tx
+                  p.token_id, p.proposal_tx, p.chain_tx
            FROM pieces p WHERE p.deleted_at IS NULL ORDER BY p.created_at DESC LIMIT 100`
         ).all();
 
@@ -9229,6 +9317,8 @@ async function saveProfile(){
         const quadCountByAgent = toCountMap(quadCounts.results || []);
 
         const rows = pieces.results || [];
+        const txCostCache = new Map();
+        const delegationStateCache = new Map();
         const statusCounts = {};
         const compositionCounts = {};
         const methodCounts = {};
@@ -9247,6 +9337,22 @@ async function saveProfile(){
           const composition = normalizeCompositionLabel(p.composition || p.mode, collaborators.length);
           const method = p.method || 'single';
           const split = revenueSplitPreview(composition);
+          const delegationStates = await Promise.all(collaborators.map(async (c) => {
+            const cacheKey = `${c.agentId}:${normalizeAddress(c.guardianAddress || '')}`;
+            if (!delegationStateCache.has(cacheKey)) {
+              delegationStateCache.set(cacheKey, resolveAgentDelegationState(db, env, {
+                id: c.agentId,
+                guardian_address: c.guardianAddress || ''
+              }).then((state) => ({
+                ...state,
+                agentId: c.agentId,
+                agentName: c.agentName
+              })).catch(() => null));
+            }
+            return delegationStateCache.get(cacheKey);
+          }));
+          const economics = await summarizePieceEconomics(env, p, txCostCache);
+          const automation = summarizeDelegationAutomationStates(delegationStates);
           const participantProfiles = collaborators.map((c) => ({
             agentId: c.agentId,
             agentName: c.agentName,
@@ -9312,15 +9418,16 @@ async function saveProfile(){
               galleryFeePct: split.galleryFeePct,
               artistPoolPct: split.artistPoolPct,
               perContributorPct: split.perContributorPct,
-              realizedRevenueEth: null,
-              realizedSpendEth: null,
-              note: 'Sale settlement and gas spend are not mirrored in D1 yet.'
+              realizedRevenueEth: economics.realizedRevenueEth,
+              realizedSpendEth: economics.realizedSpendEth,
+              proposalSpendEth: economics.proposalSpendEth,
+              mintSpendEth: economics.mintSpendEth,
+              proposalTx: economics.proposalTx,
+              mintTx: economics.mintTx,
+              note: economics.note
             },
             automation: {
-              metamaskDelegation: {
-                status: 'not_mirrored_in_d1',
-                note: 'Guardian delegation opt-in lives on-chain and is not yet indexed in these receipts.'
-              }
+              metamaskDelegation: automation
             },
             receipt: {
               id: `dc:${p.id}`,
@@ -11934,24 +12041,51 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           return json({ error: 'Delegation relayer is not configured.' }, 503);
         }
 
-        const permissionContext = parseDelegationPermissionContext(body.permissionContext || body.grantPayload?.permissionContext);
-        if (!permissionContext.length) {
-          return json({ error: 'Signed permission context is required.' }, 400);
-        }
+        const grantPayload = (body.grantPayload && typeof body.grantPayload === 'object') ? body.grantPayload : {};
+        const permissionContext = parseDelegationPermissionContext(body.permissionContext || grantPayload.permissionContext);
+        const permissionContextHex = extractDelegationContextHex(body.permissionContext)
+          || extractDelegationContextHex(grantPayload.context)
+          || extractDelegationContextHex(grantPayload.permissionContextHex)
+          || extractDelegationContextHex((Array.isArray(grantPayload.permissionContexts) ? grantPayload.permissionContexts[0] : ''));
+        const grantedPermissions = parseGrantedExecutionPermissions(body.grantedPermissions || grantPayload.grantedPermissions);
         const firstDelegation = permissionContext[0] || {};
-        if (!sameAddress(firstDelegation.delegator, guardianAddr)) {
-          return json({ error: 'Delegation delegator does not match guardian wallet.' }, 400);
-        }
-        if (!sameAddress(firstDelegation.delegate, body.delegateTarget || relayerAddress)) {
-          return json({ error: 'Delegation delegate target does not match the configured relayer.' }, 400);
+        if (permissionContext.length) {
+          if (!sameAddress(firstDelegation.delegator, guardianAddr)) {
+            return json({ error: 'Delegation delegator does not match guardian wallet.' }, 400);
+          }
+          if (!sameAddress(firstDelegation.delegate, body.delegateTarget || relayerAddress)) {
+            return json({ error: 'Delegation delegate target does not match the configured relayer.' }, 400);
+          }
         }
 
-        const validToggle = await verifyDelegationToggleTransaction(env, body.enableTxHash, guardianAddr, true);
-        if (!validToggle) {
-          return json({ error: 'Could not verify the Base toggleDelegation(true) transaction for this guardian.' }, 400);
+        const validToggle = body.enableTxHash
+          ? await verifyDelegationToggleTransaction(env, body.enableTxHash, guardianAddr, true)
+          : false;
+        const onchainDelegation = await readGuardianDelegationOnchain(env, guardianAddr);
+        if (!validToggle && !onchainDelegation.onchainEnabled) {
+          return json({ error: 'Could not verify delegation on Base. Turn on the Base toggle for this guardian first, then retry.' }, 400);
+        }
+        if (!permissionContext.length && !permissionContextHex && !grantPayload.optInConfirmed && !grantedPermissions.length) {
+          return json({ error: 'MetaMask opt-in details are required to store delegation for this agent.' }, 400);
         }
 
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const permissionContextStorage = permissionContext.length
+          ? JSON.stringify(permissionContext)
+          : (permissionContextHex || '');
+        const storedGrantPayload = {
+          source: grantPayload.source || 'metamask-smart-account-opt-in',
+          version: grantPayload.version || '',
+          optInConfirmed: grantPayload.optInConfirmed !== false,
+          smartAccountUpgradeVerified: grantPayload.smartAccountUpgradeVerified !== false,
+          onchainEnabled: true,
+          grantedPermissions,
+          permissionContexts: Array.isArray(grantPayload.permissionContexts)
+            ? grantPayload.permissionContexts
+            : (permissionContextHex ? [permissionContextHex] : []),
+          permissionContext: permissionContext.length ? permissionContext : undefined,
+          context: permissionContextHex || undefined
+        };
         try {
           await db.prepare(
             `INSERT INTO delegations (
@@ -11982,8 +12116,8 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
             agentId,
             now,
             relayerAddress,
-            JSON.stringify(permissionContext),
-            JSON.stringify(body.grantPayload || { permissionContext }),
+            permissionContextStorage,
+            JSON.stringify(storedGrantPayload),
             String(body.grantSignature || firstDelegation.signature || ''),
             String(body.grantHash || ''),
             String(body.enableTxHash || ''),

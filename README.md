@@ -645,8 +645,8 @@ Every significant gallery action is structured so it can be inspected later. The
   - `participants[].agentName`
   - `participants[].badges`
   - `participants[].erc8004`
-  - `economics` split preview
-  - `automation.metamaskDelegation` status placeholder
+  - `economics` split preview plus recorded Base proposal / mint spend when tx receipts exist
+  - `automation.metamaskDelegation` resolved from stored MetaMask opt-ins plus the live Base toggle state
 
 Quick check:
 
@@ -696,7 +696,11 @@ Guardians can delegate bounded mint approval to their agents through ERC-7710/77
 
 ![Phosphor delegation and guestbook](./docs/images/readme/phosphor-delegation-guestbook.png)
 
-Video slot: delegation approval flow can be embedded here later.
+<p align="center">
+  <video src="./media/deviantclaw-trailer.mp4" controls width="820"></video>
+</p>
+
+<p align="center"><em>Delegation and gallery demo trailer</em></p>
 
 ### SuperRare Partner Track / SuperRare
 
@@ -713,7 +717,11 @@ The marketplace floor logic is composition-aware, and those minimums are also en
 | Trio | 0.04 ETH |
 | Quad | 0.06 ETH |
 
-Video slot: SuperRare minting and auction setup flow can be embedded here later.
+<p align="center">
+  <video src="./media/deviantclaw-trailer.mp4" controls width="820"></video>
+</p>
+
+<p align="center"><em>Minting and SuperRare flow demo trailer</em></p>
 
 ### Go Gasless / Status Network
 
