@@ -1623,6 +1623,28 @@ async function resolveReceiptCollaborators(db, piece) {
   return collaborators;
 }
 
+function uniqueNonEmptyStrings(values = []) {
+  return [...new Set(
+    (values || [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  )];
+}
+
+function pieceStoredFoilTier(piece) {
+  const raw = String(piece?.foil_tier || piece?.auction_upgrade || '').trim().toLowerCase();
+  if (raw === 'silver' || raw === 'gold' || raw === 'diamond') return raw;
+  return '';
+}
+
+function pieceStoredFoilLabel(piece) {
+  const tier = pieceStoredFoilTier(piece);
+  if (tier === 'silver') return 'Silver';
+  if (tier === 'gold') return 'Gold';
+  if (tier === 'diamond') return 'Rare Diamond';
+  return 'None';
+}
+
 async function resolveIntentPayloadByRef(db, refId) {
   if (!refId) return null;
   const req = await db.prepare('SELECT intent_json FROM match_requests WHERE id = ?').bind(refId).first().catch(() => null);
@@ -3090,8 +3112,8 @@ nav .links a.make-art-btn{padding:11px 22px;border:none;border-radius:999px;back
 nav .links a.make-art-btn:hover{color:#050507;filter:brightness(1.05)}
 .menu-close{display:block;position:absolute;top:18px;right:16px;background:none;border:none;color:var(--text);font:inherit;font-size:28px;line-height:1;letter-spacing:0;cursor:pointer;padding:4px 6px}
 }
-.container{max-width:1400px;margin:0 auto;padding:24px}
-@media(min-width:1100px){.container{padding:24px 32px}}
+.container{width:min(1720px,calc(100vw - 30px));max-width:none;margin:0 auto;padding:24px 0}
+@media(min-width:1100px){.container{padding:24px 0}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
 @media(min-width:1100px){.grid{grid-template-columns:repeat(4,1fr)}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;transition:border-color 0.2s,transform 0.2s,background 0.2s,box-shadow 0.2s;display:block;color:inherit;position:relative;overflow:visible}
@@ -3264,7 +3286,7 @@ const AGENT_CSS = `
 @media(max-width:768px){.agent-banner{height:160px}}
 
 /* Profile card - overlapping banner */
-.agent-profile-card{position:relative;margin-top:-80px;padding:0;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;width:min(1900px,calc(100vw - 30px));max-width:none;margin-left:auto;margin-right:auto}
+.agent-profile-card{position:relative;margin-top:-80px;padding:0;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;width:min(1720px,calc(100vw - 30px));max-width:none;margin-left:auto;margin-right:auto}
 .agent-avatar{width:120px;height:120px;border-radius:12px;border:3px solid var(--agent-color,#6ee7b7);background:var(--surface);overflow:hidden;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
 .agent-avatar img{width:100%;height:100%;object-fit:cover}
 .agent-avatar .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface);color:var(--agent-color,#6ee7b7)}
@@ -3275,7 +3297,7 @@ const AGENT_CSS = `
 .agent-role{font-size:15px;color:var(--secondary);letter-spacing:1px;margin-top:4px}
 
 /* Stats row */
-.agent-stats-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:20px;width:min(1900px,calc(100vw - 30px));max-width:none;margin-left:auto;margin-right:auto}
+.agent-stats-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:20px;width:min(1720px,calc(100vw - 30px));max-width:none;margin-left:auto;margin-right:auto}
 .agent-stats-grid{display:flex;flex-wrap:wrap;gap:24px}
 .stat-item{text-align:center}
 .stat-number{font-size:20px;color:var(--agent-color,#6ee7b7);font-weight:400;display:block}
@@ -3286,10 +3308,13 @@ const AGENT_CSS = `
 @media(max-width:768px){.agent-stats-row{padding:14px 16px;margin-bottom:16px}.agent-stats-grid{gap:18px}.agent-action-row{width:100%;justify-content:flex-start}.agent-action-btn{width:100%}}
 
 /* Two-column layout */
-.agent-layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:28px;padding:0;width:min(1900px,calc(100vw - 30px));max-width:none;margin:0 auto}
+.agent-layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:24px;padding:0;width:100%;max-width:none;margin:0 auto}
 @media(max-width:768px){.agent-layout{grid-template-columns:1fr;padding:0 16px;gap:18px}}
 .agent-gallery{min-width:0}
-.agent-gallery .grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.agent-gallery .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:1460px){.agent-gallery .grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:980px){.agent-gallery .grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:768px){.agent-gallery .grid{grid-template-columns:1fr}}
 .agent-pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin:22px 0 6px}
 .agent-page-btn{display:inline-flex;align-items:center;justify-content:center;min-width:132px;min-height:42px;padding:0 16px;border:1px solid rgba(122,155,171,.38);border-radius:999px;background:rgba(122,155,171,.08);color:var(--primary);font-size:11px;letter-spacing:1.4px;text-transform:uppercase;text-decoration:none;transition:background .2s,color .2s,border-color .2s}
 .agent-page-btn:hover{background:rgba(122,155,171,.14);border-color:rgba(122,155,171,.62);color:#d7e6eb}
@@ -10574,6 +10599,7 @@ For image work:
         const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
         if (!piece) return json({ error: 'Not found' }, 404);
         const layers = await db.prepare('SELECT agent_id, agent_name, round_number FROM layers WHERE piece_id = ? ORDER BY round_number').bind(id).all();
+        const receiptCollaborators = await resolveReceiptCollaborators(db, piece);
         // Also check piece_collaborators and agent_a/b fields for collaborator names
         const collabs = await db.prepare('SELECT pc.agent_id, pc.agent_name, a.type as agent_type FROM piece_collaborators pc LEFT JOIN agents a ON pc.agent_id = a.id WHERE pc.piece_id = ? ORDER BY pc.round_number').bind(id).all();
         let agents = [...new Set(layers.results.map(l => l.agent_name || l.agent_id))];
@@ -10585,23 +10611,43 @@ For image work:
           const names = [piece.agent_a_name, piece.agent_b_name].filter(Boolean);
           if (names.length > agents.length) agents = [...new Set(names)];
         }
+        const artistTraits = uniqueNonEmptyStrings([
+          ...receiptCollaborators.map((c) => c.agentName || c.agentId),
+          ...agents
+        ]);
+        const guardianTraits = uniqueNonEmptyStrings(await Promise.all(
+          receiptCollaborators.map(async (collaborator) => {
+            if (collaborator.guardianXHandle) return `@${collaborator.guardianXHandle}`;
+            const rawGuardian = String(collaborator.guardianAddress || '').trim();
+            if (!rawGuardian) return '';
+            const normalizedGuardian = normalizeAddress(rawGuardian);
+            if (normalizedGuardian) {
+              const guardianRow = await db.prepare(
+                'SELECT x_handle FROM guardians WHERE LOWER(address) = ? LIMIT 1'
+              ).bind(normalizedGuardian.toLowerCase()).first().catch(() => null);
+              if (guardianRow?.x_handle) return `@${guardianRow.x_handle}`;
+            }
+            return rawGuardian;
+          })
+        ));
         const hasImage = await db.prepare('SELECT 1 FROM piece_images WHERE piece_id = ?').bind(id).first();
         const pieceForPreview = {
           ...piece,
           _has_image: !!hasImage,
-          _collaborator_names: agents,
+          _collaborator_names: artistTraits.length > 0 ? artistTraits : agents,
           collaborators: (collabs.results || []).map(c => ({ agent_name: c.agent_name, agent_id: c.agent_id }))
         };
         const pieceAccessibility = pieceAccessibilityText(pieceForPreview, { surface: 'full' });
 
         // Determine if this is an interactive piece (code/game/reaction)
-        const isInteractive = ['code', 'game', 'reaction'].includes(piece.method);
-        const composition = piece.composition || (agents.length > 1 ? (agents.length === 2 ? 'duo' : agents.length === 3 ? 'trio' : 'quad') : 'solo');
+        const pieceMethod = String(piece.method || '').trim().toLowerCase() || 'single';
+        const isInteractive = ['code', 'game', 'reaction'].includes(pieceMethod);
+        const composition = normalizeCompositionLabel(piece.composition || piece.mode, artistTraits.length || agents.length);
 
         const metadata = {
           name: piece.title || 'Untitled',
-          description: piece.description || `AI-generated art from DeviantClaw. Created by ${agents.join(', ') || 'unknown agent'}.`,
-          created_by: agents.join(', ') || 'unknown agent',
+          description: piece.description || `AI-generated art from DeviantClaw. Created by ${artistTraits.join(', ') || 'unknown agent'}.`,
+          created_by: artistTraits.join(', ') || 'unknown agent',
           image: absoluteUrl(url.origin, piecePreviewImagePath(pieceForPreview)) || undefined,
           // animation_url for interactive pieces (SuperRare renders these)
           animation_url: isInteractive ? `https://deviantclaw.art/api/pieces/${id}/view` : undefined,
@@ -10611,17 +10657,12 @@ For image work:
           accessibility_summary: pieceAccessibility.accessibilitySummary,
           attributes: [
             { trait_type: 'Composition', value: composition },
-            { trait_type: 'Method', value: piece.method || 'single' },
-            ...(collabs.results.length > 0
-              ? collabs.results.map(c => ({
-                  trait_type: (c.agent_type === 'subagent') ? 'Subagent' : 'Agent',
-                  value: c.agent_name
-                }))
-              : agents.map(a => ({ trait_type: 'Agent', value: a }))
-            ),
+            { trait_type: 'Method', value: pieceMethod },
+            ...artistTraits.map((artist) => ({ trait_type: 'Artist', value: artist })),
+            ...guardianTraits.map((guardian) => ({ trait_type: 'Guardian', value: guardian })),
             { trait_type: 'Layers', value: Math.max(layers.results.length, collabs.results.length) },
             { trait_type: 'Status', value: piece.status },
-            { trait_type: 'Foil', value: pieceFoilLabel(piece) },
+            { trait_type: 'Foil', value: pieceStoredFoilLabel(piece) },
             { trait_type: 'Revenue Split', value: composition === 'solo' ? '97% artist / 3% gallery' : composition === 'duo' ? '48.5% each / 3% gallery' : composition === 'trio' ? '32.33% each / 3% gallery' : '24.25% each / 3% gallery' },
             { trait_type: 'Auction Upgrade', value: 'Silver 0.1 ETH → Gold 0.5 ETH → Rare Diamond 1 ETH' },
             { trait_type: 'Created', display_type: 'date', value: piece.created_at ? Math.floor(new Date(piece.created_at + 'Z').getTime() / 1000) : 0 },
