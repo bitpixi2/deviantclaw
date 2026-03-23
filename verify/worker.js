@@ -324,6 +324,7 @@ function cors() {
 // ========== HTML ==========
 
 function renderVerifyPage(config) {
+  const logo = 'https://deviantclaw.art/logo.png';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -335,10 +336,10 @@ function renderVerifyPage(config) {
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:radial-gradient(circle at 14% -6%,rgba(180,213,223,0.14),transparent 28%),radial-gradient(circle at 84% 8%,rgba(214,179,194,0.10),transparent 22%),linear-gradient(180deg,#000 0%,#030407 48%,#000 100%); color:var(--text); font-family:'Courier New',monospace; }
     .bg-canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; opacity:0.18; mix-blend-mode:screen; filter:saturate(0.94) contrast(1.02); }
-    .site-nav { position:relative; z-index:2; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:18px; padding:22px 24px; border-bottom:1px solid var(--border); min-height:84px; }
-    .brand-wrap { grid-column:1; justify-self:start; display:flex; align-items:center; min-width:0; }
-    .wordmark { font-size:24px; letter-spacing:4px; line-height:1; color:#d9e6ec; text-transform:uppercase; text-shadow:0 6px 18px rgba(0,0,0,0.22); }
-    .nav-links { grid-column:3; justify-self:end; display:flex; align-items:center; gap:24px; font-size:14px; letter-spacing:1px; text-transform:uppercase; }
+    .site-nav { position:relative; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:18px 24px; border-bottom:1px solid var(--border); min-height:74px; }
+    .brand-wrap { display:flex; align-items:center; min-width:0; flex:0 0 auto; }
+    .brand-wrap img { width:152px; max-width:42vw; height:auto; display:block; filter:drop-shadow(0 8px 20px rgba(0,0,0,0.26)); }
+    .nav-links { display:flex; align-items:center; gap:24px; font-size:14px; letter-spacing:1px; text-transform:uppercase; flex:0 0 auto; }
     .nav-links a { color:var(--dim); text-decoration:none; display:inline-flex; align-items:center; min-height:42px; }
     .nav-links a:hover { color:var(--primary); }
     .verify-stage { position:relative; z-index:1; padding:44px 24px 72px; }
@@ -402,14 +403,13 @@ function renderVerifyPage(config) {
       .site-nav { padding:22px 32px; }
     }
     @media(max-width:640px) {
-      .site-nav { grid-template-columns:1fr; justify-items:center; gap:8px; padding:24px 16px 16px; min-height:auto; text-align:center; }
-      .brand-wrap, .nav-links { grid-column:auto; justify-self:center; }
-      .nav-links { justify-self:center; font-size:12px; letter-spacing:2px; }
+      .site-nav { padding:16px 16px 14px; min-height:auto; }
+      .brand-wrap img { width:128px; max-width:46vw; }
+      .nav-links { font-size:12px; letter-spacing:2px; }
       .verify-stage { padding:28px 12px 52px; }
       .verify-shell { gap:14px; }
       .verify-intro { max-width:520px; }
       .verify-intro p { font-size:14px; line-height:1.6; }
-      .wordmark { font-size:22px; letter-spacing:3px; }
       .card { min-height:auto; padding:20px 16px; gap:18px; border-radius:16px; }
       .field-grid-two { grid-template-columns:1fr; }
       .action-grid { grid-template-columns:1fr; }
@@ -430,7 +430,7 @@ function renderVerifyPage(config) {
   <canvas id="bg-canvas" class="bg-canvas" aria-hidden="true"></canvas>
   <nav class="site-nav">
     <div class="brand-wrap">
-      <div class="wordmark">DEVIANTCLAW</div>
+      <a href="https://deviantclaw.art" aria-label="DeviantClaw home"><img src="${logo}" alt="DeviantClaw" /></a>
     </div>
     <div class="nav-links">
       <a href="https://deviantclaw.art">back to gallery</a>

@@ -5614,7 +5614,7 @@ async function renderArtists(db) {
   const allCards = newcomerCards + featuredCards;
 
   const artistCSS = `
-.artists-page{max-width:1360px;margin:0 auto;padding:24px}
+.artists-page{max-width:1560px;margin:0 auto;padding:22px 16px 28px}
 .artists-page h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
 .artists-page .subtitle{font-size:13px;color:var(--dim);letter-spacing:1px;margin-bottom:28px;max-width:720px}
 .artists-section{margin-top:26px}
@@ -5624,6 +5624,7 @@ async function renderArtists(db) {
 .artists-section-note{font-size:12px;color:var(--dim);letter-spacing:.8px}
 .artists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:22px}
 @media(min-width:1200px){.artists-grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1400px){.artists-page{padding-left:12px;padding-right:12px}}
 .artist-card{display:block;background:linear-gradient(180deg,rgba(9,12,17,0.98),rgba(14,18,24,0.96));border:1px solid rgba(122,155,171,0.2);border-radius:20px;overflow:hidden;text-decoration:none;transition:transform .2s,border-color .2s,box-shadow .2s;position:relative;box-shadow:0 10px 30px rgba(0,0,0,0.22)}
 .artist-card::before{content:'';position:absolute;inset:0;background:linear-gradient(160deg,color-mix(in srgb,var(--ac) 14%,transparent),transparent 42%,rgba(255,255,255,0.02) 100%);pointer-events:none;opacity:.9}
 .artist-card:hover{border-color:color-mix(in srgb,var(--ac) 54%,rgba(255,255,255,0.18));transform:translateY(-3px);box-shadow:0 18px 42px rgba(0,0,0,0.3)}
