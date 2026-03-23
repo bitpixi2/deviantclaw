@@ -7226,6 +7226,11 @@ async function renderAgent(db, agentId, env, url) {
   const delegationHTML = `
     <div class="sidebar-section" id="delegation-section">
       <h3>Delegation for Daily Auto</h3>
+      <div style="margin:0 0 12px">
+        <label for="delegation-api-key" style="display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Guardian API Key</label>
+        <input id="delegation-api-key" type="password" placeholder="Optional if already stored from /verify" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font:12px Courier New" />
+        <div style="margin-top:6px;font-size:11px;line-height:1.55;color:var(--dim)">Fresh browser? Paste the verify API key here. The page also checks the stored cookie and local key automatically.</div>
+      </div>
       <div id="delegation-status" style="font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.65"></div>
       <div style="margin-top:8px;font-size:11px;line-height:1.65">
         <a href="/Heartbeat.md" style="color:var(--agent-color);text-decoration:none">Heartbeat (optional)</a>
@@ -7259,11 +7264,43 @@ async function renderAgent(db, agentId, env, url) {
     const statusEl = document.getElementById('delegation-status');
     const actionsEl = document.getElementById('delegation-actions');
     const delegatedPill = document.getElementById('agent-delegated-pill');
+    const delegationApiKeyInput = document.getElementById('delegation-api-key');
     let connectedWallet = '';
     let currentState = config.initialState || {};
     let delegationRuntimePromise = null;
     const delegationAutostart = new URLSearchParams(window.location.search).get('delegation') === '1';
     let delegationAutostartUsed = false;
+
+    function getCookieValue(name) {
+      const prefix = name + '=';
+      const parts = String(document.cookie || '').split(';');
+      for (const rawPart of parts) {
+        const part = rawPart.trim();
+        if (part.startsWith(prefix)) return decodeURIComponent(part.slice(prefix.length));
+      }
+      return '';
+    }
+
+    function getGuardianApiKey() {
+      return String(
+        delegationApiKeyInput?.value ||
+        localStorage.getItem('deviantclaw_api_key') ||
+        getCookieValue('dc_key') ||
+        ''
+      ).trim();
+    }
+
+    function authHeaders() {
+      const apiKey = getGuardianApiKey();
+      return apiKey ? { 'Authorization': 'Bearer ' + apiKey } : {};
+    }
+
+    (function hydrateDelegationApiKey() {
+      const key = getGuardianApiKey();
+      if (key && delegationApiKeyInput && !delegationApiKeyInput.value) {
+        delegationApiKeyInput.value = key;
+      }
+    })();
 
     async function getDelegationRuntimeModules() {
       if (!delegationRuntimePromise) {
@@ -7546,7 +7583,7 @@ async function renderAgent(db, agentId, env, url) {
         await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1, timeout: 120000 });
         const res = await fetch('/api/agents/' + encodeURIComponent(config.agentId) + '/delegate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({
             guardianAddress: connectedWallet,
             delegateTarget: config.relayerAddress,
@@ -7607,7 +7644,7 @@ async function renderAgent(db, agentId, env, url) {
         await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1, timeout: 120000 });
         const res = await fetch('/api/agents/' + encodeURIComponent(config.agentId) + '/delegate', {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({
             guardianAddress: connectedWallet,
             disableTxHash: txHash
