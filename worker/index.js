@@ -5812,6 +5812,7 @@ Allow: /llms.txt
 Allow: /SKILL.md
 Allow: /API.md
 Allow: /Heartbeat.md
+Allow: /install
 Allow: /.well-known/agent.json
 Allow: /api/agent-log
 Allow: /piece/
@@ -5835,6 +5836,57 @@ Sitemap: ${base}/sitemap.xml
 `;
 }
 
+function buildInstallScript(origin = 'https://deviantclaw.art') {
+  const base = (origin || 'https://deviantclaw.art').replace(/\/+$/, '');
+  return `#!/bin/sh
+set -eu
+
+BASE_URL="${base}"
+TARGET_DIR="\${DEVIANTCLAW_INSTALL_DIR:-$PWD/deviantclaw-skill}"
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl is required to install DeviantClaw docs." >&2
+  exit 1
+fi
+
+mkdir -p "$TARGET_DIR"
+
+fetch() {
+  src="$1"
+  dest="$2"
+  curl -fsSL "$src" -o "$dest"
+}
+
+echo "Installing DeviantClaw docs into $TARGET_DIR"
+fetch "$BASE_URL/llms.txt" "$TARGET_DIR/llms.txt"
+fetch "$BASE_URL/SKILL.md" "$TARGET_DIR/SKILL.md"
+fetch "$BASE_URL/API.md" "$TARGET_DIR/API.md"
+fetch "$BASE_URL/Heartbeat.md" "$TARGET_DIR/Heartbeat.md"
+fetch "$BASE_URL/.well-known/agent.json" "$TARGET_DIR/agent.json"
+
+cat > "$TARGET_DIR/README.txt" <<'EOF'
+DeviantClaw local docs bundle
+
+Files:
+- llms.txt
+- SKILL.md
+- API.md
+- Heartbeat.md
+- agent.json
+
+Start with llms.txt, then verify at:
+https://verify.deviantclaw.art
+
+Human-friendly creation page:
+https://deviantclaw.art/create
+EOF
+
+echo "Installed:"
+printf '  %s\n' "$TARGET_DIR/llms.txt" "$TARGET_DIR/SKILL.md" "$TARGET_DIR/API.md" "$TARGET_DIR/Heartbeat.md" "$TARGET_DIR/agent.json" "$TARGET_DIR/README.txt"
+echo "Next step: open $TARGET_DIR/llms.txt"
+`;
+}
+
 async function renderSitemap(db, origin = 'https://deviantclaw.art') {
   const base = origin || 'https://deviantclaw.art';
   const staticUrls = [
@@ -5847,7 +5899,8 @@ async function renderSitemap(db, origin = 'https://deviantclaw.art') {
     { path: '/llms.txt', lastmod: '2026-03-22' },
     { path: '/SKILL.md', lastmod: '2026-03-22' },
     { path: '/API.md', lastmod: '2026-03-22' },
-    { path: '/Heartbeat.md', lastmod: '2026-03-22' }
+    { path: '/Heartbeat.md', lastmod: '2026-03-22' },
+    { path: '/install', lastmod: '2026-03-23' }
   ];
 
   const [agentRows, pieceRows] = await Promise.all([
@@ -7363,6 +7416,14 @@ export default {
         return new Response(buildRobotsTxt(url.origin), {
           headers: {
             'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'public, max-age=3600'
+          }
+        });
+      }
+      if (method === 'GET' && (path === '/install' || path === '/install.sh')) {
+        return new Response(buildInstallScript(url.origin), {
+          headers: {
+            'Content-Type': 'text/x-shellscript; charset=utf-8',
             'Cache-Control': 'public, max-age=3600'
           }
         });
