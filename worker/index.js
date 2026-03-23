@@ -3275,6 +3275,31 @@ const PIECE_CSS = `
 .piece-details{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)}
 @media(max-width:640px){.piece-details{grid-template-columns:1fr}}
 .piece-details .detail-section{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
+.piece-guardian-panel{display:grid;gap:16px;padding:18px;background:linear-gradient(180deg,rgba(14,18,24,.94),rgba(10,12,18,.98));border:1px solid rgba(122,155,171,.26);border-radius:18px;box-shadow:0 18px 36px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.04)}
+.piece-guardian-panel h3{font-size:12px;letter-spacing:2.2px;text-transform:uppercase;color:var(--dim);margin:0}
+.piece-guardian-copy{display:grid;gap:8px}
+.piece-guardian-status{min-height:22px;font-size:14px;line-height:1.65;color:var(--text,#e0e0e0)}
+.piece-guardian-block{display:grid;gap:8px;padding:14px 16px;border:1px solid rgba(122,155,171,.18);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.015))}
+.piece-guardian-label{display:block;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim)}
+.piece-guardian-input{width:100%;padding:13px 14px;border-radius:12px;border:1px solid rgba(122,155,171,.28);background:rgba(255,255,255,.04);color:var(--text,#e0e0e0);font:13px 'Courier New',monospace}
+.piece-guardian-input::placeholder{color:#7f8a97}
+.piece-guardian-note{font-size:12px;line-height:1.65;color:var(--dim)}
+.piece-guardian-connect{display:none}
+.piece-guardian-actions{display:flex;flex-wrap:wrap;gap:10px}
+.piece-guardian-actions button,.piece-guardian-actions a,.piece-guardian-connect button{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;text-decoration:none;font-family:inherit;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,background .18s ease,border-color .18s ease,color .18s ease}
+.piece-guardian-actions button:hover,.piece-guardian-actions a:hover,.piece-guardian-connect button:hover{transform:translateY(-1px);box-shadow:0 10px 20px rgba(0,0,0,.22)}
+.piece-guardian-connect button{background:linear-gradient(135deg,#7ad7d0,#6cb8ea 54%,#f29ac5);color:#031018;border:none}
+.piece-guardian-connect button:hover{filter:saturate(1.05)}
+.piece-guardian-btn-approve{background:#22c55e;color:#04110a;border:none}
+.piece-guardian-btn-delegate{display:none;background:rgba(255,184,107,0.12);color:#ffd39a;border:1px solid rgba(255,184,107,0.34)}
+.piece-guardian-btn-reject{background:#ef4444;color:#fff;border:none}
+.piece-guardian-btn-delete{background:transparent;color:#ef7c8b;border:1px solid rgba(239,68,68,.34)}
+.piece-guardian-btn-mint{background:#2f2f2f;color:#9ca3af;border:1px solid #454545}
+.piece-guardian-result{margin-top:2px;font-size:13px;line-height:1.65;display:none}
+@media(max-width:640px){
+  .piece-guardian-panel{padding:16px}
+  .piece-guardian-actions button,.piece-guardian-actions a,.piece-guardian-connect button{width:100%}
+}
 .detail-section h3{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
 `;
 
@@ -6761,23 +6786,25 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
   const mintReady = status === 'approved';
   if (status !== 'minted' && status !== 'deleted') {
     guardianActionsHTML = `
-    <div id="guardian-actions" style="display:none;margin-top:10px;padding:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border,#2a2a35);border-radius:8px">
-      <h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:10px">Guardian Actions</h3>
-      <div id="guardian-status" style="margin-bottom:10px;font-size:13px;color:var(--text,#e0e0e0)"></div>
-      <div style="margin-bottom:10px">
-        <label for="piece-api-key" style="display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Guardian API Key</label>
-        <input id="piece-api-key" type="password" placeholder="Optional if already stored from /verify" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border,#2a2a35);background:rgba(255,255,255,0.03);color:var(--text,#e0e0e0);font:12px Courier New" />
-        <div style="margin-top:6px;font-size:11px;line-height:1.55;color:var(--dim)">Fresh browser? Paste the verify API key here. The page also checks the stored cookie and local key automatically.</div>
+    <div id="guardian-actions" class="piece-guardian-panel" style="display:none">
+      <div class="piece-guardian-copy">
+        <h3>Guardian Actions</h3>
+        <div id="guardian-status" class="piece-guardian-status"></div>
       </div>
-      <div id="guardian-connect" style="display:none;margin-bottom:10px"><button id="btn-connect" onclick="connectWalletForApproval()" style="padding:10px 18px;background:var(--primary,#6ee7b7);color:#000;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Connect Wallet</button></div>
-      <div id="guardian-buttons" style="display:flex;gap:8px;flex-wrap:wrap">
-        <button id="btn-approve" onclick="guardianAction('approve')" style="padding:10px 20px;background:#22c55e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">Approve Mint</button>
-        <a id="btn-delegate" href="#" style="display:none;align-items:center;justify-content:center;padding:10px 20px;background:rgba(255,184,107,0.14);color:#ffb86b;border:1px solid rgba(255,184,107,0.42);border-radius:6px;font-size:14px;font-weight:600;text-decoration:none">MetaMask Auto-Approve</a>
-        <button id="btn-reject" onclick="guardianAction('reject')" style="padding:10px 20px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">Reject</button>
-        <button id="btn-delete" onclick="guardianAction('delete')" style="padding:10px 20px;background:transparent;color:#ef4444;border:1px solid #ef444466;border-radius:6px;font-size:14px;cursor:pointer">Delete Piece</button>
-        <button id="btn-mint" onclick="guardianMint()" ${mintReady ? '' : 'disabled'} style="padding:10px 20px;background:${mintReady ? '#84cc16' : '#2f2f2f'};color:${mintReady ? '#04110a' : '#9ca3af'};border:1px solid ${mintReady ? '#a3e635' : '#454545'};border-radius:6px;font-size:14px;font-weight:700;cursor:${mintReady ? 'pointer' : 'not-allowed'}">Mint Piece</button>
+      <div class="piece-guardian-block">
+        <label for="piece-api-key" class="piece-guardian-label">Guardian API Key</label>
+        <input id="piece-api-key" class="piece-guardian-input" type="password" placeholder="Optional if already stored from /verify" />
+        <div class="piece-guardian-note">Fresh browser? Paste the verify API key here. The page also checks the stored cookie and local key automatically.</div>
       </div>
-      <div id="guardian-result" style="margin-top:10px;font-size:13px;display:none"></div>
+      <div id="guardian-connect" class="piece-guardian-connect"><button id="btn-connect" onclick="connectWalletForApproval()">Connect Wallet</button></div>
+      <div id="guardian-buttons" class="piece-guardian-actions">
+        <button id="btn-approve" class="piece-guardian-btn-approve" onclick="guardianAction('approve')">Approve Mint</button>
+        <a id="btn-delegate" class="piece-guardian-btn-delegate" href="#">MetaMask Auto-Approve</a>
+        <button id="btn-reject" class="piece-guardian-btn-reject" onclick="guardianAction('reject')">Reject</button>
+        <button id="btn-delete" class="piece-guardian-btn-delete" onclick="guardianAction('delete')">Delete Piece</button>
+        <button id="btn-mint" class="piece-guardian-btn-mint" onclick="guardianMint()" ${mintReady ? '' : 'disabled'} style="background:${mintReady ? '#84cc16' : '#2f2f2f'};color:${mintReady ? '#04110a' : '#9ca3af'};border-color:${mintReady ? '#a3e635' : '#454545'};cursor:${mintReady ? 'pointer' : 'not-allowed'}">Mint Piece</button>
+      </div>
+      <div id="guardian-result" class="piece-guardian-result"></div>
     </div>
 
     <script>
