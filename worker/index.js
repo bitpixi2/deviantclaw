@@ -3407,6 +3407,8 @@ const PIECE_CSS = `
 .piece-details{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)}
 @media(max-width:640px){.piece-details{grid-template-columns:1fr}}
 .piece-details .detail-section{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
+.piece-manual-section{max-width:760px;margin:22px auto 0;padding-top:22px;border-top:1px solid var(--border)}
+.piece-manual-section .piece-guardian-panel{display:grid}
 .piece-guardian-panel{display:grid;gap:16px;padding:18px;background:linear-gradient(180deg,rgba(14,18,24,.94),rgba(10,12,18,.98));border:1px solid rgba(122,155,171,.26);border-radius:18px;box-shadow:0 18px 36px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.04)}
 .piece-guardian-panel h3{font-size:12px;letter-spacing:2.2px;text-transform:uppercase;color:var(--dim);margin:0}
 .piece-guardian-copy{display:grid;gap:8px}
@@ -3428,7 +3430,9 @@ const PIECE_CSS = `
 .piece-guardian-btn-delete{background:transparent;color:#ef7c8b;border:1px solid rgba(239,68,68,.34)}
 .piece-guardian-btn-mint{background:#2f2f2f;color:#9ca3af;border:1px solid #454545}
 .piece-guardian-result{margin-top:2px;font-size:13px;line-height:1.65;display:none}
+.piece-guardian-connect-note{font-size:12px;line-height:1.7;color:var(--dim)}
 @media(max-width:640px){
+  .piece-manual-section{margin-top:18px;padding-top:18px}
   .piece-guardian-panel{padding:16px}
   .piece-guardian-actions button,.piece-guardian-actions a,.piece-guardian-connect button{width:100%}
 }
@@ -3515,13 +3519,21 @@ const AGENT_CSS = `
 .agent-badge-note{font-size:10px;color:var(--dim);line-height:1.5;margin-top:2px}
 .agent-badge-link{text-decoration:none}
 .agent-badge-link:hover{border-color:var(--agent-color,#6ee7b7)}
-.agent-guardian-info{font-size:12px;color:var(--dim);line-height:1.6}
+.agent-guardian-info{font-size:13px;color:var(--dim);line-height:1.7}
 .agent-guardian-info a{color:var(--agent-color,#6ee7b7)}
-.agent-guardian-info .guardian-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:4px}
+.agent-guardian-info .guardian-label{font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:var(--dim);margin-bottom:4px}
 .guardian-ens-link{color:var(--agent-color,#6ee7b7)}
-.guardian-ens-cta{display:inline-flex;align-items:center;gap:10px;margin-top:10px;padding:10px 14px;border:1px solid rgba(255,255,255,0.12);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;letter-spacing:1.2px;text-transform:uppercase;text-decoration:none;transition:border-color .2s,background .2s,color .2s}
-.guardian-ens-cta:hover{border-color:rgba(255,255,255,0.28);background:rgba(255,255,255,0.06);color:#fff}
+.guardian-ens-cta{display:inline-flex;align-items:center;gap:10px;margin-top:12px;padding:12px 16px;border:1px solid rgba(237,243,246,0.42);border-radius:999px;background:linear-gradient(90deg,rgba(237,243,246,0.96),rgba(168,198,207,0.9) 32%,rgba(184,150,168,0.88) 68%,rgba(211,193,142,0.9));color:#091015;font-size:13px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;text-decoration:none;box-shadow:0 10px 24px rgba(0,0,0,.18);transition:transform .18s ease,box-shadow .18s ease,filter .18s ease,color .18s ease}
+.guardian-ens-cta:hover{transform:translateY(-1px);box-shadow:0 14px 28px rgba(0,0,0,.24);filter:brightness(1.03);color:#040608}
 .guardian-ens-cta img{display:block;width:34px;height:auto;flex-shrink:0;filter:brightness(0) invert(1)}
+.agent-delegation-panel label{display:block;font-size:12px;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+.agent-delegation-panel input{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font:13px 'Courier New',monospace}
+.agent-delegation-note{margin-top:7px;font-size:12px;line-height:1.7;color:var(--dim)}
+.agent-delegation-status{font-size:15px;color:var(--text);margin-bottom:12px;line-height:1.72}
+.agent-delegation-subnote{margin-top:10px;font-size:12px;line-height:1.7}
+.agent-delegation-subnote a{color:var(--agent-color,#6ee7b7);text-decoration:none}
+.agent-delegation-actions{margin-top:14px}
+.agent-delegation-actions button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;padding:0 18px}
 .agent-joined{font-size:13px;color:var(--dim);margin-top:8px}
 .agent-delete-link{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#7b8794;text-decoration:none}
 .agent-delete-link svg{width:14px;height:14px;flex-shrink:0}
@@ -6928,7 +6940,10 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
         <input id="piece-api-key" class="piece-guardian-input" type="password" placeholder="Optional if already stored from /verify" />
         <div class="piece-guardian-note">Fresh browser? Paste the verify API key here. The page also checks the stored cookie and local key automatically.</div>
       </div>
-      <div id="guardian-connect" class="piece-guardian-connect"><button id="btn-connect" onclick="connectWalletForApproval()">Connect Wallet</button></div>
+      <div id="guardian-connect" class="piece-guardian-connect">
+        <button id="btn-connect" onclick="connectWalletForApproval()">Connect Wallet</button>
+        <div class="piece-guardian-connect-note">Connect the guardian wallet to approve, reject, delete, or mint from this page.</div>
+      </div>
       <div id="guardian-buttons" class="piece-guardian-actions">
         <button id="btn-approve" class="piece-guardian-btn-approve" onclick="guardianAction('approve')">Approve Mint</button>
         <a id="btn-delegate" class="piece-guardian-btn-delegate" href="#">MetaMask Auto-Approve</a>
@@ -7243,8 +7258,8 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
         } else {
           document.getElementById('guardian-actions').style.display = 'block';
           document.getElementById('guardian-buttons').style.display = 'none';
-          document.getElementById('guardian-connect').style.display = 'block';
-          document.getElementById('guardian-status').textContent = 'Connect wallet to approve/reject/mint.';
+          document.getElementById('guardian-connect').style.display = 'grid';
+          document.getElementById('guardian-status').textContent = 'Manual guardian actions start here. Connect wallet to approve, reject, delete, or mint.';
         }
       });
       window.ethereum.on?.('accountsChanged', (accounts) => {
@@ -7252,9 +7267,9 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
         if (connectedAddress) checkGuardianStatus();
         else {
           document.getElementById('guardian-actions').style.display = 'block';
-          document.getElementById('guardian-connect').style.display = 'block';
+          document.getElementById('guardian-connect').style.display = 'grid';
           document.getElementById('guardian-buttons').style.display = 'none';
-          document.getElementById('guardian-status').textContent = 'Connect wallet to approve/reject/mint.';
+          document.getElementById('guardian-status').textContent = 'Manual guardian actions start here. Connect wallet to approve, reject, delete, or mint.';
         }
       });
     }
@@ -7303,7 +7318,6 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
   const detailSections = [];
   if (layersHTML) detailSections.push(layersHTML);
   if (approvalsHTML) detailSections.push(approvalsHTML);
-  if (guardianActionsHTML) detailSections.push(guardianActionsHTML);
   if (joinHTML) detailSections.push(joinHTML);
   if (mintHTML) detailSections.push(mintHTML);
 
@@ -7323,6 +7337,7 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
   ${piece.description ? `<p class="piece-desc">${esc(piece.description)}</p>` : ''}
   <p class="piece-layout-note"><strong>Layout:</strong> ${esc(pieceAccessibility.layoutDescription)}</p>
   ${detailSections.length > 0 ? `<div class="piece-details">${detailSections.join('')}</div>` : ''}
+  ${guardianActionsHTML ? `<div class="piece-manual-section">${guardianActionsHTML}</div>` : ''}
 </div>`;
 
   const pieceImage = absoluteUrl(origin, piecePreviewImagePath(piece)) || 'https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg';
@@ -7550,23 +7565,23 @@ async function renderAgent(db, agentId, env, url) {
 
   // Delegation section
   const delegationHTML = `
-    <div class="sidebar-section" id="delegation-section">
+    <div class="sidebar-section agent-delegation-panel" id="delegation-section">
       <h3>Delegation for Daily Auto</h3>
       <div style="margin:0 0 12px">
-        <label for="delegation-api-key" style="display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Guardian API Key</label>
-        <input id="delegation-api-key" type="password" placeholder="Optional if already stored from /verify" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font:12px Courier New" />
-        <div style="margin-top:6px;font-size:11px;line-height:1.55;color:var(--dim)">Fresh browser? Paste the verify API key here. The page also checks the stored cookie and local key automatically.</div>
+        <label for="delegation-api-key">Guardian API Key</label>
+        <input id="delegation-api-key" type="password" placeholder="Optional if already stored from /verify" />
+        <div class="agent-delegation-note">Fresh browser? Paste the verify API key here. The page also checks the stored cookie and local key automatically.</div>
       </div>
-      <div id="delegation-status" style="font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.65"></div>
-      <div style="margin-top:8px;font-size:11px;line-height:1.65">
+      <div id="delegation-status" class="agent-delegation-status"></div>
+      <div class="agent-delegation-subnote">
         <a href="/Heartbeat.md" style="color:var(--agent-color);text-decoration:none">Heartbeat (optional)</a>
         <span style="color:var(--dim)"> for agents that already run a scheduler, loop, reminder flow, or manual ritual to create.</span>
       </div>
-      <div style="margin-top:8px;font-size:11px;line-height:1.65">
+      <div class="agent-delegation-subnote">
         <a href="#delegation-section" style="color:var(--agent-color);text-decoration:none">Delegation (optional)</a>
         <span style="color:var(--dim)"> for guardians who want to let their agent auto-approve art to go to auction.</span>
       </div>
-      <div id="delegation-actions" style="margin-top:12px">
+      <div id="delegation-actions" class="agent-delegation-actions">
         <button type="button" id="delegation-enable-primary-initial" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:11px 18px;background:#fff;color:#111;border:1px solid rgba(255,255,255,0.16);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold">
           <img src="/assets/brands/metamask.svg" alt="" aria-hidden="true" style="display:block;width:18px;height:18px;flex-shrink:0" />
           <span>Enable MetaMask Delegation</span>
