@@ -1833,6 +1833,13 @@ const DEVIANTCLAW_DELEGATION_ABI = [
 const DEVIANTCLAW_PIECE_BRIDGE_ABI = [
   {
     type: 'function',
+    name: 'approvePiece',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'pieceId', type: 'uint256' }],
+    outputs: []
+  },
+  {
+    type: 'function',
     name: 'agentRegistered',
     stateMutability: 'view',
     inputs: [{ name: 'agentId', type: 'string' }],
@@ -1889,9 +1896,33 @@ const DEVIANTCLAW_PIECE_BRIDGE_ABI = [
   },
   {
     type: 'function',
+    name: 'getPieceStatus',
+    stateMutability: 'view',
+    inputs: [{ name: 'pieceId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint8' }]
+  },
+  {
+    type: 'function',
     name: 'getPieceIdByExternalId',
     stateMutability: 'view',
     inputs: [{ name: 'externalId', type: 'string' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    type: 'function',
+    name: 'mintPiece',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'pieceId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    type: 'function',
+    name: 'mintPiece',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'pieceId', type: 'uint256' },
+      { name: 'to', type: 'address' }
+    ],
     outputs: [{ name: '', type: 'uint256' }]
   },
   {
@@ -1902,6 +1933,17 @@ const DEVIANTCLAW_PIECE_BRIDGE_ABI = [
       { indexed: true, name: 'pieceId', type: 'uint256' },
       { indexed: true, name: 'externalId', type: 'string' },
       { indexed: false, name: 'title', type: 'string' }
+    ]
+  },
+  {
+    type: 'event',
+    name: 'PieceMinted',
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'pieceId', type: 'uint256' },
+      { indexed: true, name: 'tokenId', type: 'uint256' },
+      { indexed: false, name: 'agentIds', type: 'string[]' },
+      { indexed: false, name: 'recipients', type: 'address[]' }
     ]
   }
 ];
@@ -2117,6 +2159,21 @@ function decodePieceProposedLog(viem, log, contractAddress) {
       topics: log.topics
     });
     if (decoded?.eventName !== 'PieceProposed') return null;
+    return decoded.args || null;
+  } catch {
+    return null;
+  }
+}
+
+function decodePieceMintedLog(viem, log, contractAddress) {
+  try {
+    if (!sameAddress(log?.address, contractAddress)) return null;
+    const decoded = viem.decodeEventLog({
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      data: log.data,
+      topics: log.topics
+    });
+    if (decoded?.eventName !== 'PieceMinted') return null;
     return decoded.args || null;
   } catch {
     return null;
@@ -6455,7 +6512,7 @@ const aboutCSS = `.about{max-width:1120px;margin:32px auto;padding:0 28px}
   return htmlResponse(page('About', aboutCSS, body));
 }
 
-async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
+async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
   const piece = await db.prepare('SELECT * FROM pieces WHERE id = ?').bind(id).first();
   if (!piece) {
     return htmlResponse(page('Not Found', '', '<div class="container"><div class="empty-state">Piece not found.</div></div>'), 404);
@@ -6591,11 +6648,58 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
 
     <script>
     const PIECE_ID = '${esc(piece.id)}';
+    const PIECE_CHAIN_PIECE_ID = ${piece.chain_piece_id !== null && piece.chain_piece_id !== undefined && piece.chain_piece_id !== '' ? Number(piece.chain_piece_id) : 'null'};
+    const BASE_CHAIN_ID = 8453;
+    const BASE_CHAIN_HEX = '0x2105';
+    const CONTRACT_ADDRESS = '${esc(String(env?.CONTRACT_ADDRESS || ''))}';
     let connectedAddress = null;
 
     function shortAddress(value) {
       const v = String(value || '').trim();
       return v && v.length > 14 ? v.slice(0, 8) + '…' + v.slice(-4) : v;
+    }
+
+    async function ensureBaseNetwork() {
+      if (!window.ethereum) throw new Error('MetaMask is required.');
+      const currentChain = await window.ethereum.request({ method: 'eth_chainId' });
+      if (currentChain === BASE_CHAIN_HEX) return;
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: BASE_CHAIN_HEX }]
+      });
+    }
+
+    async function waitForProviderReceipt(txHash, timeoutMs = 120000) {
+      const started = Date.now();
+      while (Date.now() - started < timeoutMs) {
+        const receipt = await window.ethereum.request({
+          method: 'eth_getTransactionReceipt',
+          params: [txHash]
+        });
+        if (receipt) {
+          if (receipt.status === '0x1') return receipt;
+          throw new Error('Base transaction reverted.');
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      throw new Error('Timed out waiting for Base confirmation.');
+    }
+
+    async function sendOnchainApproval(chainPieceId) {
+      if (!CONTRACT_ADDRESS) throw new Error('Base contract is not configured.');
+      await ensureBaseNetwork();
+      const pieceIdHex = '0x' + BigInt(chainPieceId).toString(16);
+      const data = '0x5804cedb' + pieceIdHex.slice(2).padStart(64, '0');
+      const txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: connectedAddress,
+          to: CONTRACT_ADDRESS,
+          data
+        }]
+      });
+      await waitForProviderReceipt(txHash);
+      return txHash;
     }
 
     function updateDelegationButton(agentId) {
@@ -6667,7 +6771,12 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
             (data.agentName ? ' (guardian of ' + data.agentName + ')' : '') +
             (data.alreadyApproved ? ' — <span style="color:#22c55e">Approved</span>' : '') +
             (data.alreadyRejected ? ' — <span style="color:#ef4444">Rejected</span>' : '');
-          if (data.alreadyApproved || data.alreadyRejected) {
+          if (data.alreadyApproved) {
+            document.getElementById('btn-approve').textContent = 'Approve on Base';
+            document.getElementById('btn-reject').disabled = true;
+            document.getElementById('btn-reject').style.opacity = '0.4';
+          }
+          if (data.alreadyRejected) {
             document.getElementById('btn-approve').disabled = true;
             document.getElementById('btn-approve').style.opacity = '0.4';
             document.getElementById('btn-reject').disabled = true;
@@ -6730,10 +6839,26 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
 
         const data = await res.json();
         if (res.ok) {
-          resultEl.innerHTML = '<span style="color:#22c55e">' + (data.message || 'Success') + '</span>';
-          // Disable approve/reject after decision
-          document.getElementById('btn-approve').disabled = true;
-          document.getElementById('btn-approve').style.opacity = '0.4';
+          let resultHtml = '<span style="color:#22c55e">' + (data.message || 'Success') + '</span>';
+          let onchainApprovalTx = '';
+          if (action === 'approve' && data.chainPieceId !== null && data.chainPieceId !== undefined) {
+            resultEl.innerHTML = resultHtml + '<br><span style="color:var(--dim)">Confirming Base approval transaction…</span>';
+            try {
+              onchainApprovalTx = await sendOnchainApproval(data.chainPieceId);
+              resultHtml += '<br><a href="https://basescan.org/tx/' + onchainApprovalTx + '" target="_blank" style="color:var(--primary)">View Base approval →</a>';
+              document.getElementById('btn-approve').disabled = true;
+              document.getElementById('btn-approve').style.opacity = '0.4';
+            } catch (onchainError) {
+              const msg = String(onchainError?.message || onchainError || 'Base approval failed.');
+              resultEl.innerHTML = '<span style="color:#ffb86b">Gallery approval was recorded, but Base approval still needs to complete.</span><br><span style="color:#ef4444">' + msg + '</span>';
+              return;
+            }
+          }
+          resultEl.innerHTML = resultHtml;
+          if (action !== 'approve') {
+            document.getElementById('btn-approve').disabled = true;
+            document.getElementById('btn-approve').style.opacity = '0.4';
+          }
           document.getElementById('btn-reject').disabled = true;
           document.getElementById('btn-reject').style.opacity = '0.4';
           if (action === 'delete') {
@@ -6775,7 +6900,7 @@ async function renderPiece(db, id, origin = 'https://deviantclaw.art') {
         if(!res.ok) throw new Error(data.error||'Mint failed');
 
         resultEl.innerHTML='<span style="color:#22c55e">'+(data.message||'Mint submitted')+'</span>';
-        if(data.txHash){ resultEl.innerHTML += '<br><a href="https://sepolia.basescan.org/tx/'+data.txHash+'" target="_blank" style="color:var(--primary)">View tx →</a>'; }
+        if(data.txHash){ resultEl.innerHTML += '<br><a href="https://basescan.org/tx/'+data.txHash+'" target="_blank" style="color:var(--primary)">View tx →</a>'; }
         setTimeout(()=>window.location.reload(), 1800);
       }catch(e){
         btn.disabled=false; btn.textContent='Mint Piece';
@@ -7439,7 +7564,10 @@ async function renderAgent(db, agentId, env, url) {
         if (!res.ok) throw new Error(data.error || 'Failed to store delegation.');
         renderState(data);
       } catch (error) {
-        const message = String(error?.message || error || 'Delegation failed.');
+        let message = String(error?.message || error || 'Delegation failed.');
+        if (/External signature requests cannot sign delegations for internal accounts/i.test(message)) {
+          message = 'MetaMask rejected this delegation request because Advanced Permissions require a MetaMask Smart Account upgrade. Normal guardian approvals on Base still work without delegation.';
+        }
         await fetchState().catch(() => renderState({ ...currentState, manageableByConnectedWallet: true }));
         statusEl.innerHTML = '<span style="color:var(--danger)">' + message + '</span><br>' + statusEl.innerHTML;
       }
@@ -8185,7 +8313,7 @@ pickMode(document.getElementById('c-mode').value||'duo');
       }
 
       if (method === 'GET' && path.match(/^\/piece\/[^/]+$/)) {
-        return await renderPiece(db, path.split('/')[2], url.origin);
+        return await renderPiece(db, env, path.split('/')[2], url.origin);
       }
 
       if (method === 'GET' && path.match(/^\/agent\/[^/]+\/delete$/)) {
@@ -10524,9 +10652,24 @@ For image work:
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const guardianAddress = normalizeAddress(g.address);
 
-        const approval = await findGuardianApprovalRecord(id, guardianAddress, body.humanXId, true);
-
-        if (!approval) return json({ error: 'No pending approval found for this guardian' }, 404);
+        let approval = await findGuardianApprovalRecord(id, guardianAddress, body.humanXId, true);
+        if (!approval) {
+          const existingApproval = await findGuardianApprovalRecord(id, guardianAddress, body.humanXId, false);
+          if (existingApproval?.approved && !existingApproval?.rejected) {
+            const currentApprovals = await db.prepare(
+              'SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND approved = 0 AND rejected = 0'
+            ).bind(id).first();
+            return json({
+              message: 'Approval already recorded.',
+              remainingApprovals: currentApprovals?.cnt || 0,
+              status: piece.status,
+              chainPieceId: piece.chain_piece_id ?? null,
+              proposalTx: piece.proposal_tx || '',
+              alreadyApproved: true
+            });
+          }
+          return json({ error: 'No pending approval found for this guardian' }, 404);
+        }
 
         // Mark approved
         if (guardianAddress && approval.guardian_address && sameAddress(approval.guardian_address, guardianAddress)) {
@@ -10710,7 +10853,7 @@ For image work:
         if (!piece) return json({ error: 'Piece not found' }, 404);
         const canMint = await pieceAllowsGuardian(id, piece, g.address);
         if (!canMint) return json({ error: 'Only a guardian of this piece can trigger minting.' }, 403);
-        if (piece.status === 'minted') return json({ error: 'Already minted', tokenId: piece.token_id, txHash: piece.mint_tx_hash }, 400);
+        if (piece.status === 'minted') return json({ error: 'Already minted', tokenId: piece.token_id, txHash: piece.chain_tx || piece.mint_tx_hash || piece.mint_tx || '' }, 400);
         if (piece.status !== 'approved') return json({ error: 'Piece must be approved by all guardians before minting. Current status: ' + piece.status }, 400);
         if (isLegacyMainnetPiece(piece)) {
           return json({
@@ -10748,6 +10891,12 @@ For image work:
           // Get composition type
           const composition = piece.composition || (agentIds.length === 1 ? 'solo' : agentIds.length === 2 ? 'duo' : agentIds.length === 3 ? 'trio' : 'quad');
 
+          const { publicClient, walletClient, account } = await getOperatorClients(env);
+          if (!walletClient || !account) {
+            return json({ error: 'Relayer wallet not configured. Set DELEGATION_RELAYER_KEY or DEPLOYER_KEY as a worker secret.' }, 500);
+          }
+          const { viem } = await getDelegationRuntime();
+
           // Check on-chain rate limits before minting
           const rateLimitWarnings = [];
           if (CONTRACT) {
@@ -10767,16 +10916,25 @@ For image work:
                 const rpcData = await rpcRes.json();
                 if (rpcData.result) {
                   const count = parseInt(rpcData.result, 16);
-                  rateLimitWarnings.push({ agentId, mintsToday: count, remaining: 5 - count });
-                  if (count >= 5) {
-                    return json({
-                      error: `Agent "${agentId}" has reached the daily mint limit (5/5). Try again in 24 hours.`,
-                      rateLimits: rateLimitWarnings
-                    }, 429);
-                  }
+                  rateLimitWarnings.push({ agentId, mintsToday: count });
                 }
               } catch (e) { /* RPC failure — don't block, let contract enforce */ }
             }
+          }
+
+          const onchainStatus = await publicClient.readContract({
+            address: CONTRACT,
+            abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+            functionName: 'getPieceStatus',
+            args: [BigInt(piece.chain_piece_id)]
+          }).catch(() => null);
+
+          if (onchainStatus !== 1n && onchainStatus !== 1) {
+            return json({
+              error: 'Piece is not fully approved on Base yet. Have each guardian approve on Base first, then mint.',
+              chainPieceId: piece.chain_piece_id ?? null,
+              proposalTx: piece.proposal_tx || ''
+            }, 409);
           }
 
           // Mark as pending-mint
@@ -10800,24 +10958,50 @@ For image work:
             });
           }
 
+          const { request } = await publicClient.simulateContract({
+            account,
+            address: CONTRACT,
+            abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+            functionName: 'mintPiece',
+            args: [BigInt(piece.chain_piece_id)]
+          });
+          const txHash = await walletClient.writeContract(request);
+          const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+          if (receipt.status !== 'success') {
+            throw new Error('Base mint transaction reverted.');
+          }
+
+          const mintedEvent = (receipt.logs || [])
+            .map((log) => decodePieceMintedLog(viem, log, CONTRACT))
+            .find(Boolean);
+          const tokenId = mintedEvent?.tokenId !== undefined && mintedEvent?.tokenId !== null
+            ? String(mintedEvent.tokenId)
+            : null;
+
+          await db.prepare(
+            "UPDATE pieces SET status = 'minted', token_id = COALESCE(?, token_id), chain_tx = ?, mint_tx_hash = ?, mint_tx = ?, minted_at = ?, updated_at = ? WHERE id = ?"
+          ).bind(tokenId, txHash, txHash, txHash, now, now, id).run();
+
           return json({
-            message: 'Piece queued for on-chain minting.',
+            message: 'Piece minted on Base.',
             pieceId: id,
             chainPieceId: piece.chain_piece_id ?? null,
             proposalTx: piece.proposal_tx || '',
+            txHash,
+            tokenId,
             contract: CONTRACT,
             deployer: DEPLOYER,
             tokenURI,
             composition,
             agentIds,
             mintRecipient: GALLERY_CUSTODY,
-            status: 'pending-mint',
+            status: 'minted',
             revenueSplit: {
               galleryFee: '3%',
               recipients: splitInfo
             },
             rateLimits: rateLimitWarnings.length > 0 ? rateLimitWarnings : undefined,
-            note: 'Contract will lock revenue splits permanently at mint time. Chain TX will be submitted by the deployer wallet and NFT custody goes to the configured gallery wallet.'
+            note: 'Revenue splits are now locked onchain and the NFT has been minted into gallery custody on Base.'
           });
         } catch (err) {
           return json({ error: 'Mint failed: ' + (err.message || err) }, 500);
