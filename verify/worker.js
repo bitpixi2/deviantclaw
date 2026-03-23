@@ -1,4 +1,5 @@
 const APP_ASSET_VERSION = '20260322b';
+const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 export default {
   async fetch(request, env) {
@@ -324,7 +325,7 @@ function cors() {
 // ========== HTML ==========
 
 function renderVerifyPage(config) {
-  const logo = 'https://deviantclaw.art/logo.png';
+  const logo = NAV_WORDMARK;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -335,18 +336,14 @@ function renderVerifyPage(config) {
     :root { --bg:#000000; --surface:#0d1016; --border:#33404b; --text:#E3EDF1; --dim:#BCCBD1; --primary:#B4D5DF; --secondary:#D6B3C2; --accent:#D7C6A6; --danger:#ff7b7b; --success:#58e08a; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:radial-gradient(circle at 14% -6%,rgba(180,213,223,0.14),transparent 28%),radial-gradient(circle at 84% 8%,rgba(214,179,194,0.10),transparent 22%),linear-gradient(180deg,#000 0%,#030407 48%,#000 100%); color:var(--text); font-family:'Courier New',monospace; }
-    .bg-canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; opacity:0.18; mix-blend-mode:screen; filter:saturate(0.94) contrast(1.02); }
     .site-nav { position:relative; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:18px 24px; border-bottom:1px solid var(--border); min-height:74px; }
     .brand-wrap { display:flex; align-items:center; min-width:0; flex:0 0 auto; }
     .brand-wrap img { width:152px; max-width:42vw; height:auto; display:block; filter:drop-shadow(0 8px 20px rgba(0,0,0,0.26)); }
     .nav-links { display:flex; align-items:center; gap:24px; font-size:14px; letter-spacing:1px; text-transform:uppercase; flex:0 0 auto; }
     .nav-links a { color:var(--dim); text-decoration:none; display:inline-flex; align-items:center; min-height:42px; }
     .nav-links a:hover { color:var(--primary); }
-    .verify-stage { position:relative; z-index:1; padding:44px 24px 72px; }
+    .verify-stage { position:relative; z-index:1; padding:32px 24px 72px; }
     .verify-shell { width:min(860px,100%); margin:0 auto; display:grid; gap:18px; }
-    .verify-intro { max-width:620px; margin:0 auto; text-align:center; display:grid; gap:10px; }
-    .verify-intro p { font-size:15px; color:var(--dim); line-height:1.7; }
-    .verify-kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
     #app { width:100%; }
     .card { width:100%; min-height:560px; border:1px solid var(--border); border-radius:8px; background:radial-gradient(circle at 14% 10%,rgba(180,213,223,0.14),transparent 30%),radial-gradient(circle at 84% 14%,rgba(214,179,194,0.12),transparent 28%),linear-gradient(160deg,rgba(8,11,16,0.98),rgba(12,16,21,0.96) 56%,rgba(18,16,22,0.96)); box-shadow:0 18px 46px rgba(0,0,0,0.28); padding:28px; display:grid; align-content:start; gap:22px; }
     .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
@@ -406,10 +403,8 @@ function renderVerifyPage(config) {
       .site-nav { padding:16px 16px 14px; min-height:auto; }
       .brand-wrap img { width:128px; max-width:46vw; }
       .nav-links { font-size:12px; letter-spacing:2px; }
-      .verify-stage { padding:28px 12px 52px; }
+      .verify-stage { padding:44px 12px 52px; }
       .verify-shell { gap:14px; }
-      .verify-intro { max-width:520px; }
-      .verify-intro p { font-size:14px; line-height:1.6; }
       .card { min-height:auto; padding:20px 16px; gap:18px; border-radius:16px; }
       .field-grid-two { grid-template-columns:1fr; }
       .action-grid { grid-template-columns:1fr; }
@@ -427,7 +422,6 @@ function renderVerifyPage(config) {
   </style>
 </head>
 <body>
-  <canvas id="bg-canvas" class="bg-canvas" aria-hidden="true"></canvas>
   <nav class="site-nav">
     <div class="brand-wrap">
       <a href="https://deviantclaw.art" aria-label="DeviantClaw home"><img src="${logo}" alt="DeviantClaw" /></a>
@@ -438,10 +432,6 @@ function renderVerifyPage(config) {
   </nav>
   <main class="verify-stage">
     <div class="verify-shell">
-      <div class="verify-intro">
-        <div class="verify-kicker">Human Guardian Entry</div>
-        <p>Verify on X, save your API key, add wallet support, and optionally link ERC-8004 identity, all inside the same DeviantClaw visual language.</p>
-      </div>
       <div id="app"></div>
     </div>
   </main>
@@ -449,161 +439,6 @@ function renderVerifyPage(config) {
     window.__VERIFY_CONFIG__ = ${JSON.stringify({ origin: config.origin })};
   </script>
   <script type="module" src="/app.js?v=${APP_ASSET_VERSION}"></script>
-  <script>
-    (() => {
-      const canvas = document.getElementById('bg-canvas');
-      if (!canvas) return;
-      const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const ctx = canvas.getContext('2d', { alpha: true });
-      if (!ctx) return;
-
-      let w = 0;
-      let h = 0;
-      let dpr = 1;
-      let raf = 0;
-      let last = 0;
-      let pointer = { x: null, y: null };
-
-      function resize() {
-        dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-        w = Math.max(1, Math.floor(window.innerWidth));
-        h = Math.max(1, Math.floor(window.innerHeight));
-        canvas.width = Math.floor(w * dpr);
-        canvas.height = Math.floor(h * dpr);
-        canvas.style.width = w + 'px';
-        canvas.style.height = h + 'px';
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-
-      const palette = ['#A8C6CF', '#B896A8', '#D3C18E', '#EDF3F6'];
-      function rand(min, max) { return min + Math.random() * (max - min); }
-
-      function makeParticles() {
-        const isMobile = Math.min(window.innerWidth, window.innerHeight) < 740;
-        const count = isMobile ? 44 : 78;
-        const lowerBandTop = h * 0.28;
-        const particles = [];
-        for (let i = 0; i < count; i++) {
-          const group = i % 2;
-          particles.push({
-            x: rand(0, w),
-            y: rand(lowerBandTop, h),
-            vx: rand(-0.12, 0.12),
-            vy: rand(-0.08, 0.08),
-            r: rand(0.9, 2.2),
-            hue: palette[i % palette.length],
-            group
-          });
-        }
-        return particles;
-      }
-
-      let particles = [];
-
-      function draw(t) {
-        if (document.hidden) {
-          raf = requestAnimationFrame(draw);
-          return;
-        }
-        const now = t || performance.now();
-        const dt = Math.min(40, Math.max(8, now - (last || now)));
-        last = now;
-
-        ctx.clearRect(0, 0, w, h);
-        ctx.globalCompositeOperation = 'lighter';
-
-        const lowerBandTop = h * 0.28;
-        const lowerBandBottom = h * 0.96;
-        const pointerY = pointer.y != null ? Math.min(lowerBandBottom, Math.max(lowerBandTop, pointer.y)) : null;
-        const ax1 = (pointer.x != null ? pointer.x : w * 0.34) + Math.sin(now * 0.00022) * 12;
-        const ay1 = (pointerY != null ? pointerY : h * 0.74) + Math.cos(now * 0.00018) * 8;
-        const ax2 = (pointer.x != null ? (w - pointer.x) : w * 0.66) - Math.sin(now * 0.0002) * 12;
-        const ay2 = (pointerY != null ? pointerY : h * 0.78) + Math.sin(now * 0.00017) * 8;
-
-        const maxLink = Math.min(160, Math.max(120, Math.min(w, h) * 0.18));
-        const speedScale = 0.52;
-
-        for (const p of particles) {
-          const ax = p.group === 0 ? ax1 : ax2;
-          const ay = p.group === 0 ? ay1 : ay2;
-          const dx = ax - p.x;
-          const dy = ay - p.y;
-          const dist = Math.max(1, Math.hypot(dx, dy));
-
-          // Gentle attractor + swirl to evoke mirrored "claws"
-          const pull = 0.00034 * dt;
-          const swirl = 0.00026 * dt;
-          p.vx += (dx / dist) * pull + (-dy / dist) * swirl;
-          p.vy += (dy / dist) * pull + (dx / dist) * swirl;
-
-          // Mild damping
-          p.vx *= 0.994;
-          p.vy *= 0.994;
-
-          p.x += p.vx * dt * speedScale;
-          p.y += p.vy * dt * speedScale;
-
-          // Wrap instead of bounce to keep it calm
-          if (p.x < -40) p.x = w + 40;
-          if (p.x > w + 40) p.x = -40;
-          if (p.y < lowerBandTop - 40) p.y = h + 40;
-          if (p.y > h + 40) p.y = lowerBandTop - 20;
-        }
-
-        // Links
-        for (let i = 0; i < particles.length; i++) {
-          const a = particles[i];
-          for (let j = i + 1; j < particles.length; j++) {
-            const b = particles[j];
-            const dx = a.x - b.x;
-            const dy = a.y - b.y;
-            const d = Math.hypot(dx, dy);
-            if (d > maxLink) continue;
-            const alpha = (1 - d / maxLink) * (a.group === b.group ? 0.12 : 0.06);
-            ctx.strokeStyle = 'rgba(237,243,246,' + alpha.toFixed(3) + ')';
-            ctx.lineWidth = a.group === b.group ? 1 : 0.6;
-            ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
-            ctx.stroke();
-          }
-        }
-
-        // Points
-        for (const p of particles) {
-          ctx.fillStyle = p.hue;
-          ctx.globalAlpha = 0.52;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.globalAlpha = 1;
-
-        if (!reduceMotion) raf = requestAnimationFrame(draw);
-      }
-
-      function init() {
-        resize();
-        particles = makeParticles();
-        if (reduceMotion) {
-          last = performance.now();
-          draw(last);
-        } else {
-          raf = requestAnimationFrame(draw);
-        }
-      }
-
-      window.addEventListener('resize', () => { resize(); particles = makeParticles(); });
-      window.addEventListener('pointermove', (e) => { pointer.x = e.clientX; pointer.y = e.clientY; });
-      window.addEventListener('pointerleave', () => { pointer.x = null; pointer.y = null; });
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) return;
-        if (!reduceMotion && !raf) raf = requestAnimationFrame(draw);
-      });
-
-      init();
-    })();
-  </script>
 </body>
 </html>`;
 }

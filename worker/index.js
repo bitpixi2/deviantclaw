@@ -1746,6 +1746,16 @@ function normalizeAddress(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizePrivateKeyInput(value) {
+  let key = String(value || '').trim();
+  if (!key) return '';
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1).trim();
+  }
+  if (/^[a-fA-F0-9]{64}$/.test(key)) return `0x${key}`;
+  return key;
+}
+
 function sameAddress(a, b) {
   const left = normalizeAddress(a);
   const right = normalizeAddress(b);
@@ -1898,7 +1908,7 @@ async function getOperatorClients(env) {
     chain: chains.base,
     transport
   });
-  const key = String(env?.DELEGATION_RELAYER_KEY || env?.DEPLOYER_KEY || '').trim();
+  const key = normalizePrivateKeyInput(env?.DELEGATION_RELAYER_KEY || env?.DEPLOYER_KEY);
   if (!key) {
     return {
       publicClient,
@@ -2285,7 +2295,7 @@ async function ensurePieceProposedOnChain(db, env, pieceInput) {
 async function getDelegationExecutorAddress(env) {
   const explicit = normalizeAddress(env?.DELEGATION_RELAYER_ADDRESS || env?.DEPLOYER_ADDRESS);
   if (explicit) return explicit;
-  const key = String(env?.DELEGATION_RELAYER_KEY || env?.DEPLOYER_KEY || '').trim();
+  const key = normalizePrivateKeyInput(env?.DELEGATION_RELAYER_KEY || env?.DEPLOYER_KEY);
   if (!key) return '';
   const { accounts } = await getDelegationRuntime();
   return normalizeAddress(accounts.privateKeyToAccount(key).address);
@@ -2298,7 +2308,7 @@ async function getDelegationClients(env) {
     chain: chains.base,
     transport
   });
-  const key = String(env?.DELEGATION_RELAYER_KEY || env?.DEPLOYER_KEY || '').trim();
+  const key = normalizePrivateKeyInput(env?.DELEGATION_RELAYER_KEY || env?.DEPLOYER_KEY);
   if (!key) {
     return {
       publicClient,
@@ -10349,7 +10359,7 @@ For image work:
         if (!CONTRACT) return json({ error: 'Contract not deployed yet' }, 503);
 
         const DEPLOYER = env.DELEGATION_RELAYER_ADDRESS || env.DEPLOYER_ADDRESS;
-        const DEPLOYER_KEY = env.DELEGATION_RELAYER_KEY || env.DEPLOYER_KEY; // Set via: wrangler secret put DELEGATION_RELAYER_KEY
+        const DEPLOYER_KEY = normalizePrivateKeyInput(env.DELEGATION_RELAYER_KEY || env.DEPLOYER_KEY); // Set via: wrangler secret put DELEGATION_RELAYER_KEY
         const GALLERY_CUSTODY = env.GALLERY_CUSTODY_ADDRESS || DEPLOYER;
 
         if (!DEPLOYER || !DEPLOYER_KEY) return json({ error: 'Relayer not configured. Set DELEGATION_RELAYER_KEY or DEPLOYER_KEY as a worker secret.' }, 500);
