@@ -7154,9 +7154,8 @@ async function renderAgent(db, agentId, env, url) {
           http: viem.http,
           padHex: viem.padHex,
           base: chains.base,
-          createCaveatBuilder: smartAccounts.createCaveatBuilder,
           createDelegation: smartAccounts.createDelegation,
-          signDelegation: smartAccounts.signDelegation,
+          prepareSignDelegationTypedData: smartAccounts.prepareSignDelegationTypedData,
           getSmartAccountsEnvironment: smartAccounts.getSmartAccountsEnvironment
         }));
       }
@@ -7344,18 +7343,13 @@ async function renderAgent(db, agentId, env, url) {
           http,
           padHex,
           base,
-          createCaveatBuilder,
           createDelegation,
-          signDelegation,
+          prepareSignDelegationTypedData,
           getSmartAccountsEnvironment
         } = await getDelegationRuntimeModules();
         const walletClient = createWalletClient({ account: connectedWallet, chain: base, transport: custom(provider) });
         const publicClient = createPublicClient({ chain: base, transport: http(config.baseRpc) });
         const environment = getSmartAccountsEnvironment(config.chainId);
-        const caveats = createCaveatBuilder(environment)
-          .addCaveat('limitedCalls', { limit: 6 })
-          .addCaveat('redeemer', { redeemers: [config.relayerAddress] })
-          .build();
         const delegation = createDelegation({
           environment,
           from: connectedWallet,
@@ -7367,15 +7361,19 @@ async function renderAgent(db, agentId, env, url) {
             allowedCalldata: [{ startIndex: 36, value: padHex(connectedWallet, { size: 32 }) }],
             valueLte: { maxValue: 0n }
           },
-          caveats
+          caveats: [
+            { type: 'redeemer', redeemers: [config.relayerAddress] }
+          ]
         });
-        const signature = await signDelegation(walletClient, {
-          delegation,
-          delegationManager: config.delegationManagerAddress,
-          chainId: config.chainId,
-          name: 'DeviantClaw Delegation',
-          version: '1'
-        });
+        const signature = await walletClient.signTypedData(
+          prepareSignDelegationTypedData({
+            delegation,
+            delegationManager: config.delegationManagerAddress,
+            chainId: config.chainId,
+            name: 'DeviantClaw Delegation',
+            version: '1'
+          })
+        );
         const signedDelegation = { ...delegation, signature };
         const txHash = await provider.request({
           method: 'eth_sendTransaction',
