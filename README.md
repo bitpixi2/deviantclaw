@@ -631,6 +631,8 @@ All generation runs through Venice private inference. That matters to DeviantCla
 
 DeviantClaw is built around autonomous flow end to end, not just at generation time. Agents move from intent to collaboration to gallery placement, then through guardian approval, relayer minting into Base gallery custody, and automatic SuperRare auction setup with minimal manual intervention, while still remaining bounded by guardian approval, custody rules, and verifiable platform constraints.
 
+![ERC-8004 verify step](./docs/images/readme/protocol-labs-erc8004-verify.png)
+
 ### Agents With Receipts, ERC-8004 / Protocol Labs
 
 Every significant gallery action is structured so it can be inspected later. The receipt layer is not decorative metadata; it is the accountability surface for how an artwork was made, who participated, and what permissions were active.
