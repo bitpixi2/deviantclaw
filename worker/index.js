@@ -7111,9 +7111,9 @@ async function renderAgent(db, agentId, env, url) {
         <span style="color:var(--dim)"> for guardians who want to let their agent auto-approve art to go to auction.</span>
       </div>
       <div id="delegation-actions" style="margin-top:12px">
-        <button type="button" id="delegation-open-metamask-initial" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:11px 18px;background:#fff;color:#111;border:1px solid rgba(255,255,255,0.16);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold">
+        <button type="button" id="delegation-enable-primary-initial" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:11px 18px;background:#fff;color:#111;border:1px solid rgba(255,255,255,0.16);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold">
           <img src="/assets/brands/metamask.svg" alt="" aria-hidden="true" style="display:block;width:18px;height:18px;flex-shrink:0" />
-          <span>Open in MetaMask</span>
+          <span>Enable MetaMask Delegation</span>
         </button>
       </div>
     </div>
@@ -7171,6 +7171,10 @@ async function renderAgent(db, agentId, env, url) {
       return '<button type="button" id="' + id + '" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:11px 18px;background:#fff;color:#111;border:1px solid rgba(255,255,255,0.16);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold"><img src="/assets/brands/metamask.svg" alt="" aria-hidden="true" style="display:block;width:18px;height:18px;flex-shrink:0" /><span>' + label + '</span></button>';
     }
 
+    function metaMaskPrimaryButton(label = 'Enable MetaMask Delegation', id = 'delegation-enable-btn') {
+      return '<button type="button" id="' + id + '" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:11px 18px;background:#fff;color:#111;border:1px solid rgba(255,255,255,0.16);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold"><img src="/assets/brands/metamask.svg" alt="" aria-hidden="true" style="display:block;width:18px;height:18px;flex-shrink:0" /><span>' + label + '</span></button>';
+    }
+
     async function openMetaMask() {
       const provider = getMetaMaskProvider();
       if (provider) {
@@ -7209,8 +7213,13 @@ async function renderAgent(db, agentId, env, url) {
 
       if (!provider) {
         statusEl.innerHTML = '<span style="color:var(--dim)">Open this profile in MetaMask to delegate up to ' + max + ' approvals per day from the guardian wallet.</span>';
-        actionsEl.innerHTML = openMetaMaskButton();
-        wireOpenMetaMaskButton();
+        actionsEl.innerHTML = metaMaskPrimaryButton('Enable MetaMask Delegation', 'delegation-enable-deeplink-btn');
+        document.getElementById('delegation-enable-deeplink-btn')?.addEventListener('click', () => {
+          enableDelegation().catch((error) => {
+            const message = String(error?.message || error || 'Could not open MetaMask.');
+            statusEl.innerHTML = '<span style="color:var(--danger)">' + message + '</span><br>' + statusEl.innerHTML;
+          });
+        });
         return;
       }
 
@@ -7222,9 +7231,8 @@ async function renderAgent(db, agentId, env, url) {
 
       if (!connectedWallet) {
         statusEl.innerHTML = '<span>Connect the guardian wallet <strong>' + shortAddress(config.guardianAddress) + '</strong> to delegate up to ' + max + ' daily approvals for ' + config.agentName + '.</span>';
-        actionsEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px"><button type="button" id="delegation-connect-btn" style="padding:11px 18px;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer">Connect MetaMask</button>' + openMetaMaskButton() + '</div>';
-        document.getElementById('delegation-connect-btn')?.addEventListener('click', connectWallet);
-        wireOpenMetaMaskButton();
+        actionsEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' + metaMaskPrimaryButton('Enable MetaMask Delegation', 'delegation-enable-btn') + '</div>';
+        document.getElementById('delegation-enable-btn')?.addEventListener('click', enableDelegation);
         return;
       }
 
@@ -7248,9 +7256,8 @@ async function renderAgent(db, agentId, env, url) {
           ? 'A signed grant exists, but the Base contract toggle is off. Step 2 is still needed from the guardian wallet: confirm the Base transaction.'
           : 'Step 1: sign in MetaMask. Step 2: confirm the Base transaction to turn delegation on.');
       statusEl.innerHTML = '<span>' + detail + '</span><br><span style="font-size:11px;color:var(--dim)">Daily ceiling: ' + max + ' approvals.</span>';
-      actionsEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px"><button type="button" id="delegation-enable-btn" style="padding:11px 18px;background:var(--agent-color);color:var(--bg);border:1px solid var(--agent-color);border-radius:999px;font:12px Courier New;letter-spacing:1px;cursor:pointer;font-weight:bold">1. Sign in MetaMask</button>' + openMetaMaskButton() + '</div>';
+      actionsEl.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' + metaMaskPrimaryButton('Enable MetaMask Delegation', 'delegation-enable-btn') + '</div>';
       document.getElementById('delegation-enable-btn')?.addEventListener('click', enableDelegation);
-      wireOpenMetaMaskButton();
     }
 
     async function fetchState() {
@@ -7414,9 +7421,9 @@ async function renderAgent(db, agentId, env, url) {
     }
 
     const initialProvider = getMetaMaskProvider();
-    document.getElementById('delegation-open-metamask-initial')?.addEventListener('click', () => {
-      openMetaMask().catch((error) => {
-        const message = String(error?.message || error || 'Could not open MetaMask.');
+    document.getElementById('delegation-enable-primary-initial')?.addEventListener('click', () => {
+      enableDelegation().catch((error) => {
+        const message = String(error?.message || error || 'Could not start MetaMask delegation.');
         statusEl.innerHTML = '<span style="color:var(--danger)">' + message + '</span><br>' + statusEl.innerHTML;
       });
     });
