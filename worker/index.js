@@ -1910,6 +1910,23 @@ const DEVIANTCLAW_PIECE_BRIDGE_ABI = [
   },
   {
     type: 'function',
+    name: 'pieces',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [
+      { name: 'externalId', type: 'string' },
+      { name: 'title', type: 'string' },
+      { name: 'tokenURI', type: 'string' },
+      { name: 'composition', type: 'string' },
+      { name: 'method', type: 'string' },
+      { name: 'status', type: 'uint8' },
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'approvalsNeeded', type: 'uint256' },
+      { name: 'approvalsReceived', type: 'uint256' }
+    ]
+  },
+  {
+    type: 'function',
     name: 'mintPiece',
     stateMutability: 'nonpayable',
     inputs: [{ name: 'pieceId', type: 'uint256' }],
@@ -2369,6 +2386,10 @@ async function resolveExistingPieceProposalByExternalId(db, env, piece) {
   if (chainPieceId === null || chainPieceId === undefined) return null;
   const numericPieceId = Number(chainPieceId);
   if (!Number.isFinite(numericPieceId) || numericPieceId < 0) return null;
+  const onchainPiece = await readOnchainPieceSummary(env, numericPieceId);
+  if (!onchainPiece || String(onchainPiece.externalId || '').trim() !== String(piece.id || '').trim()) {
+    return null;
+  }
 
   const proposedAt = piece.proposed_at || new Date().toISOString().slice(0, 19).replace('T', ' ');
   const nextStatus = (piece.status === 'draft' || piece.status === 'wip') ? 'proposed' : piece.status;
@@ -2383,6 +2404,59 @@ async function resolveExistingPieceProposalByExternalId(db, env, piece) {
     proposed_at: proposedAt,
     status: nextStatus
   };
+}
+
+async function readOnchainPieceSummary(env, pieceId) {
+  const contractAddress = normalizeAddress(env?.CONTRACT_ADDRESS);
+  if (!contractAddress) return null;
+  if (pieceId === null || pieceId === undefined || pieceId === '') return null;
+  const numericPieceId = Number(pieceId);
+  if (!Number.isFinite(numericPieceId) || numericPieceId < 0) return null;
+  const { publicClient } = await getOperatorClients(env);
+  const args = [BigInt(numericPieceId)];
+
+  try {
+    const tuple = await publicClient.readContract({
+      address: contractAddress,
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      functionName: 'pieces',
+      args
+    });
+    const readField = (index, key) => Array.isArray(tuple) ? tuple[index] : tuple?.[key];
+    return {
+      externalId: String(readField(0, 'externalId') || ''),
+      title: String(readField(1, 'title') || ''),
+      tokenURI: String(readField(2, 'tokenURI') || ''),
+      composition: String(readField(3, 'composition') || ''),
+      method: String(readField(4, 'method') || ''),
+      status: Number(readField(5, 'status') ?? -1),
+      tokenId: Number(readField(6, 'tokenId') ?? 0),
+      approvalsNeeded: Number(readField(7, 'approvalsNeeded') ?? 0),
+      approvalsReceived: Number(readField(8, 'approvalsReceived') ?? 0)
+    };
+  } catch {}
+
+  try {
+    const statusRaw = await publicClient.readContract({
+      address: contractAddress,
+      abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
+      functionName: 'getPieceStatus',
+      args
+    });
+    return {
+      externalId: '',
+      title: '',
+      tokenURI: '',
+      composition: '',
+      method: '',
+      status: Number(statusRaw ?? -1),
+      tokenId: 0,
+      approvalsNeeded: 0,
+      approvalsReceived: 0
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function ensurePieceProposedOnChain(db, env, pieceInput) {
@@ -10960,7 +11034,9 @@ For image work:
         const canMint = await pieceAllowsGuardian(id, piece, g.address);
         if (!canMint) return json({ error: 'Only a guardian of this piece can trigger minting.' }, 403);
         if (piece.status === 'minted') return json({ error: 'Already minted', tokenId: piece.token_id, txHash: piece.chain_tx || piece.mint_tx_hash || piece.mint_tx || '' }, 400);
-        if (piece.status !== 'approved') return json({ error: 'Piece must be approved by all guardians before minting. Current status: ' + piece.status }, 400);
+        if (piece.status !== 'approved' && piece.status !== 'pending-mint') {
+          return json({ error: 'Piece must be approved by all guardians before minting. Current status: ' + piece.status }, 400);
+        }
         if (isLegacyMainnetPiece(piece)) {
           return json({
             error: `${piece.legacy_reason || 'This piece predates Base mainnet proposal sync.'} Recreate it to mint on the live Base contract.`
@@ -11028,19 +11104,40 @@ For image work:
             }
           }
 
-          const onchainStatus = await publicClient.readContract({
-            address: CONTRACT,
-            abi: DEVIANTCLAW_PIECE_BRIDGE_ABI,
-            functionName: 'getPieceStatus',
-            args: [BigInt(piece.chain_piece_id)]
-          }).catch(() => null);
+          const onchainPiece = await readOnchainPieceSummary(env, piece.chain_piece_id);
+          const onchainStatus = onchainPiece?.status ?? null;
 
-          if (onchainStatus !== 1n && onchainStatus !== 1) {
+          if (onchainStatus === 2) {
+            const tokenId = onchainPiece?.tokenId ? String(onchainPiece.tokenId) : null;
+            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            await db.prepare(
+              "UPDATE pieces SET status = 'minted', token_id = COALESCE(?, token_id), minted_at = COALESCE(minted_at, ?), updated_at = ? WHERE id = ?"
+            ).bind(tokenId, now, now, id).run();
+            return json({
+              message: 'Piece already minted on Base.',
+              pieceId: id,
+              chainPieceId: piece.chain_piece_id ?? null,
+              proposalTx: piece.proposal_tx || '',
+              tokenId,
+              contract: CONTRACT,
+              mintRecipient: GALLERY_CUSTODY,
+              status: 'minted'
+            });
+          }
+
+          if (onchainStatus !== 1) {
             return json({
               error: 'Piece is not fully approved on Base yet. Have each guardian approve on Base first, then mint.',
               chainPieceId: piece.chain_piece_id ?? null,
               proposalTx: piece.proposal_tx || ''
             }, 409);
+          }
+
+          if (piece.status !== 'approved') {
+            await db.prepare(
+              "UPDATE pieces SET status = 'approved', updated_at = ? WHERE id = ?"
+            ).bind(new Date().toISOString().slice(0, 19).replace('T', ' '), id).run();
+            piece.status = 'approved';
           }
 
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
