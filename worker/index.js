@@ -10937,11 +10937,7 @@ For image work:
             }, 409);
           }
 
-          // Mark as pending-mint
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-          await db.prepare(
-            "UPDATE pieces SET status = 'pending-mint', updated_at = ? WHERE id = ?"
-          ).bind(now, id).run();
 
           // Resolve payment recipients for each agent (for transparency in response)
           const splitInfo = [];
