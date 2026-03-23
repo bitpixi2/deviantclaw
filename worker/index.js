@@ -7155,11 +7155,47 @@ async function renderAgent(db, agentId, env, url) {
           padHex: viem.padHex,
           base: chains.base,
           createDelegation: smartAccounts.createDelegation,
-          prepareSignDelegationTypedData: smartAccounts.prepareSignDelegationTypedData,
           getSmartAccountsEnvironment: smartAccounts.getSmartAccountsEnvironment
         }));
       }
       return delegationRuntimePromise;
+    }
+
+    function buildDelegationTypedData(delegation) {
+      const saltValue = String(delegation && delegation.salt ? delegation.salt : '0x');
+      const salt = saltValue === '0x' ? '0' : BigInt(saltValue).toString(10);
+      return {
+        domain: {
+          chainId: config.chainId,
+          name: 'DelegationManager',
+          version: '1',
+          verifyingContract: config.delegationManagerAddress
+        },
+        types: {
+          Caveat: [
+            { name: 'enforcer', type: 'address' },
+            { name: 'terms', type: 'bytes' }
+          ],
+          Delegation: [
+            { name: 'delegate', type: 'address' },
+            { name: 'delegator', type: 'address' },
+            { name: 'authority', type: 'bytes32' },
+            { name: 'caveats', type: 'Caveat[]' },
+            { name: 'salt', type: 'uint256' }
+          ]
+        },
+        primaryType: 'Delegation',
+        message: {
+          delegate: delegation.delegate,
+          delegator: delegation.delegator,
+          authority: delegation.authority,
+          caveats: (delegation.caveats || []).map((caveat) => ({
+            enforcer: caveat.enforcer,
+            terms: caveat.terms
+          })),
+          salt
+        }
+      };
     }
 
     function shortAddress(value) {
@@ -7344,7 +7380,6 @@ async function renderAgent(db, agentId, env, url) {
           padHex,
           base,
           createDelegation,
-          prepareSignDelegationTypedData,
           getSmartAccountsEnvironment
         } = await getDelegationRuntimeModules();
         const walletClient = createWalletClient({ account: connectedWallet, chain: base, transport: custom(provider) });
@@ -7365,15 +7400,10 @@ async function renderAgent(db, agentId, env, url) {
             { type: 'redeemer', redeemers: [config.relayerAddress] }
           ]
         });
-        const signature = await walletClient.signTypedData(
-          prepareSignDelegationTypedData({
-            delegation,
-            delegationManager: config.delegationManagerAddress,
-            chainId: config.chainId,
-            name: 'DeviantClaw Delegation',
-            version: '1'
-          })
-        );
+        const signature = await provider.request({
+          method: 'eth_signTypedData_v4',
+          params: [connectedWallet, JSON.stringify(buildDelegationTypedData(delegation))]
+        });
         const signedDelegation = { ...delegation, signature };
         const txHash = await provider.request({
           method: 'eth_sendTransaction',
