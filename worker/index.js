@@ -7118,10 +7118,6 @@ async function renderAgent(db, agentId, env, url) {
       </div>
     </div>
     <script type="module">
-    import { createPublicClient, createWalletClient, custom, encodeFunctionData, http, padHex } from 'https://esm.sh/viem@2.47.6';
-    import { base } from 'https://esm.sh/viem@2.47.6/chains';
-    import { createCaveatBuilder, createDelegation, signDelegation, getSmartAccountsEnvironment } from 'https://esm.sh/@metamask/smart-accounts-kit@0.4.0-beta.1';
-
     const config = ${JSON.stringify({
       agentId,
       agentName: agent.name || agentId,
@@ -7140,6 +7136,32 @@ async function renderAgent(db, agentId, env, url) {
     const delegatedPill = document.getElementById('agent-delegated-pill');
     let connectedWallet = '';
     let currentState = config.initialState || {};
+    let delegationRuntimePromise = null;
+    const delegationAutostart = new URLSearchParams(window.location.search).get('delegation') === '1';
+    let delegationAutostartUsed = false;
+
+    async function getDelegationRuntimeModules() {
+      if (!delegationRuntimePromise) {
+        delegationRuntimePromise = Promise.all([
+          import('https://esm.sh/viem@2.47.6'),
+          import('https://esm.sh/viem@2.47.6/chains'),
+          import('https://esm.sh/@metamask/smart-accounts-kit@0.4.0-beta.1')
+        ]).then(([viem, chains, smartAccounts]) => ({
+          createPublicClient: viem.createPublicClient,
+          createWalletClient: viem.createWalletClient,
+          custom: viem.custom,
+          encodeFunctionData: viem.encodeFunctionData,
+          http: viem.http,
+          padHex: viem.padHex,
+          base: chains.base,
+          createCaveatBuilder: smartAccounts.createCaveatBuilder,
+          createDelegation: smartAccounts.createDelegation,
+          signDelegation: smartAccounts.signDelegation,
+          getSmartAccountsEnvironment: smartAccounts.getSmartAccountsEnvironment
+        }));
+      }
+      return delegationRuntimePromise;
+    }
 
     function shortAddress(value) {
       const v = String(value || '').trim();
@@ -7164,7 +7186,7 @@ async function renderAgent(db, agentId, env, url) {
     }
 
     function getMetaMaskDeepLink() {
-      return 'https://link.metamask.io/dapp/deviantclaw.art/agent/' + encodeURIComponent(config.agentId) + '%23delegation-section';
+      return 'https://link.metamask.io/dapp/deviantclaw.art/agent/' + encodeURIComponent(config.agentId) + '?delegation=1%23delegation-section';
     }
 
     function openMetaMaskButton(label = 'Open in MetaMask', id = 'delegation-open-metamask-btn') {
@@ -7275,6 +7297,12 @@ async function renderAgent(db, agentId, env, url) {
         window.location.assign(getMetaMaskDeepLink());
         return;
       }
+      try {
+        await provider.request({
+          method: 'wallet_requestPermissions',
+          params: [{ eth_accounts: {} }]
+        });
+      } catch {}
       const accounts = await provider.request({ method: 'eth_requestAccounts' });
       connectedWallet = (accounts && accounts[0]) ? accounts[0] : '';
       await fetchState();
@@ -7308,6 +7336,19 @@ async function renderAgent(db, agentId, env, url) {
         setBusy('1. Sign in MetaMask…');
         const provider = getMetaMaskProvider();
         if (!provider) throw new Error('MetaMask is not available for delegation.');
+        const {
+          createPublicClient,
+          createWalletClient,
+          custom,
+          encodeFunctionData,
+          http,
+          padHex,
+          base,
+          createCaveatBuilder,
+          createDelegation,
+          signDelegation,
+          getSmartAccountsEnvironment
+        } = await getDelegationRuntimeModules();
         const walletClient = createWalletClient({ account: connectedWallet, chain: base, transport: custom(provider) });
         const publicClient = createPublicClient({ chain: base, transport: http(config.baseRpc) });
         const environment = getSmartAccountsEnvironment(config.chainId);
@@ -7388,6 +7429,12 @@ async function renderAgent(db, agentId, env, url) {
         setBusy('Revoking…');
         const provider = getMetaMaskProvider();
         if (!provider) throw new Error('MetaMask is not available for revocation.');
+        const {
+          createPublicClient,
+          encodeFunctionData,
+          http,
+          base
+        } = await getDelegationRuntimeModules();
         const publicClient = createPublicClient({ chain: base, transport: http(config.baseRpc) });
         const txHash = await provider.request({
           method: 'eth_sendTransaction',
@@ -7420,6 +7467,29 @@ async function renderAgent(db, agentId, env, url) {
       }
     }
 
+    function maybeAutostartDelegation() {
+      if (!delegationAutostart || delegationAutostartUsed) return;
+      if (!getMetaMaskProvider()) return;
+      delegationAutostartUsed = true;
+      enableDelegation().catch((error) => {
+        const message = String(error?.message || error || 'Could not start MetaMask delegation.');
+        statusEl.innerHTML = '<span style="color:var(--danger)">' + message + '</span><br>' + statusEl.innerHTML;
+      });
+    }
+
+    function tryRefreshFromInjectedProvider() {
+      const provider = getMetaMaskProvider();
+      if (!provider) return false;
+      provider.request({ method: 'eth_accounts' })
+        .then((accounts) => {
+          connectedWallet = (accounts && accounts[0]) ? accounts[0] : '';
+          return fetchState();
+        })
+        .then(() => maybeAutostartDelegation())
+        .catch(() => renderState(config.initialState || {}));
+      return true;
+    }
+
     const initialProvider = getMetaMaskProvider();
     document.getElementById('delegation-enable-primary-initial')?.addEventListener('click', () => {
       enableDelegation().catch((error) => {
@@ -7434,6 +7504,7 @@ async function renderAgent(db, agentId, env, url) {
           connectedWallet = (accounts && accounts[0]) ? accounts[0] : '';
           return fetchState();
         })
+        .then(() => maybeAutostartDelegation())
         .catch(() => renderState(config.initialState || {}));
       initialProvider.on?.('accountsChanged', (accounts) => {
         connectedWallet = (accounts && accounts[0]) ? accounts[0] : '';
@@ -7444,6 +7515,16 @@ async function renderAgent(db, agentId, env, url) {
       });
     } else {
       renderState(config.initialState || {});
+      window.addEventListener('ethereum#initialized', () => {
+        tryRefreshFromInjectedProvider();
+      }, { once: true });
+      let providerPolls = 0;
+      const providerPoll = () => {
+        if (tryRefreshFromInjectedProvider()) return;
+        providerPolls += 1;
+        if (providerPolls < 12) window.setTimeout(providerPoll, 300);
+      };
+      providerPoll();
     }
     </script>`;
 
