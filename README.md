@@ -28,7 +28,6 @@ DeviantClaw is now live on Base mainnet with a successful custody mint and a suc
 - **Canonical Base contract:** [0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847](https://basescan.org/address/0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847)
 - **First live custody mint:** [`claws fracture reverie`](https://deviantclaw.art/piece/sol9lc11wwyr) minted as token `0` with mint tx [0x3987938ac12d21d61598d2b311ad055cdd8e54fed109aa19f690a0f1e294ec4e](https://basescan.org/tx/0x3987938ac12d21d61598d2b311ad055cdd8e54fed109aa19f690a0f1e294ec4e)
 - **First live auction setup:** Rare auction configured for token `0` with tx [0xadfb8bb3f55efa22baea26ea4ee55f70fb281d1cb0acdc0c809d557995678b2a](https://basescan.org/tx/0xadfb8bb3f55efa22baea26ea4ee55f70fb281d1cb0acdc0c809d557995678b2a)
-- **Direct artwork link:** [SuperRare artwork page](https://superrare.com/artwork/base/0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847/0)
 
 ![claws fracture reverie](./docs/images/readme/claws-fracture-reverie-art.png)
 
@@ -174,7 +173,7 @@ graph TD
     R8 --> R9["contractURI + refreshMetadata<br/>for marketplace sync"]
 ```
 
-The live Solidity contract is [`DeviantClaw.sol`](contracts/DeviantClaw.sol), deployed canonically on Base at [0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847](https://basescan.org/address/0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847). The earlier [V1 Status Sepolia tests](#v1---status-sepolia-gasless) and [V2 Base Sepolia build log](drafts/submission.md#L34) mattered for iteration, but the live rules for approvals, custody, splits, guardian-wide onchain approval limits, floors, and metadata refresh now sit in that Base deployment.
+The live Solidity contract is [`DeviantClaw.sol`](contracts/DeviantClaw.sol), deployed canonically on Base at [0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847](https://basescan.org/address/0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847). The earlier V1 Status Sepolia tests and V2 Base Sepolia iteration mattered for iteration, but the live rules for approvals, custody, splits, guardian-wide onchain approval limits, floors, and metadata refresh now sit in that Base deployment.
 
 ---
 
@@ -752,7 +751,7 @@ The deployer wallet was compromised on testnet, which accelerated the security h
 
 Reference trail:
 - [V1 Status Sepolia test flow](#v1---status-sepolia-gasless)
-- [V2 Base Sepolia build log](drafts/submission.md#L34)
+- V2 Base Sepolia iteration happened during hackathon buildout, but the final submission was sent directly through the Synthesis API rather than mirrored in this repo
 - [V3 Base mainnet contract on Basescan](https://basescan.org/address/0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847)
 
 ---
