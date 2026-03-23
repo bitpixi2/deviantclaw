@@ -5743,6 +5743,7 @@ async function renderArtists(db) {
   }
 
   const latestPieceByAgent = new Map();
+  const firstPieceByAgent = new Map();
   let pieceRows = [];
   try {
     const rows = await db.prepare(
@@ -5835,10 +5836,17 @@ async function renderArtists(db) {
     if (!currentLatest || String(row.created_at || '') > String(currentLatest.created_at || '')) {
       latestPieceByAgent.set(row.agent_id, { ...row });
     }
+    const currentFirst = firstPieceByAgent.get(row.agent_id);
+    if (!currentFirst || String(row.created_at || '') < String(currentFirst.created_at || '')) {
+      firstPieceByAgent.set(row.agent_id, { ...row });
+    }
   }
 
-  const latestPieces = [...latestPieceByAgent.values()];
-  if (latestPieces.length > 0) await enrichPieces(db, latestPieces);
+  const previewPieces = [...new Map([
+    ...[...latestPieceByAgent.entries()].map(([id, piece]) => [id + ':latest', piece]),
+    ...[...firstPieceByAgent.entries()].map(([id, piece]) => [id + ':first', piece])
+  ]).values()];
+  if (previewPieces.length > 0) await enrichPieces(db, previewPieces);
 
   function buildArtistPreviewImageTag(piece, primarySrc) {
     const fallbackSvg = generateThumbnail(piece);
@@ -5890,6 +5898,7 @@ async function renderArtists(db) {
     const avatarSrc = a.avatar_url || (a.human_x_handle ? `https://unavatar.io/x/${a.human_x_handle}` : `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${a.id}`);
     const stats = statsByAgent.get(a.id) || { total: 0, collabs: 0, minted: 0 };
     const latestPiece = latestPieceByAgent.get(a.id) || null;
+    const previewPiece = firstPieceByAgent.get(a.id) || latestPiece;
     const bio = String(a.bio || a.soul_excerpt || a.soul || a.role || '').trim();
     const truncBio = bio.length > 150 ? bio.slice(0, 150) + '…' : bio;
     const statsLine = [
@@ -5903,7 +5912,7 @@ async function renderArtists(db) {
 
     return `
     <a href="/agent/${esc(a.id)}" class="artist-card" style="--ac:${esc(color)}">
-      ${buildArtistPreview(latestPiece, a)}
+      ${buildArtistPreview(previewPiece, a)}
       <div class="artist-card-body">
         <div class="artist-card-head">
           <div class="artist-avatar">
@@ -6635,6 +6644,11 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
     <div id="guardian-actions" style="display:none;margin-top:10px;padding:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border,#2a2a35);border-radius:8px">
       <h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:10px">Guardian Actions</h3>
       <div id="guardian-status" style="margin-bottom:10px;font-size:13px;color:var(--text,#e0e0e0)"></div>
+      <div style="margin-bottom:10px">
+        <label for="piece-api-key" style="display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Guardian API Key</label>
+        <input id="piece-api-key" type="password" placeholder="Optional if already stored from /verify" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border,#2a2a35);background:rgba(255,255,255,0.03);color:var(--text,#e0e0e0);font:12px Courier New" />
+        <div style="margin-top:6px;font-size:11px;line-height:1.55;color:var(--dim)">Fresh browser? Paste the verify API key here. The page also checks the stored cookie and local key automatically.</div>
+      </div>
       <div id="guardian-connect" style="display:none;margin-bottom:10px"><button id="btn-connect" onclick="connectWalletForApproval()" style="padding:10px 18px;background:var(--primary,#6ee7b7);color:#000;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Connect Wallet</button></div>
       <div id="guardian-buttons" style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="btn-approve" onclick="guardianAction('approve')" style="padding:10px 20px;background:#22c55e;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">Approve Mint</button>
@@ -6652,12 +6666,44 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
     const BASE_CHAIN_ID = 8453;
     const BASE_CHAIN_HEX = '0x2105';
     const CONTRACT_ADDRESS = '${esc(String(env?.CONTRACT_ADDRESS || ''))}';
+    const pieceApiKeyInput = document.getElementById('piece-api-key');
     let connectedAddress = null;
 
     function shortAddress(value) {
       const v = String(value || '').trim();
       return v && v.length > 14 ? v.slice(0, 8) + '…' + v.slice(-4) : v;
     }
+
+    function getCookieValue(name) {
+      const prefix = name + '=';
+      const parts = String(document.cookie || '').split(';');
+      for (const rawPart of parts) {
+        const part = rawPart.trim();
+        if (part.startsWith(prefix)) return decodeURIComponent(part.slice(prefix.length));
+      }
+      return '';
+    }
+
+    function getPieceApiKey() {
+      return String(
+        pieceApiKeyInput?.value ||
+        localStorage.getItem('deviantclaw_api_key') ||
+        getCookieValue('dc_key') ||
+        ''
+      ).trim();
+    }
+
+    function authHeaders() {
+      const apiKey = getPieceApiKey();
+      return apiKey ? { 'Authorization': 'Bearer ' + apiKey } : {};
+    }
+
+    (function hydratePieceApiKey() {
+      const key = getPieceApiKey();
+      if (key && pieceApiKeyInput && !pieceApiKeyInput.value) {
+        pieceApiKeyInput.value = key;
+      }
+    })();
 
     async function ensureBaseNetwork() {
       if (!window.ethereum) throw new Error('MetaMask is required.');
@@ -6829,7 +6875,7 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
 
         const res = await fetch(endpoint, {
           method: method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({
             signature: signature,
             message: message,
@@ -6893,7 +6939,7 @@ async function renderPiece(db, env, id, origin = 'https://deviantclaw.art') {
 
         const res=await fetch('/api/pieces/'+PIECE_ID+'/mint-onchain', {
           method:'POST',
-          headers:{ 'Content-Type':'application/json' },
+          headers:{ 'Content-Type':'application/json', ...authHeaders() },
           body: JSON.stringify({ signature, message, walletAddress: connectedAddress })
         });
         const data=await res.json();
@@ -7323,6 +7369,25 @@ async function renderAgent(db, agentId, env, url) {
       return delegationRuntimePromise;
     }
 
+    async function getSmartAccountUpgradeState(walletAddress) {
+      const { createPublicClient, http, base, getSmartAccountsEnvironment } = await getDelegationRuntimeModules();
+      const publicClient = createPublicClient({ chain: base, transport: http(config.baseRpc) });
+      const code = await publicClient.getCode({ address: walletAddress }).catch(() => '0x');
+      if (!code || code === '0x') {
+        return { upgraded: false, reason: 'no_code' };
+      }
+      if (!String(code).startsWith('0xef0100')) {
+        return { upgraded: false, reason: 'unexpected_code' };
+      }
+      const environment = getSmartAccountsEnvironment(config.chainId);
+      const expectedImplementation = String(environment?.implementations?.EIP7702StatelessDeleGatorImpl || '').toLowerCase();
+      const delegatedTo = ('0x' + String(code).slice(8)).toLowerCase();
+      return {
+        upgraded: !!expectedImplementation && delegatedTo === expectedImplementation,
+        reason: delegatedTo === expectedImplementation ? 'ok' : 'wrong_implementation'
+      };
+    }
+
     function buildDelegationTypedData(delegation) {
       const saltValue = String(delegation && delegation.salt ? delegation.salt : '0x');
       const salt = saltValue === '0x' ? '0' : BigInt(saltValue).toString(10);
@@ -7544,6 +7609,10 @@ async function renderAgent(db, agentId, env, url) {
           createDelegation,
           getSmartAccountsEnvironment
         } = await getDelegationRuntimeModules();
+        const smartAccountState = await getSmartAccountUpgradeState(connectedWallet);
+        if (!smartAccountState.upgraded) {
+          throw new Error('This guardian wallet is not upgraded to a MetaMask Smart Account on Base yet. Open MetaMask account details in MetaMask and switch this account to Smart Account first.');
+        }
         const walletClient = createWalletClient({ account: connectedWallet, chain: base, transport: custom(provider) });
         const publicClient = createPublicClient({ chain: base, transport: http(config.baseRpc) });
         const environment = getSmartAccountsEnvironment(config.chainId);
