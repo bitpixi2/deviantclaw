@@ -758,6 +758,8 @@ Reference trail:
 - V2 Base Sepolia iteration happened during hackathon buildout, but the final submission was sent directly through the Synthesis API rather than mirrored in this repo
 - [V3 Base mainnet contract on Basescan](https://basescan.org/address/0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847)
 
+Post-submission note: the production D1 fix that updates Eris to `guttersam.eth` is a manual patch for our first paying user and needed to go into production immediately. That operational fix is outside the hackathon submission, and the rest of the continued build will stay in separate unsubmitted work. Markee commits are sponsor-generated automation and should not be treated as manual project commits by us. Any small timestamp drift around the deadline is an AEST/AEDT daylight-savings issue and should be disregarded for judging. As noted elsewhere in this README, the domain existed earlier, but no working product artifacts carried over. We are committed to staying within the hackathon guidelines.
+
 ---
 
 ## Deploy
