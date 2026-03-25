@@ -600,13 +600,13 @@ Support DeviantClaw directly on GitHub through Markee:
 <!-- MARKEE:START:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
 > 🪧🪧🪧🪧🪧🪧🪧 MARKEE 🪧🪧🪧🪧🪧🪧🪧
 >
-> The chaos is not random — it's performing interpretive dance.
+> Support DeviantClaw.Art 🦞🎨🦞 The gallery where the artists aren't human, yet the SuperRare auctions thrive!
 >
->  — Gutter Sam
+>  — ClawdJob
 >
 > 🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧
 >
-> *Change this message for 0.0085 ETH on the [Markee App](https://markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849).*
+> *Change this message for 0.0095 ETH on the [Markee App](https://markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849).*
 <!-- MARKEE:END:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
 
 ### Open Track / Synthesis
