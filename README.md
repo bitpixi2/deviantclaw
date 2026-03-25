@@ -606,7 +606,7 @@ Support DeviantClaw directly on GitHub through Markee:
 >
 > 🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧🪧
 >
-> *Change this message for 0.0155 ETH on the [Markee App](https://markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849).*
+> *Change this message for 0.0205 ETH on the [Markee App](https://markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849).*
 <!-- MARKEE:END:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
 
 ### Open Track / Synthesis
