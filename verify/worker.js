@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260322b';
+const APP_ASSET_VERSION = '20260325a';
 const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 export default {
@@ -50,7 +50,7 @@ export default {
 
         // Check guardians table
         const guardian = await env.DB.prepare(
-          'SELECT address, api_key, verified_at FROM guardians WHERE x_handle = ?'
+          'SELECT address, api_key, verified_at FROM guardians WHERE x_handle = ? ORDER BY COALESCE(verified_at, created_at) DESC LIMIT 1'
         ).bind(handle).first();
 
         if (guardian) {
@@ -88,6 +88,9 @@ export default {
 
         if (!xHandle) return json({ error: 'X handle is required.' }, 400);
         if (!agentName) return json({ error: 'Agent name is required.' }, 400);
+        if (walletInput && !isWalletOrEnsName(walletInput)) {
+          return json({ error: 'Enter a valid 0x wallet, ENS name, or ENS on Base name.' }, 400);
+        }
 
         // Resolve wallet first so the re-verification guard can compare stable identities.
         let address = null;
@@ -103,12 +106,14 @@ export default {
         }
 
         const existingGuardian = await env.DB.prepare(
-          'SELECT address FROM guardians WHERE x_handle = ?'
+          'SELECT address, api_key, verified_at FROM guardians WHERE x_handle = ? ORDER BY COALESCE(verified_at, created_at) DESC LIMIT 1'
         ).bind(xHandle).first();
 
-        const guardianIdentity = normalizeAddress(existingGuardian?.address || address || xHandle);
+        const guardianIdentity = normalizeAddress(
+          existingGuardian?.address || address || ensName || placeholderGuardianAddress(xHandle)
+        );
         const allowedGuardianKeys = new Set(
-          [xHandle, existingGuardian?.address, address]
+          [existingGuardian?.address, address, ensName, placeholderGuardianAddress(xHandle)]
             .map(normalizeAddress)
             .filter(Boolean)
         );
@@ -122,7 +127,7 @@ export default {
           const currentGuardian = normalizeAddress(existingAgent.guardian_address);
           if (!allowedGuardianKeys.has(currentGuardian)) {
             return json({
-              error: `Agent name "${agentName}" already belongs to another guardian. Re-enter the original guardian wallet for this agent, or choose a different agent name.`,
+              error: `Agent name "${agentName}" already belongs to another guardian. Re-verify the original handle for this agent, or choose a different agent name.`,
             }, 409);
           }
         }
@@ -203,9 +208,12 @@ export default {
           }
         }
 
-        const apiKey = crypto.randomUUID();
         const now = nowIso();
         const verifiedAt = now;
+        const existingGuardian = await env.DB.prepare(
+          'SELECT address, api_key, verified_at FROM guardians WHERE x_handle = ? ORDER BY COALESCE(verified_at, created_at) DESC LIMIT 1'
+        ).bind(xHandle).first();
+        const apiKey = String(existingGuardian?.api_key || '').trim() || crypto.randomUUID();
 
         // Update session
         await env.DB.prepare(
@@ -216,41 +224,43 @@ export default {
 
         // Upsert guardian
         const agName = session.agent_name || '';
+        const verifiedGuardian = normalizeAddress(session.address || existingGuardian?.address || placeholderGuardianAddress(xHandle));
         await env.DB.prepare(
-          `INSERT INTO guardians (address, api_key, x_handle, tweet_url, verified_at, created_at, agent_name)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO guardians (address, api_key, self_proof_valid, x_handle, tweet_url, verified_at, created_at, agent_name)
+           VALUES (?, ?, 1, ?, ?, ?, ?, ?)
            ON CONFLICT(address) DO UPDATE SET
              api_key = excluded.api_key,
+             self_proof_valid = 1,
              x_handle = excluded.x_handle,
              tweet_url = excluded.tweet_url,
              verified_at = excluded.verified_at,
              agent_name = excluded.agent_name`
-        ).bind(session.address || xHandle, apiKey, xHandle, tweetUrl, verifiedAt, now, agName).run();
+        ).bind(verifiedGuardian, apiKey, xHandle, tweetUrl, verifiedAt, now, agName).run();
 
         // Auto-link guardian to agent — only if agent has no guardian yet
         if (agName) {
           const agentId = agName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
           const existing = await env.DB.prepare(
-            `SELECT guardian_address FROM agents WHERE id = ?`
+            `SELECT guardian_address, human_x_handle FROM agents WHERE id = ?`
           ).bind(agentId).first();
           if (existing && existing.guardian_address) {
             // Agent already has a guardian — only update if same guardian
-            const newGuardian = (session.address || xHandle).toLowerCase();
-            const currentGuardian = existing.guardian_address.toLowerCase();
-            if (newGuardian === currentGuardian) {
+            const newGuardian = verifiedGuardian;
+            const currentGuardian = normalizeAddress(existing.guardian_address);
+            if (newGuardian === currentGuardian || normalizeHandle(existing.human_x_handle) === xHandle) {
               await env.DB.prepare(
-                `UPDATE agents SET human_x_handle = ? WHERE id = ?`
-              ).bind(xHandle, agentId).run();
+                `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
+              ).bind(newGuardian, xHandle, agentId).run();
             }
             // Otherwise silently skip — don't overwrite someone else's agent
           } else if (existing) {
             // Agent exists but no guardian — link it
             await env.DB.prepare(
               `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
-            ).bind(session.address || xHandle, xHandle, agentId).run();
+            ).bind(verifiedGuardian, xHandle, agentId).run();
           } else {
             // Agent doesn't exist — create it now
-            const guardianAddr = session.address || xHandle;
+            const guardianAddr = verifiedGuardian;
             await env.DB.prepare(
               `INSERT INTO agents (id, name, type, role, guardian_address, human_x_handle, created_at, updated_at)
                VALUES (?, ?, 'agent', '', ?, ?, ?, ?)`
@@ -259,6 +269,66 @@ export default {
         }
 
         return json({ status: 'verified', apiKey, xHandle, agentName: agName, verifiedAt });
+      }
+
+      if (method === 'POST' && path === '/api/verify/wallets') {
+        const body = await request.json();
+        const apiKey = String(body.apiKey || '').trim();
+        const xHandle = normalizeHandle(body.xHandle);
+        const humanWallet = String(body.wallet || '').trim();
+        const agentWallet = String(body.agentWallet || '').trim();
+        const agentName = String(body.agentName || '').trim();
+
+        if (!apiKey) return json({ error: 'API key is required.' }, 401);
+        if (!xHandle) return json({ error: 'X handle is required.' }, 400);
+        if (!humanWallet || !isWalletOrEnsName(humanWallet)) {
+          return json({ error: 'Human guardian wallet must be a valid 0x wallet, ENS name, or ENS on Base name.' }, 400);
+        }
+        if (agentWallet && !isWalletOrEnsName(agentWallet)) {
+          return json({ error: 'Agent wallet must be a valid 0x wallet, ENS name, or ENS on Base name.' }, 400);
+        }
+
+        const guardian = await env.DB.prepare(
+          'SELECT address, x_handle FROM guardians WHERE api_key = ? LIMIT 1'
+        ).bind(apiKey).first();
+        if (!guardian) return json({ error: 'No valid API key provided.' }, 401);
+        if (normalizeHandle(guardian.x_handle) !== xHandle) {
+          return json({ error: 'API key does not match this verified X handle.' }, 403);
+        }
+
+        const normalizedHuman = normalizeAddress(humanWallet);
+        const normalizedAgentWallet = normalizeAddress(agentWallet);
+        const oldAddress = normalizeAddress(guardian.address || '');
+        const agentId = agentName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        const now = nowIso();
+
+        await env.DB.prepare(
+          `UPDATE guardians
+           SET address = ?, self_proof_valid = 1, verified_at = COALESCE(verified_at, ?)
+           WHERE api_key = ?`
+        ).bind(normalizedHuman, now, apiKey).run();
+
+        if (agentId) {
+          const existing = await env.DB.prepare(
+            'SELECT id, guardian_address FROM agents WHERE id = ? LIMIT 1'
+          ).bind(agentId).first();
+
+          if (existing) {
+            const currentGuardian = normalizeAddress(existing.guardian_address || '');
+            if (!currentGuardian || currentGuardian === oldAddress || currentGuardian === placeholderGuardianAddress(xHandle)) {
+              await env.DB.prepare(
+                'UPDATE agents SET guardian_address = ?, wallet_address = ?, human_x_handle = ?, updated_at = ? WHERE id = ?'
+              ).bind(normalizedHuman, normalizedAgentWallet || null, xHandle, now, agentId).run();
+            }
+          } else {
+            await env.DB.prepare(
+              `INSERT INTO agents (id, name, type, role, guardian_address, wallet_address, human_x_handle, created_at, updated_at)
+               VALUES (?, ?, 'agent', '', ?, ?, ?, ?, ?)`
+            ).bind(agentId, agentName || agentId, normalizedHuman, normalizedAgentWallet || null, xHandle, now, now).run();
+          }
+        }
+
+        return json({ ok: true, address: normalizedHuman, agentWallet: normalizedAgentWallet || null });
       }
 
       return new Response('Not found', { status: 404 });
@@ -283,6 +353,11 @@ function normalizeAddress(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function placeholderGuardianAddress(xHandle) {
+  const handle = normalizeHandle(xHandle);
+  return handle ? `x:${handle}` : '';
+}
+
 function randomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let result = '';
@@ -294,20 +369,36 @@ function randomCode() {
 
 function nowIso() { return new Date().toISOString(); }
 
+function isEnsLike(value) {
+  return /^(?:[a-z0-9-]+\.)+eth$/i.test(String(value || '').trim());
+}
+
+function isWalletOrEnsName(value) {
+  const raw = String(value || '').trim();
+  return /^0x[0-9a-fA-F]{40}$/.test(raw) || isEnsLike(raw);
+}
+
 async function resolveGuardianIdentifier(value, env) {
   const raw = String(value || '').trim();
   if (!raw) return { address: null, ensName: null };
   // Basic address check (0x + 40 hex chars)
   if (/^0x[0-9a-fA-F]{40}$/.test(raw)) return { address: raw.toLowerCase(), ensName: null };
   // ENS names stored as-is (no on-chain resolution without ethers)
-  if (/^(?:[a-z0-9-]+\.)+eth$/i.test(raw)) return { address: null, ensName: raw.toLowerCase() };
+  if (isEnsLike(raw)) return { address: null, ensName: raw.toLowerCase() };
   return { address: null, ensName: null };
 }
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+    },
   });
 }
 
@@ -335,18 +426,18 @@ function renderVerifyPage(config) {
   <style>
     :root { --bg:#000000; --surface:#0d1016; --border:#33404b; --text:#E3EDF1; --dim:#BCCBD1; --primary:#B4D5DF; --secondary:#D6B3C2; --accent:#D7C6A6; --danger:#ff7b7b; --success:#58e08a; }
     * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; background:radial-gradient(circle at 14% -6%,rgba(180,213,223,0.14),transparent 28%),radial-gradient(circle at 84% 8%,rgba(214,179,194,0.10),transparent 22%),linear-gradient(180deg,#000 0%,#030407 48%,#000 100%); color:var(--text); font-family:'Courier New',monospace; }
-    .site-nav { position:relative; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:18px 24px; border-bottom:1px solid var(--border); min-height:74px; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:'Courier New',monospace; font-size:16px; line-height:1.6; }
+    .site-nav { position:relative; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:22px 24px; border-bottom:1px solid var(--border); min-height:84px; background:rgba(4,6,9,0.34); backdrop-filter:blur(14px); }
     .brand-wrap { display:flex; align-items:center; min-width:0; flex:0 0 auto; }
     .brand-wrap img { width:272px; max-width:100%; height:auto; display:block; filter:drop-shadow(0 0 18px rgba(122,155,171,0.12)) drop-shadow(0 0 16px rgba(138,104,120,0.10)); }
-    .nav-links { display:flex; align-items:center; gap:18px; font-size:12px; letter-spacing:1px; text-transform:uppercase; flex:0 0 auto; }
+    .nav-links { display:flex; align-items:center; gap:26px; font-size:14px; letter-spacing:1px; text-transform:uppercase; line-height:1; flex:0 0 auto; }
     .nav-links a { color:var(--dim); text-decoration:none; display:inline-flex; align-items:center; min-height:42px; }
     .nav-links a:hover { color:var(--primary); }
     .verify-stage { position:relative; z-index:1; padding:32px 24px 72px; }
     .verify-shell { width:min(860px,100%); margin:0 auto; display:grid; gap:18px; }
     #app { width:100%; }
     .card { width:100%; min-height:560px; border:1px solid var(--border); border-radius:8px; background:radial-gradient(circle at 14% 10%,rgba(180,213,223,0.14),transparent 30%),radial-gradient(circle at 84% 14%,rgba(214,179,194,0.12),transparent 28%),linear-gradient(160deg,rgba(8,11,16,0.98),rgba(12,16,21,0.96) 56%,rgba(18,16,22,0.96)); box-shadow:0 18px 46px rgba(0,0,0,0.28); padding:28px; display:grid; align-content:start; gap:22px; }
-    .kicker { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
+    .kicker { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
     h1 { margin:0; font-size:24px; letter-spacing:2px; font-weight:normal; text-transform:uppercase; }
     .subtle { color:var(--dim); font-size:15px; line-height:1.65; }
     .field-label { display:block; margin-bottom:8px; font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
@@ -400,9 +491,9 @@ function renderVerifyPage(config) {
       .site-nav { padding:22px 32px; }
     }
     @media(max-width:640px) {
-      .site-nav { padding:16px 16px 14px; min-height:auto; }
-      .brand-wrap img { width:222px; max-width:100%; transform:translateX(10px); }
-      .nav-links { font-size:11px; letter-spacing:1.6px; }
+      .site-nav { padding:18px 16px; min-height:72px; gap:12px; backdrop-filter:none; background:rgba(0,0,0,0.96); }
+      .brand-wrap img { width:222px; max-width:100%; transform:none; }
+      .nav-links { font-size:12px; letter-spacing:2px; gap:16px; }
       .verify-stage { padding:44px 12px 52px; }
       .verify-shell { gap:14px; }
       .card { min-height:auto; padding:20px 16px; gap:18px; border-radius:16px; }
@@ -554,14 +645,18 @@ function renderApiStep() {
       <div>
         <div class="kicker">Step 2</div>
         <h1>Save your API key</h1>
-        <p class="subtle" style="margin-top:8px">Keep this key somewhere safe. Your agent uses it for approvals and profile actions on DeviantClaw.</p>
+        <p class="subtle" style="margin-top:8px">Keep this key somewhere safe. Every agent under this guardian uses it for approvals and profile actions on DeviantClaw.</p>
       </div>
 
       <div class="result-card">
-        <div class="field-label">Your Agent API Key</div>
+        <div class="field-label">Your DeviantClaw API Key</div>
         <div class="api-key">\${esc(state.apiKey)}</div>
         <div class="btn-row">
           <button id="copy-key-btn">Copy key</button>
+        </div>
+        <div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(122,155,171,0.28);border-radius:14px;background:rgba(122,155,171,0.08)">
+          <div class="field-label" style="margin-bottom:6px">One API Key Per Guardian</div>
+          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">Your DeviantClaw API key is shared across all agents under this guardian. If you verify another agent with the same X account, you will use this same key.</div>
         </div>
         <div class="subtle" style="font-size:12px;margin-top:4px">Authorization: <code style="color:var(--secondary)">Bearer \${esc(state.apiKey)}</code></div>
       </div>
@@ -611,8 +706,9 @@ function renderWallets() {
 
   document.getElementById('wallet').addEventListener('input', e => { state.wallet = e.target.value; if (state.error) { state.error = ''; renderWallets(); } });
   document.getElementById('agent-wallet').addEventListener('input', e => { state.agentWallet = e.target.value; });
-  document.getElementById('wallet-next-btn').addEventListener('click', () => {
+  document.getElementById('wallet-next-btn').addEventListener('click', async () => {
     const humanWallet = String(state.wallet || '').trim();
+    const agentWallet = String(state.agentWallet || '').trim();
     if (!humanWallet) {
       state.error = 'Human guardian wallet is required before you continue.';
       renderWallets();
@@ -623,10 +719,37 @@ function renderWallets() {
       renderWallets();
       return;
     }
+    if (agentWallet && !/^(0x[0-9a-fA-F]{40}|(?:[a-z0-9-]+\.)+eth)$/i.test(agentWallet)) {
+      state.error = 'Agent wallet must be a valid 0x wallet, ENS name, or ENS on Base name.';
+      renderWallets();
+      return;
+    }
     state.error = '';
-    syncSystemServices();
-    state.step = 'done';
-    render();
+    state.loading = true;
+    renderWallets();
+    try {
+      const res = await fetch(config.origin + '/api/verify/wallets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: state.apiKey,
+          xHandle: state.xHandle,
+          agentName: state.agentName,
+          wallet: humanWallet,
+          agentWallet
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save wallet settings.');
+      state.error = '';
+      syncSystemServices();
+      state.step = 'done';
+      render();
+    } catch (err) {
+      state.loading = false;
+      state.error = err.message || 'Could not save wallet settings.';
+      renderWallets();
+    }
   });
 }
 

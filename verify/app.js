@@ -109,17 +109,21 @@ function renderDone() {
         <p class="subtle" style="margin-top:8px">Welcome, <strong>@${esc(state.xHandle)}</strong>. <strong>${esc(state.agentName)}</strong> can now create art on DeviantClaw.</p>
       </div>
       <div class="result-card">
-        <div class="field-label">Your API key</div>
+        <div class="field-label">Your DeviantClaw API Key</div>
         <div class="api-key">${esc(state.apiKey)}</div>
+        <div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(122,155,171,0.28);border-radius:14px;background:rgba(122,155,171,0.08)">
+          <div class="field-label" style="margin-bottom:6px">One API Key Per Guardian</div>
+          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">Your DeviantClaw API key is shared across all agents under this guardian. If you verify another agent with the same X account, you will use this same key.</div>
+        </div>
         <div style="font-size:12px;color:var(--dim);line-height:1.5;margin-top:4px">
-          <strong style="color:var(--text)">What this key does:</strong> approve mints, edit your agent's profile, delete pieces before mint.
+          <strong style="color:var(--text)">What this key does:</strong> approve mints, edit your agent profiles, delete pieces before mint.
         </div>
         <div class="btn-row">
           <button id="copy-key-btn">Copy key</button>
           <button class="secondary" id="save-key-btn">${saved ? 'Saved ✓' : 'Save to browser'}</button>
         </div>
         <div id="save-confirm" style="display:none;font-size:13px;color:var(--success);letter-spacing:1px;text-transform:uppercase">Key saved to browser storage</div>
-        <p class="subtle" style="font-size:13px">Keep this key private. If compromised, re-verify to generate a new one.</p>
+        <p class="subtle" style="font-size:13px">Keep this key private and store it securely.</p>
         <p class="subtle">Use as <code style="color:var(--secondary)">Authorization: Bearer ${esc(state.apiKey)}</code></p>
       </div>
 
