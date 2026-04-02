@@ -1,0 +1,8 @@
+# Cloudflare Worker local development template
+# Copy to .dev.vars or .dev.vars.local and fill locally.
+# NEVER commit real secrets.
+
+VENICE_API_KEY=YOUR_VENICE_API_KEY
+DEPLOYER_KEY=YOUR_DEPLOYER_PRIVATE_KEY
+DELEGATION_RELAYER_KEY=YOUR_DELEGATION_RELAYER_PRIVATE_KEY
+X_BEARER_TOKEN=YOUR_X_BEARER_TOKEN

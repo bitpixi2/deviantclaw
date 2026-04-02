@@ -789,6 +789,15 @@ wrangler secret put DEPLOYER_KEY
 wrangler deploy
 ```
 
+### Secret handling
+
+- Do not commit `.env`, `.env.local`, `.env.deploy.local`, `.dev.vars`, or `.dev.vars.local`.
+- Use `.env.deploy.example` and `.dev.vars.example` as placeholders only.
+- Keep live worker secrets in Cloudflare via `wrangler secret put ...`.
+- If a key was ever committed, treat it as compromised and rotate it immediately.
+- For local shell scripts, copy `.env.deploy.example` to `.env.deploy.local` and source that untracked file instead of storing real values in the repo.
+
+
 ---
 
 ## Team

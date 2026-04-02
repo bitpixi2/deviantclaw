@@ -26,8 +26,9 @@ if [ -z "${DEPLOYER_KEY:-}" ]; then
     echo "Usage:"
     echo "  DEPLOYER_KEY=0x... bash scripts/deploy-status-sepolia.sh"
     echo ""
-    echo "Or source from .env.deploy:"
-    echo "  source .env.deploy && bash scripts/deploy-status-sepolia.sh"
+    echo "Or source from an untracked local file:" 
+    echo "  cp .env.deploy.example .env.deploy.local"
+    echo "  source .env.deploy.local && bash scripts/deploy-status-sepolia.sh"
     exit 1
 fi
 
