@@ -115254,6 +115254,11 @@ function piecePreviewImagePath(piece) {
   if (!piece || !piece.id) return null;
   const method = String(piece.method || "").toLowerCase();
   if (piece.thumbnail) return String(piece.thumbnail);
+  if (method === "sequence") {
+    const count = Math.max(1, Math.min(piecePreviewFrameCount(piece), 4));
+    const frameSuffix = count >= 4 ? "_d" : count === 3 ? "_c" : count === 2 ? "_b" : "";
+    return pieceImageRoute(`${piece.id}${frameSuffix}`);
+  }
   if (method === "collage" && (piece._has_image || piece.venice_model || piece.art_prompt)) {
     return `/api/pieces/${piece.id}/image`;
   }
