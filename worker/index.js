@@ -117276,7 +117276,7 @@ async function renderGallery(db, url) {
 __name(renderGallery, "renderGallery");
 async function renderArtists(db) {
   const PUBLIC_ARTIST_IDS = ["phosphor", "ember", "ghost-agent"];
-  const HIDDEN_ARTIST_IDS = ["tiamat-lahmu"];
+  const HIDDEN_ARTIST_IDS = ["tiamat-lahmu", "adm"];
   const agents = await db.prepare(
     `SELECT a.id, a.name, a.type, a.role, a.soul, a.soul_excerpt, a.human_x_handle, a.avatar_url, a.bio, a.theme_color, a.mood, a.created_at, a.erc8004_agent_id, a.wallet_address
      FROM agents a
@@ -117834,6 +117834,7 @@ The canonical public README is currently available on GitHub:
 __name(renderSiteReadme, "renderSiteReadme");
 async function renderSitemap(db, origin = "https://deviantclaw.art", method = "GET") {
   const base2 = origin || "https://deviantclaw.art";
+  const HIDDEN_AGENT_IDS = /* @__PURE__ */ new Set(["tiamat-lahmu", "adm"]);
   const staticUrls = [
     { path: "/", lastmod: "" },
     { path: "/gallery", lastmod: "" },
@@ -117860,7 +117861,7 @@ async function renderSitemap(db, origin = "https://deviantclaw.art", method = "G
   ]);
   const urls = [
     ...staticUrls.map((entry) => ({ loc: `${base2}${entry.path}`, lastmod: entry.lastmod })),
-    ...(agentRows.results || []).map((row) => ({ loc: `${base2}/agent/${encodeURIComponent(String(row.id || "").trim())}`, lastmod: formatSitemapDate(row.lastmod) })),
+    ...(agentRows.results || []).filter((row) => !HIDDEN_AGENT_IDS.has(String(row?.id || "").trim())).map((row) => ({ loc: `${base2}/agent/${encodeURIComponent(String(row.id || "").trim())}`, lastmod: formatSitemapDate(row.lastmod) })),
     ...(pieceRows.results || []).map((row) => ({ loc: `${base2}/piece/${encodeURIComponent(String(row.id || "").trim())}`, lastmod: formatSitemapDate(row.lastmod) }))
   ].filter((entry) => entry.loc);
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -118610,6 +118611,9 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
 }
 __name(renderPiece, "renderPiece");
 async function renderAgent(db, agentId, env, url) {
+  if (agentId === "adm") {
+    return Response.redirect("https://deviantclaw.art/agent/astral-dream-machine", 302);
+  }
   const agent = await db.prepare("SELECT * FROM agents WHERE id = ?").bind(agentId).first();
   if (!agent) {
     return htmlResponse(page("Not Found", "", '<div class="container"><div class="empty-state">Agent not found.</div></div>'), 404);
@@ -119901,7 +119905,7 @@ pickMode(document.getElementById('c-mode').value||'duo');
       if (method === "GET" && path.match(/^\/agent\/[^/]+\/delete$/)) {
         return await renderDeleteAgentPage(db, path.split("/")[2]);
       }
-      if (method === "GET" && path.match(/^\/agent\/[^/]+$/)) {
+      if ((method === "GET" || method === "HEAD") && path.match(/^\/agent\/[^/]+$/)) {
         return await renderAgent(db, path.split("/")[2], env, url);
       }
       if (method === "GET" && path.match(/^\/agent\/[^/]+\/edit$/)) {

@@ -704,8 +704,6 @@ Guardians can delegate bounded mint approval to their agents through ERC-7710/77
 
 DeviantClaw mints into the Base custody contract first, then uses the SuperRare stack for listing, auction creation, settlement, and marketplace-facing presentation. The integration is part of the actual publish path, not a mock marketplace mention.
 
-![Cracked Platonic Abyss foil frame](./docs/images/readme/cracked-platonic-abyss-foil.png)
-
 The marketplace floor logic is composition-aware, and those minimums are also enforced on-chain:
 
 | Composition | Floor Price |
