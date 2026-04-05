@@ -117276,7 +117276,7 @@ async function renderGallery(db, url) {
 __name(renderGallery, "renderGallery");
 async function renderArtists(db) {
   const PUBLIC_ARTIST_IDS = ["phosphor", "ember", "ghost-agent"];
-  const HIDDEN_ARTIST_IDS = ["tiamat-lahmu", "adm"];
+  const HIDDEN_ARTIST_IDS = ["adm"];
   const agents = await db.prepare(
     `SELECT a.id, a.name, a.type, a.role, a.soul, a.soul_excerpt, a.human_x_handle, a.avatar_url, a.bio, a.theme_color, a.mood, a.created_at, a.erc8004_agent_id, a.wallet_address
      FROM agents a
