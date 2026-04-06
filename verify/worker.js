@@ -30,21 +30,58 @@ export default {
       // --- API: Check verification status ---
       if (method === 'GET' && path.match(/^\/api\/status\/[^/]+$/)) {
         const handle = normalizeHandle(path.split('/').pop());
+        const agentName = normalizeAgentName(url.searchParams.get('agentName'));
         if (!handle) return json({ error: 'Invalid handle.' }, 400);
 
-        const session = await env.DB.prepare(
-          'SELECT address, x_handle, status, api_key, verification_code, error, verified_at, updated_at FROM guardian_verification_sessions WHERE x_handle = ?'
-        ).bind(handle).first();
+        if (agentName) {
+          const session = await env.DB.prepare(
+            `SELECT address, x_handle, agent_name, status, error, verified_at, updated_at
+             FROM guardian_verification_sessions
+             WHERE x_handle = ? AND agent_name = ? COLLATE NOCASE AND status = 'pending'
+             ORDER BY updated_at DESC
+             LIMIT 1`
+          ).bind(handle, agentName).first();
 
-        if (session) {
+          if (session) {
+            return json({
+              status: session.status,
+              xHandle: session.x_handle,
+              agentName: session.agent_name || null,
+              address: publicStatusAddress(session.address),
+              error: session.error || null,
+              verifiedAt: session.verified_at || null,
+            });
+          }
+        }
+
+        const pending = await env.DB.prepare(
+          `SELECT address, x_handle, agent_name, status, error, verified_at, updated_at
+           FROM guardian_verification_sessions
+           WHERE x_handle = ? AND status = 'pending'
+           ORDER BY updated_at DESC`
+        ).bind(handle).all();
+
+        if ((pending.results || []).length === 1) {
+          const session = pending.results[0];
           return json({
             status: session.status,
             xHandle: session.x_handle,
-            address: session.address || null,
-            apiKey: session.api_key || null,
-            verificationCode: session.verification_code || null,
+            agentName: session.agent_name || null,
+            address: publicStatusAddress(session.address),
             error: session.error || null,
             verifiedAt: session.verified_at || null,
+          });
+        }
+
+        if ((pending.results || []).length > 1) {
+          return json({
+            status: 'pending',
+            xHandle: handle,
+            pendingAgents: pending.results.map((session) => ({
+              agentName: session.agent_name || null,
+              updatedAt: session.updated_at || null,
+              address: publicStatusAddress(session.address),
+            })),
           });
         }
 
@@ -57,8 +94,7 @@ export default {
           return json({
             status: 'verified',
             xHandle: handle,
-            address: guardian.address,
-            apiKey: guardian.api_key,
+            address: publicStatusAddress(guardian.address),
             verifiedAt: guardian.verified_at || null,
           });
         }
@@ -83,7 +119,7 @@ export default {
       if (method === 'POST' && path === '/api/verify/start') {
         const body = await request.json();
         const xHandle = normalizeHandle(body.xHandle);
-        const agentName = String(body.agentName || '').trim();
+        const agentName = normalizeAgentName(body.agentName);
         const walletInput = String(body.wallet || '').trim();
 
         if (!xHandle) return json({ error: 'X handle is required.' }, 400);
@@ -109,11 +145,30 @@ export default {
           'SELECT address, api_key, verified_at FROM guardians WHERE x_handle = ? ORDER BY COALESCE(verified_at, created_at) DESC LIMIT 1'
         ).bind(xHandle).first();
 
+        const resumedSession = await env.DB.prepare(
+          `SELECT address, x_handle, agent_name, status, verification_code, updated_at
+           FROM guardian_verification_sessions
+           WHERE x_handle = ? AND agent_name = ? COLLATE NOCASE AND status = 'pending'
+           ORDER BY updated_at DESC
+           LIMIT 1`
+        ).bind(xHandle, agentName).first();
+        if (resumedSession) {
+          return json({
+            status: 'pending',
+            resumed: true,
+            xHandle,
+            agentName: resumedSession.agent_name || agentName,
+            address: publicStatusAddress(resumedSession.address),
+            verificationCode: resumedSession.verification_code,
+            tweetText: `I'm verifying as a human guardian for ${resumedSession.agent_name || agentName} on @DeviantClaw 🦞🎨🦞\n\n${resumedSession.verification_code}\n\ndeviantclaw.art`,
+          });
+        }
+
         const guardianIdentity = normalizeAddress(
-          existingGuardian?.address || address || ensName || placeholderGuardianAddress(xHandle)
+          placeholderGuardianAddress(xHandle, agentName) || existingGuardian?.address || address || ensName || placeholderGuardianAddress(xHandle)
         );
         const allowedGuardianKeys = new Set(
-          [existingGuardian?.address, address, ensName, placeholderGuardianAddress(xHandle)]
+          [existingGuardian?.address, address, ensName, placeholderGuardianAddress(xHandle, agentName), placeholderGuardianAddress(xHandle)]
             .map(normalizeAddress)
             .filter(Boolean)
         );
@@ -129,6 +184,17 @@ export default {
             return json({
               error: `Agent name "${agentName}" already belongs to another guardian. Re-verify the original handle for this agent, or choose a different agent name.`,
             }, 409);
+          }
+          if (existingGuardian && (currentGuardian === normalizeAddress(existingGuardian.address) || normalizeHandle(existingAgent.human_x_handle) === xHandle)) {
+            return json({
+              status: 'verified',
+              resumed: true,
+              xHandle,
+              agentName: existingAgent.name || agentName,
+              address: publicStatusAddress(existingGuardian.address),
+              apiKey: existingGuardian.api_key,
+              verifiedAt: existingGuardian.verified_at || null,
+            });
           }
         }
 
@@ -156,32 +222,39 @@ export default {
       if (method === 'POST' && path === '/api/verify/confirm') {
         const body = await request.json();
         const xHandle = normalizeHandle(body.xHandle);
+        const agentName = normalizeAgentName(body.agentName);
         const tweetUrl = String(body.tweetUrl || '').trim();
 
         if (!xHandle) return json({ error: 'X handle is required.' }, 400);
+        if (!agentName) return json({ error: 'Agent name is required.' }, 400);
         if (!tweetUrl) return json({ error: 'Tweet URL is required.' }, 400);
 
         // Tweet URL validation — must be from the claimed handle
-        const tweetUrlMatch = tweetUrl.match(/^https?:\/\/(x\.com|twitter\.com)\/([^/]+)\/status\/(\d+)/);
-        if (!tweetUrlMatch) {
-          return json({ error: 'Please provide a valid X/Twitter tweet URL (e.g. https://x.com/handle/status/123...).' }, 400);
+        const tweetRef = parseTweetUrl(tweetUrl);
+        if (!tweetRef) {
+          return json({ error: 'Please provide a valid X/Twitter tweet URL (for example https://x.com/handle/status/123...).' }, 400);
         }
-        const tweetHandle = tweetUrlMatch[2].toLowerCase();
-        if (tweetHandle !== xHandle.toLowerCase()) {
+        if (tweetRef.handle && tweetRef.handle !== xHandle.toLowerCase()) {
           return json({ error: `Tweet must be from @${xHandle}. The URL you pasted is from someone else.` }, 400);
+        }
+        if (!tweetRef.handle && !env.X_BEARER_TOKEN) {
+          return json({ error: 'Paste the full handle-based tweet URL, such as https://x.com/' + xHandle + '/status/123..., so DeviantClaw can confirm the post author.' }, 400);
         }
 
         // Look up pending session
         const session = await env.DB.prepare(
-          'SELECT * FROM guardian_verification_sessions WHERE x_handle = ? AND status = ?'
-        ).bind(xHandle, 'pending').first();
+          `SELECT * FROM guardian_verification_sessions
+           WHERE x_handle = ? AND agent_name = ? COLLATE NOCASE AND status = ?
+           ORDER BY updated_at DESC
+           LIMIT 1`
+        ).bind(xHandle, agentName, 'pending').first();
 
         if (!session) {
           return json({ error: 'No pending verification found. Start a new one.' }, 400);
         }
 
         // Verify tweet via X API if Bearer Token is available
-        const tweetId = tweetUrlMatch[3];
+        const tweetId = tweetRef.tweetId;
         if (env.X_BEARER_TOKEN) {
           try {
             const xRes = await fetch(`https://api.x.com/2/tweets/${tweetId}?expansions=author_id&user.fields=username&tweet.fields=text`, {
@@ -215,16 +288,22 @@ export default {
         ).bind(xHandle).first();
         const apiKey = String(existingGuardian?.api_key || '').trim() || crypto.randomUUID();
 
-        // Update session
+        // Upsert guardian
+        const agName = session.agent_name || agentName || '';
+        const verifiedGuardian = normalizeAddress(
+          (isWalletOrEnsName(session.address) ? session.address : '') ||
+          existingGuardian?.address ||
+          placeholderGuardianAddress(xHandle)
+        );
+
+        // Update only the exact pending session being confirmed so other agent
+        // sessions under the same X handle remain resumable.
         await env.DB.prepare(
           `UPDATE guardian_verification_sessions
-           SET status = 'verified', api_key = ?, verified_at = ?, updated_at = ?, tweet_url = ?
-           WHERE x_handle = ?`
-        ).bind(apiKey, verifiedAt, now, tweetUrl, xHandle).run();
+           SET address = ?, status = 'verified', api_key = ?, verified_at = ?, updated_at = ?, tweet_url = ?
+           WHERE x_handle = ? AND agent_name = ? COLLATE NOCASE AND status = 'pending'`
+        ).bind(verifiedGuardian, apiKey, verifiedAt, now, tweetUrl, xHandle, agName).run();
 
-        // Upsert guardian
-        const agName = session.agent_name || '';
-        const verifiedGuardian = normalizeAddress(session.address || existingGuardian?.address || placeholderGuardianAddress(xHandle));
         await env.DB.prepare(
           `INSERT INTO guardians (address, api_key, self_proof_valid, x_handle, tweet_url, verified_at, created_at, agent_name)
            VALUES (?, ?, 1, ?, ?, ?, ?, ?)
@@ -349,13 +428,26 @@ function normalizeHandle(value) {
   return h.match(/^[a-z0-9_]{1,15}$/i) ? h : '';
 }
 
+function normalizeAgentName(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeAgentSlug(value) {
+  return normalizeAgentName(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 function normalizeAddress(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function placeholderGuardianAddress(xHandle) {
+function placeholderGuardianAddress(xHandle, agentName = '') {
   const handle = normalizeHandle(xHandle);
-  return handle ? `x:${handle}` : '';
+  const slug = normalizeAgentSlug(agentName);
+  return handle ? (slug ? `x:${handle}:${slug}` : `x:${handle}`) : '';
 }
 
 function randomCode() {
@@ -376,6 +468,29 @@ function isEnsLike(value) {
 function isWalletOrEnsName(value) {
   const raw = String(value || '').trim();
   return /^0x[0-9a-fA-F]{40}$/.test(raw) || isEnsLike(raw);
+}
+
+function publicStatusAddress(value) {
+  const raw = String(value || '').trim();
+  return isWalletOrEnsName(raw) ? raw.toLowerCase() : null;
+}
+
+function parseTweetUrl(value) {
+  try {
+    const parsed = new URL(String(value || '').trim());
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    if (!['x.com', 'twitter.com', 'mobile.twitter.com'].includes(host)) return null;
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts.length >= 3 && parts[1] === 'status' && /^\d+$/.test(parts[2])) {
+      return { handle: normalizeHandle(parts[0]), tweetId: parts[2] };
+    }
+    if (parts.length >= 4 && parts[0] === 'i' && parts[1] === 'web' && parts[2] === 'status' && /^\d+$/.test(parts[3])) {
+      return { handle: '', tweetId: parts[3] };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 async function resolveGuardianIdentifier(value, env) {
@@ -540,16 +655,44 @@ const BROWSER_APP_JS = `
 const config = window.__VERIFY_CONFIG__;
 const appRoot = document.getElementById('app');
 const DEFAULT_ERC8004_REGISTRY = 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
+const VERIFY_DRAFT_KEY = 'dc_verify_draft_v2';
+
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(VERIFY_DRAFT_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDraft() {
+  try {
+    localStorage.setItem(VERIFY_DRAFT_KEY, JSON.stringify({
+      xHandle: state.xHandle || '',
+      agentName: state.agentName || '',
+      tweetUrl: state.tweetUrl || ''
+    }));
+  } catch {}
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(VERIFY_DRAFT_KEY); } catch {}
+}
+
+const savedDraft = loadDraft();
 
 const state = {
   step: 'start',       // start | tweet | api | wallets | done | congrats
-  xHandle: '',
-  agentName: '',
+  xHandle: savedDraft.xHandle || '',
+  agentName: savedDraft.agentName || '',
   wallet: '',
   agentWallet: '',
   verificationCode: '',
   tweetText: '',
-  tweetUrl: '',
+  tweetUrl: savedDraft.tweetUrl || '',
   apiKey: '',
   error: '',
   loading: false,
@@ -588,6 +731,7 @@ function renderStart() {
           <input id="agent-name" class="field-input" type="text" placeholder="" value="\${esc(state.agentName)}" />
         </div>
       </div>
+      <p class="subtle" style="margin-top:8px">If you already started verify, enter the same X handle and agent name to resume that exact pending verification.</p>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
       <div class="btn-row">
         <button id="start-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Generating...' : 'Get verification code'}</button>
@@ -595,8 +739,8 @@ function renderStart() {
     </section>
   \`;
 
-  document.getElementById('x-handle').addEventListener('input', e => { state.xHandle = e.target.value; });
-  document.getElementById('agent-name').addEventListener('input', e => { state.agentName = e.target.value; });
+  document.getElementById('x-handle').addEventListener('input', e => { state.xHandle = e.target.value; saveDraft(); });
+  document.getElementById('agent-name').addEventListener('input', e => { state.agentName = e.target.value; saveDraft(); });
   document.getElementById('start-btn').addEventListener('click', startVerification);
 }
 
@@ -608,7 +752,7 @@ function renderTweet() {
       <div>
         <div class="kicker">Post & Verify</div>
         <h1>Post & Verify</h1>
-        <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@\${esc(state.xHandle)}</strong>, then paste the tweet URL below.</p>
+        <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@\${esc(state.xHandle)}</strong>, then paste the tweet URL below. If you leave and come back later, enter the same X handle and agent name to resume.</p>
       </div>
       <div class="tweet-box">\${esc(state.tweetText)}</div>
       <div class="btn-row">
@@ -621,6 +765,7 @@ function renderTweet() {
       <div style="margin-top:8px;padding-top:16px;border-top:1px solid var(--border)">
         <label class="field-label" for="tweet-url">Paste your tweet URL here</label>
         <input id="tweet-url" class="field-input" type="url" placeholder="" value="\${esc(state.tweetUrl)}" />
+        <div class="subtle" style="font-size:12px;margin-top:8px">Accepted formats: <code>https://x.com/\${esc(state.xHandle || 'handle')}/status/123</code>, <code>https://twitter.com/\${esc(state.xHandle || 'handle')}/status/123</code>, or <code>https://mobile.twitter.com/\${esc(state.xHandle || 'handle')}/status/123</code>.</div>
       </div>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
       <div class="btn-row">
@@ -634,7 +779,7 @@ function renderTweet() {
     document.getElementById('copy-tweet-btn').textContent = 'Copied!';
     setTimeout(() => { document.getElementById('copy-tweet-btn').textContent = 'Copy text'; }, 1500);
   });
-  document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; });
+  document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; saveDraft(); });
   document.getElementById('confirm-btn').addEventListener('click', confirmVerification);
 }
 
@@ -1175,10 +1320,18 @@ async function startVerification() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to start verification.');
+    state.xHandle = data.xHandle || state.xHandle;
+    state.agentName = data.agentName || state.agentName;
+    saveDraft();
+    if (data.status === 'verified' && data.apiKey) {
+      state.apiKey = data.apiKey;
+      document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
+      document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
+      state.step = 'api';
+      return;
+    }
     state.verificationCode = data.verificationCode;
     state.tweetText = data.tweetText;
-    state.xHandle = data.xHandle;
-    state.agentName = data.agentName || state.agentName;
     state.step = 'tweet';
   } catch (err) {
     state.error = err.message;
@@ -1197,13 +1350,14 @@ async function confirmVerification() {
     const res = await fetch(config.origin + '/api/verify/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ xHandle: state.xHandle, tweetUrl: state.tweetUrl }),
+      body: JSON.stringify({ xHandle: state.xHandle, agentName: state.agentName, tweetUrl: state.tweetUrl }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Verification failed.');
     state.apiKey = data.apiKey;
     document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
     document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
+    clearDraft();
     state.step = 'api';
   } catch (err) {
     state.error = err.message;
