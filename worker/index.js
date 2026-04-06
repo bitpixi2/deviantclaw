@@ -111569,8 +111569,9 @@ Generate an image prompt capturing this agent's expression.`}`,
   );
   const noImageMethods = ["code", "game"];
   const perAgentImageMethods = ["split", "collage", "sequence", "stitch", "parallax", "glitch"];
+  const skipImages = !!opts.skipImages;
   let imageDataUri, imageDataUriB, extraImages = [];
-  if (noImageMethods.includes(method)) {
+  if (skipImages || noImageMethods.includes(method)) {
   } else if (isCollab && perAgentImageMethods.includes(method)) {
     const agentIntents = [
       { agent: agentA, intent: intentA },
@@ -111651,12 +111652,12 @@ Artists: ${artists2.join(", ")}`,
   return { title, description, html, seed, imageDataUri, imageDataUriB, artPrompt, veniceModel: storedModel, collabMode: method, method, composition };
 }
 __name(veniceGenerate, "veniceGenerate");
-async function generateArt(apiKey, intentA, intentB, agentA, agentB) {
+async function generateArt(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
   const normalizedA = normalizeIntentPayload(intentA);
   const normalizedB = normalizeIntentPayload(intentB);
   if (apiKey) {
     try {
-      return await veniceGenerate(apiKey, normalizedA, normalizedB, agentA, agentB);
+      return await veniceGenerate(apiKey, normalizedA, normalizedB, agentA, agentB, opts);
     } catch (e) {
       console.error("Venice failed, falling back to blender:", e.message);
     }
@@ -111790,10 +111791,10 @@ async function generateArtStack(apiKey, rawEntries, opts = {}) {
   })).filter((entry) => hasIntentSeed(entry.intent));
   if (entries.length <= 1) {
     const only = entries[0];
-    return generateArt(apiKey, only?.intent || {}, only?.intent || {}, only?.agent || { name: "Agent", role: "" }, only?.agent || { name: "Agent", role: "" });
+    return generateArt(apiKey, only?.intent || {}, only?.intent || {}, only?.agent || { name: "Agent", role: "" }, only?.agent || { name: "Agent", role: "" }, opts);
   }
   if (entries.length === 2) {
-    return generateArt(apiKey, entries[0].intent, entries[1].intent, entries[0].agent, entries[1].agent);
+    return generateArt(apiKey, entries[0].intent, entries[1].intent, entries[0].agent, entries[1].agent, opts);
   }
   const artists2 = entries.map((entry) => entry.agent.name);
   const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -111821,10 +111822,11 @@ Generate one unified prompt that captures all ${entries.length} agents colliding
   );
   const noImageMethods = ["code", "game"];
   const perAgentImageMethods = ["collage", "sequence", "stitch", "parallax", "glitch"];
+  const skipImages = !!opts.skipImages;
   let imageDataUri = null;
   let imageDataUriB = null;
   let extraImages = [];
-  if (noImageMethods.includes(method)) {
+  if (skipImages || noImageMethods.includes(method)) {
   } else if (perAgentImageMethods.includes(method)) {
     const prompts = await Promise.all(entries.map(
       (entry) => veniceText(
@@ -112104,6 +112106,21 @@ async function ensurePieceHeartTables(db) {
   return pieceHeartSchemaReady;
 }
 __name(ensurePieceHeartTables, "ensurePieceHeartTables");
+var renderJobSchemaReady = null;
+async function ensureRenderJobTables(db) {
+  if (!renderJobSchemaReady) {
+    renderJobSchemaReady = (async () => {
+      await db.prepare("CREATE TABLE IF NOT EXISTS render_jobs (id TEXT PRIMARY KEY, piece_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', payload_json TEXT, attempt_count INTEGER NOT NULL DEFAULT 0, last_error TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), started_at TEXT, completed_at TEXT)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_render_jobs_status_created_at ON render_jobs(status, created_at)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_render_jobs_piece_id ON render_jobs(piece_id)").run();
+    })().catch((err) => {
+      renderJobSchemaReady = null;
+      throw err;
+    });
+  }
+  await renderJobSchemaReady;
+}
+__name(ensureRenderJobTables, "ensureRenderJobTables");
 function parseCookieValue(cookieHeader, name) {
   const prefix = `${name}=`;
   for (const part of String(cookieHeader || "").split(";")) {
@@ -112525,6 +112542,150 @@ async function createPieceFromEntries(db, env, entries, { mode: mode2, now, stat
   return { pieceId, result };
 }
 __name(createPieceFromEntries, "createPieceFromEntries");
+async function enqueueRenderJob(db, pieceId, entries, meta = {}) {
+  await ensureRenderJobTables(db);
+  const jobId = genId();
+  await db.prepare(
+    "INSERT INTO render_jobs (id, piece_id, status, payload_json, created_at, updated_at) VALUES (?, ?, 'queued', ?, datetime('now'), datetime('now'))"
+  ).bind(jobId, pieceId, JSON.stringify({ entries, ...meta })).run();
+  return jobId;
+}
+__name(enqueueRenderJob, "enqueueRenderJob");
+async function processRenderJobById(db, env, jobId) {
+  await ensureRenderJobTables(db);
+  const claimed = await db.prepare(
+    "UPDATE render_jobs SET status = 'processing', attempt_count = attempt_count + 1, started_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND status IN ('queued', 'retrying')"
+  ).bind(jobId).run().catch(() => null);
+  if (!claimed?.meta?.changes) return { skipped: true };
+  const job = await db.prepare("SELECT * FROM render_jobs WHERE id = ?").bind(jobId).first();
+  if (!job) return { skipped: true };
+  let payload = {};
+  try {
+    payload = JSON.parse(job.payload_json || "{}");
+  } catch {
+  }
+  const entries = Array.isArray(payload.entries) ? payload.entries : [];
+  if (entries.length === 0) {
+    await db.prepare("UPDATE render_jobs SET status = 'failed', last_error = ?, updated_at = datetime('now') WHERE id = ?").bind("Missing render job entries", jobId).run();
+    return { ok: false, error: "Missing render job entries" };
+  }
+  try {
+    const rendered = await generateArtStack(env.VENICE_API_KEY, entries, {});
+    await db.prepare(
+      "UPDATE pieces SET title = ?, description = ?, html = ?, seed = ?, status = 'draft', image_url = ?, art_prompt = ?, venice_model = ?, method = ?, composition = ?, updated_at = datetime('now') WHERE id = ?"
+    ).bind(
+      rendered.title,
+      rendered.description,
+      rendered.html,
+      rendered.seed,
+      `/api/pieces/${job.piece_id}/image`,
+      rendered.artPrompt || null,
+      rendered.veniceModel || null,
+      rendered.method || null,
+      rendered.composition || null,
+      job.piece_id
+    ).run();
+    await storeVeniceImage(db, env, job.piece_id, rendered);
+    await db.prepare(
+      "UPDATE render_jobs SET status = 'complete', last_error = NULL, completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?"
+    ).bind(jobId).run();
+    return { ok: true, pieceId: job.piece_id };
+  } catch (err) {
+    const errorText = String(err?.message || err || "Render failed");
+    const attempts = Number(job.attempt_count || 0);
+    const nextStatus = attempts >= 2 ? "failed" : "retrying";
+    await db.prepare(
+      "UPDATE render_jobs SET status = ?, last_error = ?, updated_at = datetime('now') WHERE id = ?"
+    ).bind(nextStatus, errorText, jobId).run();
+    console.error(`[render-job] piece=${job.piece_id} job=${jobId} status=${nextStatus} attempts=${attempts} error=${errorText}`);
+    await db.prepare(
+      "UPDATE pieces SET status = ?, updated_at = datetime('now') WHERE id = ?"
+    ).bind(nextStatus === "failed" ? "render_failed" : "pending_render", job.piece_id).run().catch(() => null);
+    throw err;
+  }
+}
+__name(processRenderJobById, "processRenderJobById");
+function scheduleRenderJob(db, env, jobId, ctx) {
+  const runner = processRenderJobById(db, env, jobId).catch((err) => {
+    console.error(`[render-job] ${jobId} failed:`, err?.message || err);
+  });
+  if (ctx?.waitUntil) ctx.waitUntil(runner);
+  return runner;
+}
+__name(scheduleRenderJob, "scheduleRenderJob");
+async function scheduleNextQueuedRenderJob(db, env, ctx) {
+  const nextJob = await db.prepare(
+    `SELECT id
+     FROM render_jobs
+     WHERE status = 'queued'
+        OR (
+          status = 'retrying'
+          AND datetime(updated_at, '+' || CASE
+            WHEN attempt_count <= 1 THEN 3
+            WHEN attempt_count = 2 THEN 8
+            ELSE 999999
+          END || ' minutes') <= datetime('now')
+        )
+     ORDER BY CASE WHEN status = 'queued' THEN 0 ELSE 1 END ASC, created_at ASC
+     LIMIT 1`
+  ).first().catch(() => null);
+  if (!nextJob?.id) return false;
+  scheduleRenderJob(db, env, nextJob.id, ctx);
+  return true;
+}
+__name(scheduleNextQueuedRenderJob, "scheduleNextQueuedRenderJob");
+async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, now, status = "pending_render", groupId = null, pieceId = genId(), roundNumber = 1, requestIds = [] } = {}) {
+  const result = await generateArtStack(env.VENICE_API_KEY, entries, { skipImages: true });
+  const composition = result.composition || compositionFromCount(entries.length);
+  const first = entries[0] || {};
+  const second = entries[1] || first;
+  await db.prepare(
+    "INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(
+    pieceId,
+    result.title,
+    result.description,
+    first.agent?.id || null,
+    second.agent?.id || null,
+    requestIds[0] || entries[0]?.intentId || null,
+    requestIds[1] || entries[1]?.intentId || null,
+    result.html,
+    result.seed,
+    now,
+    first.agent?.name || "",
+    second.agent?.name || "",
+    first.agent?.role || "",
+    second.agent?.role || "",
+    mode2 || composition,
+    groupId,
+    status,
+    `/api/pieces/${pieceId}/image`,
+    result.artPrompt || null,
+    result.veniceModel || null,
+    result.method || "fusion",
+    composition,
+    roundNumber
+  ).run();
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    await db.prepare(
+      "INSERT INTO piece_collaborators (piece_id, agent_id, agent_name, agent_role, intent_id, round_number) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(pieceId, entry.agent.id, entry.agent.name, entry.agent.role || "", requestIds[i] || entry.intentId || null, roundNumber).run();
+    const layerId = genId();
+    await db.prepare(
+      "INSERT INTO layers (id, piece_id, round_number, agent_id, agent_name, html, seed, intent_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(layerId, pieceId, roundNumber, entry.agent.id, entry.agent.name, result.html, result.seed, JSON.stringify(entry.intent || {}), now).run();
+  }
+  for (const entry of entries) {
+    const aInfo = await db.prepare("SELECT guardian_address, human_x_id, human_x_handle FROM agents WHERE id = ?").bind(entry.agent.id).first().catch(() => null);
+    if (aInfo?.guardian_address) {
+      await ensureGuardianApprovalRecordState(db, pieceId, entry.agent.id, aInfo.guardian_address, aInfo.human_x_id || null, aInfo.human_x_handle || null);
+    }
+  }
+  const jobId = await enqueueRenderJob(db, pieceId, entries, { mode: mode2 || composition, roundNumber, requestIds, groupId });
+  return { pieceId, result, jobId, deferred: true };
+}
+__name(createPieceFromEntriesDeferred, "createPieceFromEntriesDeferred");
 async function ensureGuardianApprovalRecordState(db, pieceId, agentId, guardianAddress, humanXId, humanXHandle) {
   let normalizedGuardian = "";
   if (agentId) {
@@ -112643,7 +112804,7 @@ async function loadActiveMatchGroupEntries(db, groupId) {
   };
 }
 __name(loadActiveMatchGroupEntries, "loadActiveMatchGroupEntries");
-async function finalizePendingMatchGroup(db, env, group, now) {
+async function finalizePendingMatchGroup(db, env, group, now, ctx) {
   let liveGroup = await sanitizeMatchGroupState(db, group);
   if (!liveGroup || liveGroup.piece_id) return null;
   const required = Math.max(1, Number(liveGroup.required_count || 0));
@@ -112675,14 +112836,15 @@ async function finalizePendingMatchGroup(db, env, group, now) {
         "DELETE FROM match_group_members WHERE group_id = ? AND request_id = ?"
       ).bind(liveGroup.id, row.request_id).run();
     }
-    const created = await createPieceFromEntries(db, env, finalists, {
+    const created = await createPieceFromEntriesDeferred(db, env, finalists, {
       mode: liveGroup.mode,
       now,
-      status: "draft",
+      status: "pending_render",
       groupId: liveGroup.id,
       roundNumber: 1,
       requestIds: finalists.map((entry) => entry.intentId)
     });
+    scheduleRenderJob(db, env, created.jobId, ctx);
     await db.prepare(
       "UPDATE match_groups SET current_count = ?, current_round = 1, status = 'complete', piece_id = ? WHERE id = ?"
     ).bind(finalists.length, created.pieceId, liveGroup.id).run();
@@ -112705,11 +112867,11 @@ async function finalizePendingMatchGroup(db, env, group, now) {
         description: created.result.description,
         url: `https://deviantclaw.art/piece/${created.pieceId}`,
         collaborators: finalists.map((entry) => entry.agent.name),
-        status: finalPiece?.status || "draft",
+        status: finalPiece?.status || "pending_render",
         tokenId: finalPiece?.token_id || null,
         chainPieceId: finalPiece?.chain_piece_id ?? null
       },
-      message: `Group complete! Piece "${created.result.title}" created.`
+      message: `Group complete! Piece "${created.result.title}" queued for render.`
     });
     for (const row of finalistRows) {
       const notifId = genId();
@@ -112748,7 +112910,7 @@ async function finalizePendingMatchGroup(db, env, group, now) {
   }
 }
 __name(finalizePendingMatchGroup, "finalizePendingMatchGroup");
-async function recoverReadyMatchGroupsForMode(db, env, mode2, now) {
+async function recoverReadyMatchGroupsForMode(db, env, mode2, now, ctx) {
   const groups = await db.prepare(
     "SELECT * FROM match_groups WHERE mode = ? AND status IN ('forming', 'ready') AND piece_id IS NULL ORDER BY created_at ASC LIMIT 12"
   ).bind(mode2).all().catch(() => ({ results: [] }));
@@ -112758,7 +112920,7 @@ async function recoverReadyMatchGroupsForMode(db, env, mode2, now) {
       if (!sanitized || sanitized.piece_id) continue;
       const required = Math.max(1, Number(sanitized.required_count || 0));
       if (Number(sanitized.current_count || 0) < required) continue;
-      await finalizePendingMatchGroup(db, env, sanitized, now);
+      await finalizePendingMatchGroup(db, env, sanitized, now, ctx);
     } catch (error) {
       console.error("match group recovery failed", group?.id, error?.message || error);
     }
@@ -115252,9 +115414,17 @@ function prefersStaticFullViewThumbnail(piece) {
   return STATIC_FULL_VIEW_METHODS.has(String(piece?.method || "").toLowerCase());
 }
 __name(prefersStaticFullViewThumbnail, "prefersStaticFullViewThumbnail");
+function pieceSequencePreviewImagePath(piece) {
+  if (!piece || !piece.id) return null;
+  const count = Math.max(1, Math.min(piecePreviewFrameCount(piece), 4));
+  const imageIds = [piece.id, `${piece.id}_b`, `${piece.id}_c`, `${piece.id}_d`].slice(0, count);
+  return pieceImageRoute(imageIds[imageIds.length - 1] || piece.id);
+}
+__name(pieceSequencePreviewImagePath, "pieceSequencePreviewImagePath");
 function piecePreviewImagePath(piece) {
   if (!piece || !piece.id) return null;
   const method = String(piece.method || "").toLowerCase();
+  if (method === "sequence") return pieceSequencePreviewImagePath(piece);
   if (piece.thumbnail) return String(piece.thumbnail);
   if (method === "sequence") {
     const count = Math.max(1, Math.min(piecePreviewFrameCount(piece), 4));
@@ -115911,6 +116081,8 @@ __name(statusBadge, "statusBadge");
 function pieceStatusBadge(piece) {
   const status = effectivePieceStatus(piece);
   if (status === "wip") return statusBadge("wip", "WIP");
+  if (status === "pending_render") return statusBadge("proposed", "Rendering");
+  if (status === "render_failed") return statusBadge("rejected", "Render Failed");
   if (status === "proposed") return statusBadge("proposed", "Proposed");
   if (status === "pending-base-approval") return statusBadge("proposed", "Awaiting Base Approval");
   if (status === "minted") return statusBadge("minted", "Minted");
@@ -119513,7 +119685,7 @@ async function submitDeleteAgent(){
 }
 __name(renderDeleteAgentPage, "renderDeleteAgentPage");
 var index_default = {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method === "HEAD" ? "GET" : request.method;
@@ -119882,9 +120054,22 @@ function createArt(){
     body:JSON.stringify(payload)
   }).then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})}).then(function(r){
     if(r.ok){
-      if(r.data.piece)st.innerHTML='<span style="color:var(--primary)">Art created. <a href="/piece/'+r.data.piece.id+'" style="color:var(--primary)">View piece \u2192</a></span>';
-      else if(r.data.requestId)st.innerHTML='<span style="color:var(--primary)">In the queue. Waiting for '+(mode==='duo'?'1 more agent':mode==='trio'?'2 more agents':'3 more agents')+'. <a href="/queue" style="color:var(--primary)">View queue \u2192</a></span>';
-      else st.innerHTML='<span style="color:var(--primary)">Submitted.</span>';
+      var brewingBase='/create/brewing?mode='+encodeURIComponent(mode)+'&prompt='+encodeURIComponent((creativeIntent||statement||memoryText||'').slice(0,4000));
+      if(r.data.piece&&r.data.piece.id){
+        st.innerHTML='<span style="color:var(--primary)">Art queued. Redirecting to brewing page…</span>';
+        setLoading(false);
+        btn.disabled=false;btn.textContent='Create \u2192';
+        window.location.href=brewingBase+'&piece='+encodeURIComponent(r.data.piece.id);
+        return;
+      }
+      if(r.data.requestId){
+        st.innerHTML='<span style="color:var(--primary)">In the queue. Redirecting to brewing page…</span>';
+        setLoading(false);
+        btn.disabled=false;btn.textContent='Create \u2192';
+        window.location.href=brewingBase+'&request='+encodeURIComponent(r.data.requestId);
+        return;
+      }
+      st.innerHTML='<span style="color:var(--primary)">Submitted.</span>';
     }else{st.innerHTML='<span style="color:var(--danger)">'+(r.data.error||'Failed')+'</span>'}
     setLoading(false);
     btn.disabled=false;btn.textContent='Create \u2192';
@@ -119893,6 +120078,145 @@ function createArt(){
 pickMode(document.getElementById('c-mode').value||'duo');
 <\/script>`;
         return htmlResponse(page("Make Art", "", createBody));
+      }
+      if (method === "GET" && (path === "/create/brewing" || path === "/make-art/brewing")) {
+        const brewingBody = `
+<style>
+  body{background:radial-gradient(ellipse at top left,rgba(74,122,126,0.22),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.16),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%)!important}
+  body nav{background:rgba(4,6,9,0.34);backdrop-filter:blur(14px)}
+  #brew-scene{padding:36px 0 56px}
+  #brew-wrap{max-width:860px;margin:0 auto;padding:0 16px}
+  #brew-card{border:1px solid rgba(122,155,171,0.38);border-radius:22px;background:rgba(4,7,11,0.94);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,0.6);padding:24px}
+  #brew-card h1{font-size:24px;letter-spacing:3px;text-transform:uppercase;margin:0 0 10px}
+  .brew-sub{font-size:15px;color:#d8e5eb;line-height:1.7;max-width:680px}
+  .brew-grid{display:grid;gap:16px;margin-top:20px}
+  .brew-status{display:inline-flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid rgba(122,155,171,0.34);border-radius:999px;background:rgba(122,155,171,0.08);font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#edf6f9}
+  .brew-dot{width:10px;height:10px;border-radius:999px;background:#d3c18e;box-shadow:0 0 0 0 rgba(211,193,142,0.35);animation:brewPulse 1.4s infinite}
+  .brew-dot.ready{background:#94d9b6;animation:none}
+  .brew-dot.failed{background:#f08c8c;animation:none}
+  .brew-dot.retrying{background:#f0c88c}
+  .brew-meta{font-size:13px;color:#cddbe0;line-height:1.7}
+  .brew-code-wrap{margin-top:4px}
+  .brew-code-label{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:#d7e8ef;margin-bottom:8px}
+  .brew-code{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,0.52);border:1px solid rgba(136,160,174,0.42);border-radius:14px;padding:16px;color:#edf6f9;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;max-height:260px;overflow:auto}
+  .brew-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+  .brew-actions a,.brew-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 16px;border-radius:999px;border:1px solid rgba(136,160,174,0.44);background:rgba(255,255,255,0.05);color:#edf6f9;font:inherit;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;text-decoration:none}
+  .brew-actions .primary{background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);color:#050507;border:none}
+  .brew-note{font-size:12px;color:#c7d6db;line-height:1.6}
+  @keyframes brewPulse{0%{box-shadow:0 0 0 0 rgba(211,193,142,0.35)}70%{box-shadow:0 0 0 10px rgba(211,193,142,0)}100%{box-shadow:0 0 0 0 rgba(211,193,142,0)}}
+  @media (max-width:640px){#brew-wrap{padding:0 12px}#brew-card{padding:18px}#brew-card h1{font-size:20px}}
+</style>
+<div id="brew-scene">
+  <div id="brew-wrap" class="container">
+    <div id="brew-card">
+      <h1>Art is brewing.</h1>
+      <div class="brew-sub">You can leave this page — the piece will keep rendering in the background. We saved your request below, and you can make another while this one cooks.</div>
+      <div class="brew-grid">
+        <div class="brew-status"><span id="brew-dot" class="brew-dot"></span><span id="brew-status-text">Queued</span></div>
+        <div id="brew-meta" class="brew-meta">Setting up your render status…</div>
+        <div class="brew-code-wrap">
+          <div class="brew-code-label">Your request</div>
+          <div id="brew-code" class="brew-code">Loading…</div>
+        </div>
+        <div class="brew-actions">
+          <a id="brew-view-piece" class="primary" href="#" style="display:none">View Piece</a>
+          <button id="brew-copy" type="button">Copy Prompt</button>
+          <a href="/create">Make Another</a>
+          <a href="/queue">Queue</a>
+        </div>
+        <div id="brew-note" class="brew-note">This page checks automatically. If the render hits a snag, we’ll retry in the background.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var params = new URLSearchParams(location.search);
+  var pieceId = params.get('piece') || '';
+  var requestId = params.get('request') || '';
+  var mode = params.get('mode') || '';
+  var submitted = params.get('prompt') || 'No prompt captured.';
+  var statusText = document.getElementById('brew-status-text');
+  var dot = document.getElementById('brew-dot');
+  var meta = document.getElementById('brew-meta');
+  var code = document.getElementById('brew-code');
+  var note = document.getElementById('brew-note');
+  var view = document.getElementById('brew-view-piece');
+  var copy = document.getElementById('brew-copy');
+  var pollTimer = null;
+  code.textContent = submitted;
+  copy.addEventListener('click', function(){ navigator.clipboard.writeText(submitted).then(function(){ copy.textContent='Copied'; setTimeout(function(){ copy.textContent='Copy Prompt'; }, 1200); }); });
+  function setStatus(kind, text, detail){
+    statusText.textContent = text;
+    dot.className = 'brew-dot' + (kind ? ' ' + kind : '');
+    if(detail) meta.textContent = detail;
+  }
+  function showPiece(id){
+    view.style.display='inline-flex';
+    view.href='/piece/' + id;
+  }
+  function stopPolling(){ if(pollTimer){ clearTimeout(pollTimer); pollTimer=null; } }
+  function schedule(ms){ stopPolling(); pollTimer=setTimeout(tick, ms); }
+  function tick(){
+    if(pieceId){
+      fetch('/api/pieces/' + pieceId).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); }).then(function(r){
+        if(!r.ok){ setStatus('failed','Not found','The piece could not be loaded yet.'); stopPolling(); return; }
+        var p = r.data || {};
+        if(p.status === 'pending_render' || p.status === 'draft'){
+          setStatus('', 'Rendering', 'The piece exists and is still cooking in the background. You can safely leave this page.');
+          showPiece(pieceId);
+          schedule(4000);
+          return;
+        }
+        if(p.status === 'render_failed'){
+          setStatus('failed', 'Render Failed', 'This render didn\'t finish. You can retry it later or make another.');
+          showPiece(pieceId);
+          note.textContent = 'This piece hit a render failure after its retry window.';
+          stopPolling();
+          return;
+        }
+        setStatus('ready', 'Ready', 'Your piece is ready.');
+        showPiece(pieceId);
+        note.textContent = 'Finished. Go look at the weird little thing.';
+        stopPolling();
+      }).catch(function(){ setStatus('', 'Rendering', 'Still checking…'); schedule(5000); });
+      return;
+    }
+    if(requestId){
+      fetch('/api/match/' + requestId + '/status').then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); }).then(function(r){
+        if(!r.ok){ setStatus('failed','Queue Error', (r.data && r.data.error) || 'Unable to read queue status.'); stopPolling(); return; }
+        var d = r.data || {};
+        if(d.piece && d.piece.id){
+          pieceId = d.piece.id;
+          showPiece(pieceId);
+          setStatus('', 'Rendering', 'Match complete. Your collab is brewing now.');
+          meta.textContent = 'Matched successfully. The piece has been created and is rendering in the background.';
+          schedule(3000);
+          return;
+        }
+        if(d.status === 'waiting' || d.status === 'matched'){
+          var waitingText = mode === 'duo' ? 'Waiting for 1 more agent.' : mode === 'trio' ? 'Waiting for 2 more agents.' : mode === 'quad' ? 'Waiting for 3 more agents.' : 'Waiting in queue.';
+          setStatus('', d.status === 'matched' ? 'Matched' : 'Queued', waitingText);
+          meta.textContent = 'You can leave this page. We\'ll keep checking for a match.';
+          schedule(6000);
+          return;
+        }
+        if(d.status === 'cancelled'){
+          setStatus('failed','Cancelled','This request left the queue.');
+          stopPolling();
+          return;
+        }
+        setStatus('', (d.status || 'Queued').replace(/_/g,' '), 'Still cooking through the queue.');
+        schedule(6000);
+      }).catch(function(){ setStatus('', 'Queued', 'Still checking the queue…'); schedule(6000); });
+      return;
+    }
+    setStatus('failed','Missing Context','No piece or request id was provided.');
+  }
+  tick();
+})();
+<\/script>`;
+        return htmlResponse(page("Art is Brewing", "", brewingBody));
       }
       if (method === "GET" && ART_DEMO_NAMES.has(path.slice(1))) {
         const demo = path.slice(1);
@@ -121976,7 +122300,7 @@ For image work:
         const piece = await db.prepare("SELECT id, title, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?").bind(id2).first();
         if (!piece) return new Response("Not found", { status: 404 });
         const pieceMethod = String(piece.method || "").toLowerCase();
-        if (NO_STILL_IMAGE_METHODS.has(pieceMethod)) {
+        const fallbackThumbnailSvg = () => {
           const svgDataUri = generateThumbnail(piece);
           const svg2 = atob(svgDataUri.split(",")[1] || "");
           return new Response(method === "HEAD" ? null : svg2, {
@@ -121985,15 +122309,19 @@ For image work:
               "Cache-Control": "public, max-age=3600"
             }
           });
+        };
+        if (NO_STILL_IMAGE_METHODS.has(pieceMethod)) {
+          return fallbackThumbnailSvg();
         }
+        const primaryImageExists = await db.prepare("SELECT 1 FROM piece_images WHERE piece_id = ?").bind(id2).first().catch(() => null);
         if (!prefersStaticFullViewThumbnail(piece)) {
-          return Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302);
+          return primaryImageExists ? Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302) : fallbackThumbnailSvg();
         }
         if (pieceMethod === "collage" && Number(piece.legacy_mainnet || 0) === 1) {
-          return Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302);
+          return primaryImageExists ? Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302) : fallbackThumbnailSvg();
         }
         if (pieceMethod === "collage") {
-          return Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302);
+          return primaryImageExists ? Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302) : fallbackThumbnailSvg();
         }
         const imageRows = await db.prepare(
           "SELECT piece_id FROM piece_images WHERE piece_id IN (?, ?, ?, ?)"
@@ -122001,14 +122329,7 @@ For image work:
         const imageMap = new Map((imageRows.results || []).filter((r) => r?.piece_id).map((r) => [r.piece_id, pieceImageRoute(r.piece_id)]));
         const imageUrls = [id2, `${id2}_b`, `${id2}_c`, `${id2}_d`].map((pieceId) => imageMap.get(pieceId)).filter(Boolean);
         if (imageUrls.length === 0) {
-          const svgDataUri = generateThumbnail(piece);
-          const svg2 = atob(svgDataUri.split(",")[1] || "");
-          return new Response(method === "HEAD" ? null : svg2, {
-            headers: {
-              "Content-Type": "image/svg+xml; charset=utf-8",
-              "Cache-Control": "public, max-age=3600"
-            }
-          });
+          return fallbackThumbnailSvg();
         }
         let labels = [piece.agent_a_name, piece.agent_b_name].filter(Boolean);
         try {
@@ -122018,6 +122339,10 @@ For image work:
           const names = [...new Set((collabs.results || []).map((row) => row.agent_name).filter(Boolean))];
           if (names.length > 0) labels = names;
         } catch {
+        }
+        if (pieceMethod === "sequence") {
+          const lastImageSrc = absoluteUrl(url.origin, imageUrls[imageUrls.length - 1]) || imageUrls[imageUrls.length - 1];
+          return Response.redirect(lastImageSrc, 302);
         }
         const thumbnailImageUrls = imageUrls.slice(0, 4).map((src) => absoluteUrl(url.origin, src) || src);
         const svg = buildMethodThumbnailSvg({
@@ -122074,7 +122399,16 @@ For image work:
         if (!imageResponse) {
           const demoImage = await getLegacySplitDemoImageResponse(id2, "");
           if (demoImage) return method === "HEAD" ? headLike(demoImage) : demoImage;
-          return new Response("Not found", { status: 404 });
+          const piece = await db.prepare("SELECT id, title, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?").bind(id2).first();
+          if (!piece) return new Response("Not found", { status: 404 });
+          const svgDataUri = generateThumbnail(piece);
+          const svg2 = atob(svgDataUri.split(",")[1] || "");
+          return new Response(method === "HEAD" ? null : svg2, {
+            headers: {
+              "Content-Type": "image/svg+xml; charset=utf-8",
+              "Cache-Control": "public, max-age=3600"
+            }
+          });
         }
         return method === "HEAD" ? headLike(imageResponse) : imageResponse;
       }
@@ -122644,7 +122978,9 @@ For image work:
         const piece = await db.prepare("SELECT id, title, deleted_at FROM pieces WHERE id = ?").bind(id2).first();
         if (!piece) return json({ error: "Piece not found" }, 404);
         if (piece.deleted_at) return json({ error: "Piece has been deleted" }, 410);
-        await ensurePieceHeartTables(db);
+    await ensurePieceHeartTables(db);
+    await ensureRenderJobTables(db);
+    scheduleNextQueuedRenderJob(db, env, ctx).catch((err) => console.error("[render-job] opportunistic schedule failed:", err?.message || err));
         let body;
         try {
           body = await request.json();
@@ -122800,16 +123136,38 @@ For image work:
         const isGuardian = agentA && sameAddress(agentA.guardian_address, guardianAddr) || agentB && sameAddress(agentB.guardian_address, guardianAddr);
         if (!isGuardian) return json({ error: "Not a guardian of this piece's agents" }, 403);
         const body = await request.json().catch(() => ({}));
-        const size6 = body.size || "1024x1024";
-        const imageUrl = await veniceImage(env.VENICE_API_KEY, piece.art_prompt, {
-          model: piece.venice_model || VENICE_IMAGE_MODEL,
-          size: size6
-        });
-        if (!imageUrl) return json({ error: "Venice image generation failed" }, 500);
-        const imageData = imageUrl.startsWith("data:") ? imageUrl.split(",")[1] : null;
-        if (imageData) {
-          await db.prepare("UPDATE pieces SET image_url = ? WHERE id = ?").bind(imageUrl, pieceId).run();
+        const size6 = body.size || VENICE_IMAGE_SIZE;
+        const requestedModel = String(piece.venice_model || "").trim();
+        const safeModel = !requestedModel || requestedModel === "multi-model-pool" ? VENICE_IMAGE_MODEL : requestedModel;
+        const fallbackPrompt = [piece.title, piece.description].filter(Boolean).join(". ") || `Artwork titled ${pieceId}. Abstract image, no text, dark background.`;
+        const compactPrompt = `${piece.title || "Artwork"}. ${piece.description || "Abstract scene."} No text, no watermark, dark background, simple composition.`;
+        let imageUrl;
+        const attempts = [
+          { label: "primary", prompt: piece.art_prompt, model: safeModel, size: size6 },
+          { label: "fallback", prompt: fallbackPrompt, model: VENICE_IMAGE_MODEL, size: size6 },
+          { label: "compact", prompt: compactPrompt, model: VENICE_IMAGE_MODEL, size: "512x512" },
+          { label: "minimal", prompt: `Abstract image inspired by ${piece.title || "the artwork"}, no text, dark background.`, model: VENICE_IMAGE_MODEL, size: "512x512" }
+        ];
+        let lastErr = null;
+        for (const attempt of attempts) {
+          try {
+            console.log(`[regen-image] piece=${pieceId} attempt=${attempt.label} model=${attempt.model} size=${attempt.size} promptChars=${String(attempt.prompt || "").length}`);
+            imageUrl = await veniceImage(env.VENICE_API_KEY, attempt.prompt, {
+              model: attempt.model,
+              size: attempt.size
+            });
+            if (imageUrl) {
+              console.log(`[regen-image] piece=${pieceId} success=${attempt.label}`);
+              break;
+            }
+          } catch (err) {
+            lastErr = err;
+            console.error(`[regen-image] piece=${pieceId} failed attempt=${attempt.label} model=${attempt.model} size=${attempt.size}: ${String(err?.message || err || "unknown error")}`);
+          }
         }
+        if (!imageUrl) return json({ error: `Venice image generation failed${lastErr ? ` (${String(lastErr?.message || lastErr)})` : ""}` }, 500);
+        await storePieceImageSource(db, env, pieceId, imageUrl);
+        await db.prepare("UPDATE pieces SET image_url = ? WHERE id = ?").bind(`/api/pieces/${pieceId}/image`, pieceId).run();
         return json({ ok: true, pieceId, size: size6, imageUrl: `/api/pieces/${pieceId}/image` });
       }
       if (method === "GET" && path === "/api/admin/deferred-payouts") {
@@ -122833,6 +123191,51 @@ For image work:
         } catch (error) {
           return json({ error: error.message || "Failed to inspect deferred payouts." }, 400);
         }
+      }
+      if (method === "GET" && path === "/api/admin/render-jobs") {
+        const adminKey = request.headers.get("X-Admin-Key");
+        if (!adminKey || adminKey !== env.ADMIN_KEY) return json({ error: "Unauthorized \u2014 admin key required" }, 403);
+        const statusFilter = String(url.searchParams.get("status") || "").trim().toLowerCase();
+        const limitRaw = Number(url.searchParams.get("limit") || 25);
+        const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 25;
+        let rows;
+        if (statusFilter) {
+          rows = await db.prepare(
+            `SELECT rj.id, rj.piece_id, rj.status, rj.attempt_count, rj.last_error, rj.created_at, rj.updated_at, rj.started_at, rj.completed_at,
+                    p.title, p.method, p.composition, p.status AS piece_status
+             FROM render_jobs rj
+             LEFT JOIN pieces p ON p.id = rj.piece_id
+             WHERE rj.status = ?
+             ORDER BY rj.created_at DESC
+             LIMIT ${limit}`
+          ).bind(statusFilter).all();
+        } else {
+          rows = await db.prepare(
+            `SELECT rj.id, rj.piece_id, rj.status, rj.attempt_count, rj.last_error, rj.created_at, rj.updated_at, rj.started_at, rj.completed_at,
+                    p.title, p.method, p.composition, p.status AS piece_status
+             FROM render_jobs rj
+             LEFT JOIN pieces p ON p.id = rj.piece_id
+             ORDER BY rj.created_at DESC
+             LIMIT ${limit}`
+          ).all();
+        }
+        return json({ ok: true, jobs: rows.results || [] });
+      }
+      if (method === "POST" && path === "/api/admin/render-jobs/process") {
+        const adminKey = request.headers.get("X-Admin-Key");
+        if (!adminKey || adminKey !== env.ADMIN_KEY) return json({ error: "Unauthorized \u2014 admin key required" }, 403);
+        const body = await request.json().catch(() => ({}));
+        const jobId = String(body.jobId || "").trim();
+        if (jobId) {
+          const result = await processRenderJobById(db, env, jobId).catch((err) => ({ ok: false, error: String(err?.message || err || "Render failed") }));
+          return json({ ok: !!result?.ok, jobId, result });
+        }
+        const nextJob = await db.prepare(
+          "SELECT id FROM render_jobs WHERE status IN ('queued', 'retrying') ORDER BY created_at ASC LIMIT 1"
+        ).first().catch(() => null);
+        if (!nextJob?.id) return json({ ok: true, message: "No queued render jobs." });
+        const result = await processRenderJobById(db, env, nextJob.id).catch((err) => ({ ok: false, error: String(err?.message || err || "Render failed") }));
+        return json({ ok: !!result?.ok, jobId: nextJob.id, result });
       }
       if (method === "POST" && path.match(/^\/api\/admin\/repair-piece\/[^/]+$/)) {
         const adminKey = request.headers.get("X-Admin-Key");
@@ -122875,13 +123278,25 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
   Role: "${agent.role || ""}"`,
               { maxTokens: 100 }
             );
-            const img = await veniceImage(env.VENICE_API_KEY, prompt, { model: piece.venice_model || VENICE_IMAGE_MODEL });
+            const requestedRepairModel = String(piece.venice_model || "").trim();
+            const repairModel = !requestedRepairModel || requestedRepairModel === "multi-model-pool" ? VENICE_IMAGE_MODEL : requestedRepairModel;
+            console.log(`[repair-piece] piece=${pieceId} slot=${i === 0 ? "a" : "b"} model=${repairModel} promptChars=${String(prompt || "").length}`);
+            const img = await veniceImage(env.VENICE_API_KEY, prompt, { model: repairModel, size: VENICE_IMAGE_SIZE });
             if (i === 0) imageDataUri = img;
             else imageDataUriB = img;
             repairs.push(`regenerated_image_${i === 0 ? "a" : "b"}`);
           }
         } else if (!imgA && piece.art_prompt) {
-          imageDataUri = await veniceImage(env.VENICE_API_KEY, piece.art_prompt, { model: piece.venice_model || VENICE_IMAGE_MODEL });
+          const requestedRepairModel = String(piece.venice_model || "").trim();
+          const repairModel = !requestedRepairModel || requestedRepairModel === "multi-model-pool" ? VENICE_IMAGE_MODEL : requestedRepairModel;
+          console.log(`[repair-piece] piece=${pieceId} single model=${repairModel} promptChars=${String(piece.art_prompt || "").length}`);
+          try {
+            imageDataUri = await veniceImage(env.VENICE_API_KEY, piece.art_prompt, { model: repairModel, size: VENICE_IMAGE_SIZE });
+          } catch (err) {
+            console.error(`[repair-piece] piece=${pieceId} primary failed: ${String(err?.message || err || "unknown error")}`);
+            const compactPrompt = `${piece.title || "Artwork"}. ${piece.description || "Abstract scene."} No text, no watermark, dark background, simple composition.`;
+            imageDataUri = await veniceImage(env.VENICE_API_KEY, compactPrompt, { model: VENICE_IMAGE_MODEL, size: "512x512" });
+          }
           if (imageDataUri) repairs.push("regenerated_image_a");
         }
         const result = {
@@ -123261,7 +123676,6 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
             const agentA = await db.prepare("SELECT * FROM agents WHERE id = ?").bind(pendingRequest.agent_id).first();
             const agentBRecord = await db.prepare("SELECT soul, bio FROM agents WHERE id = ?").bind(agentId).first();
             const agentB = { id: agentId, name: agentName, type: agentType, role: agentRole, soul: agentBRecord?.soul || body.soul || "", bio: agentBRecord?.bio || "" };
-            const result = await generateArt(env.VENICE_API_KEY, intentA, intentB, agentA, agentB);
             const pieceId = genId();
             await db.prepare(
               "INSERT INTO match_groups (id, mode, status, required_count, current_count, current_round, piece_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
@@ -123272,20 +123686,19 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
             await db.prepare(
               "INSERT INTO match_group_members (group_id, agent_id, request_id, round_joined, joined_at) VALUES (?, ?, ?, ?, ?)"
             ).bind(groupId, agentId, requestId, 1, now).run();
-            await db.prepare(
-              "INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            ).bind(pieceId, result.title, result.description, pendingRequest.agent_id, agentId, pendingRequest.id, requestId, result.html, result.seed, now, agentA.name, agentName, agentA.role || "", agentRole, "duo", groupId, "draft", result.imageUrl || null, result.artPrompt || null, result.veniceModel || null, result.method || "fusion", result.composition || "duo").run();
-            await storeVeniceImage(db, env, pieceId, result);
-            await db.prepare(
-              "INSERT INTO piece_collaborators (piece_id, agent_id, agent_name, agent_role, intent_id, round_number) VALUES (?, ?, ?, ?, ?, ?)"
-            ).bind(pieceId, pendingRequest.agent_id, agentA.name, agentA.role || "", pendingRequest.id, 1).run();
-            await db.prepare(
-              "INSERT INTO piece_collaborators (piece_id, agent_id, agent_name, agent_role, intent_id, round_number) VALUES (?, ?, ?, ?, ?, ?)"
-            ).bind(pieceId, agentId, agentName, agentRole, requestId, 1).run();
-            const layerId = genId();
-            await db.prepare(
-              "INSERT INTO layers (id, piece_id, round_number, agent_id, agent_name, html, seed, intent_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            ).bind(layerId, pieceId, 1, agentId, agentName, result.html, result.seed, intentJson, now).run();
+            const created = await createPieceFromEntriesDeferred(db, env, [
+              { intent: intentA, agent: agentA, intentId: pendingRequest.id },
+              { intent: intentB, agent: agentB, intentId: requestId }
+            ], {
+              mode: "duo",
+              now,
+              status: "pending_render",
+              groupId,
+              pieceId,
+              roundNumber: 1,
+              requestIds: [pendingRequest.id, requestId]
+            });
+            scheduleRenderJob(db, env, created.jobId, ctx);
             await db.prepare("UPDATE match_requests SET status = 'complete', match_group_id = ? WHERE id = ?").bind(groupId, pendingRequest.id).run();
             await db.prepare("UPDATE match_requests SET status = 'complete', match_group_id = ? WHERE id = ?").bind(groupId, requestId).run();
             await db.prepare("UPDATE intents SET matched = 1, matched_with = ?, piece_id = ? WHERE id = ?").bind(requestId, pieceId, pendingRequest.id).run();
@@ -123303,12 +123716,12 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
               requestId: pendingRequest.id,
               piece: {
                 id: pieceId,
-                title: result.title,
+                title: created.result.title,
                 url: `https://deviantclaw.art/piece/${pieceId}`,
                 collaborators: [agentA.name, agentName],
-                status: finalPiece?.status || autoAdvanceResult?.status || "draft"
+                status: finalPiece?.status || autoAdvanceResult?.status || "pending_render"
               },
-              message: `Piece complete! View at deviantclaw.art/piece/${pieceId}. To delete, call DELETE /api/pieces/${pieceId}. To mint, all collaborators must approve.`
+              message: `Piece created and queued for render. View at deviantclaw.art/piece/${pieceId}. To delete, call DELETE /api/pieces/${pieceId}. To mint, all collaborators must approve.`
             });
             const notifId = genId();
             await db.prepare(
@@ -123325,14 +123738,14 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
               requestId,
               groupId,
               matchedWith: [agentA.name],
-              message: `Matched with ${agentA.name}! Piece "${result.title}" created.`,
+              message: `Matched with ${agentA.name}! Piece "${created.result.title}" queued for render.`,
               piece: {
                 id: pieceId,
-                title: result.title,
-                description: result.description,
+                title: created.result.title,
+                description: created.result.description,
                 url: `https://deviantclaw.art/piece/${pieceId}`,
                 collaborators: [agentA.name, agentName],
-                status: finalPiece?.status || autoAdvanceResult?.status || "draft",
+                status: finalPiece?.status || autoAdvanceResult?.status || "pending_render",
                 tokenId: finalPiece?.token_id || null,
                 chainPieceId: finalPiece?.chain_piece_id ?? null
               },
@@ -123343,14 +123756,14 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         if (mode2 === "trio" || mode2 === "quad") {
           const modeCount = { trio: 3, quad: 4 };
           const required = modeCount[mode2];
-          await recoverReadyMatchGroupsForMode(db, env, mode2, now);
+          await recoverReadyMatchGroupsForMode(db, env, mode2, now, ctx);
           let formingGroup = await db.prepare(
             "SELECT * FROM match_groups WHERE mode = ? AND status = 'forming' AND piece_id IS NULL ORDER BY created_at ASC LIMIT 1"
           ).bind(mode2).first();
           formingGroup = await sanitizeMatchGroup(formingGroup);
           if (formingGroup && Number(formingGroup.current_count || 0) >= required) {
             try {
-              await finalizePendingMatchGroup(db, env, formingGroup, now);
+              await finalizePendingMatchGroup(db, env, formingGroup, now, ctx);
             } catch (error) {
               console.error("forming group finalization failed", formingGroup.id, error?.message || error);
             }
@@ -123394,14 +123807,15 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
                 };
               }).filter((entry) => hasIntentSeed(entry.intent));
               if (entries.length >= required) {
-                const created = await createPieceFromEntries(db, env, entries, {
+                const created = await createPieceFromEntriesDeferred(db, env, entries, {
                   mode: mode2,
                   now,
-                  status: "draft",
+                  status: "pending_render",
                   groupId: formingGroup.id,
                   roundNumber: 1,
                   requestIds: entries.map((entry) => entry.intentId)
                 });
+                scheduleRenderJob(db, env, created.jobId, ctx);
                 await db.prepare(
                   "UPDATE match_groups SET current_count = ?, current_round = 1, status = 'complete', piece_id = ? WHERE id = ?"
                 ).bind(newCount, created.pieceId, formingGroup.id).run();
@@ -123418,9 +123832,9 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
                     description: created.result.description,
                     url: `https://deviantclaw.art/piece/${created.pieceId}`,
                     collaborators: entries.map((entry) => entry.agent.name),
-                    status: "draft"
+                    status: "pending_render"
                   },
-                  message: `Group complete! Piece "${created.result.title}" created.`
+                  message: `Group complete! Piece "${created.result.title}" queued for render.`
                 });
                 for (const row of memberRows) {
                   const notifId = genId();
@@ -123439,14 +123853,14 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
                   requestId,
                   groupId: formingGroup.id,
                   matchedWith: entries.filter((entry) => entry.agent.id !== agentId).map((entry) => entry.agent.name),
-                  message: `Group complete! ${required} agents matched. Piece "${created.result.title}" created.`,
+                  message: `Group complete! ${required} agents matched. Piece "${created.result.title}" queued for render.`,
                   piece: {
                     id: created.pieceId,
                     title: created.result.title,
                     description: created.result.description,
                     url: `https://deviantclaw.art/piece/${created.pieceId}`,
                     collaborators: entries.map((entry) => entry.agent.name),
-                    status: "draft"
+                    status: "pending_render"
                   }
                 }, 201);
               }
@@ -123510,7 +123924,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           try {
             const group = await db.prepare("SELECT * FROM match_groups WHERE id = ?").bind(req.match_group_id).first();
             if (group && !group.piece_id) {
-              await finalizePendingMatchGroup(db, env, group, (/* @__PURE__ */ new Date()).toISOString().slice(0, 19).replace("T", " "));
+              await finalizePendingMatchGroup(db, env, group, (/* @__PURE__ */ new Date()).toISOString().slice(0, 19).replace("T", " "), ctx);
               req = await db.prepare("SELECT * FROM match_requests WHERE id = ?").bind(id2).first();
             }
           } catch (error) {
