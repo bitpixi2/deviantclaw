@@ -115302,6 +115302,45 @@ function generateThumbnail(piece) {
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 __name(generateThumbnail, "generateThumbnail");
+function generatePieceGlitchFallback(piece, size = "full") {
+  const isThumb = size === "thumb";
+  const width = isThumb ? 240 : 1200;
+  const height = isThumb ? 120 : 1200;
+  const title = esc(formatArtworkTitle(piece?.title || "Untitled"));
+  const titleY = isThumb ? 26 : 92;
+  const headlineY = isThumb ? 54 : 470;
+  const bodyY = isThumb ? 72 : 560;
+  const body2Y = isThumb ? 84 : 620;
+  const footerY = isThumb ? 104 : 1080;
+  const headlineSize = isThumb ? 13 : 46;
+  const bodySize = isThumb ? 7.2 : 22;
+  const footerSize = isThumb ? 6.8 : 18;
+  const titleSize = isThumb ? 8 : 18;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>
+    <linearGradient id="glitch-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#07070b"/>
+      <stop offset="55%" stop-color="#120f18"/>
+      <stop offset="100%" stop-color="#050508"/>
+    </linearGradient>
+    <radialGradient id="glitch-glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="60%" stop-color="#b896a8" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#glitch-bg)"/>
+  <rect width="${width}" height="${height}" fill="url(#glitch-glow)"/>
+  <rect x="${isThumb ? 10 : 42}" y="${isThumb ? 10 : 42}" width="${width - (isThumb ? 20 : 84)}" height="${height - (isThumb ? 20 : 84)}" rx="${isThumb ? 10 : 22}" fill="none" stroke="rgba(255,255,255,0.09)"/>
+  <text x="50%" y="${titleY}" text-anchor="middle" fill="rgba(255,255,255,0.38)" font-family="'Courier New', monospace" font-size="${titleSize}" letter-spacing="${isThumb ? 1.6 : 4}">${title}</text>
+  <text x="50%" y="${headlineY}" text-anchor="middle" fill="#f4edf7" font-family="'Courier New', monospace" font-size="${headlineSize}" letter-spacing="${isThumb ? 0.4 : 2.4}">DeviantClaw has encountered a glitch!</text>
+  <text x="50%" y="${bodyY}" text-anchor="middle" fill="rgba(255,255,255,0.72)" font-family="'Courier New', monospace" font-size="${bodySize}">The developer has been notified to patch this piece.</text>
+  <text x="50%" y="${body2Y}" text-anchor="middle" fill="rgba(255,255,255,0.62)" font-family="'Courier New', monospace" font-size="${bodySize}">Please wait 24 hours.</text>
+  <text x="50%" y="${footerY}" text-anchor="middle" fill="rgba(255,255,255,0.24)" font-family="'Courier New', monospace" font-size="${footerSize}" letter-spacing="${isThumb ? 1 : 3}">TEMPORARY FALLBACK \u00B7 MEDIA REPAIR PENDING</text>
+</svg>`;
+}
+__name(generatePieceGlitchFallback, "generatePieceGlitchFallback");
 function generateLegacySlotThumbnailSvg(piece, label, slotIndex = 0) {
   const width = 1200;
   const height = 1200;
@@ -122310,8 +122349,7 @@ For image work:
         if (!piece) return new Response("Not found", { status: 404 });
         const pieceMethod = String(piece.method || "").toLowerCase();
         const fallbackThumbnailSvg = () => {
-          const svgDataUri = generateThumbnail(piece);
-          const svg2 = atob(svgDataUri.split(",")[1] || "");
+          const svg2 = generatePieceGlitchFallback(piece, "thumb");
           return new Response(method === "HEAD" ? null : svg2, {
             headers: {
               "Content-Type": "image/svg+xml; charset=utf-8",
@@ -122410,8 +122448,7 @@ For image work:
           if (demoImage) return method === "HEAD" ? headLike(demoImage) : demoImage;
           const piece = await db.prepare("SELECT id, title, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?").bind(id2).first();
           if (!piece) return new Response("Not found", { status: 404 });
-          const svgDataUri = generateThumbnail(piece);
-          const svg2 = atob(svgDataUri.split(",")[1] || "");
+          const svg2 = generatePieceGlitchFallback(piece, "full");
           return new Response(method === "HEAD" ? null : svg2, {
             headers: {
               "Content-Type": "image/svg+xml; charset=utf-8",
