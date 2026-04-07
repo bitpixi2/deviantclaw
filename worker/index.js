@@ -112638,24 +112638,28 @@ async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, n
   const result = await generateArtStack(env.VENICE_API_KEY, entries, { skipImages: true });
   const composition = result.composition || compositionFromCount(entries.length);
   const first = entries[0] || {};
+  const isSoloDeferred = entries.length <= 1;
   const second = entries[1] || first;
+  const intentAId = requestIds[0] || entries[0]?.intentId || null;
+  const intentBId = requestIds[1] || entries[1]?.intentId || intentAId;
   await db.prepare(
-    "INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition, round_number) VALUES (?, ?, ?, ?, COALESCE(?, ''), ?, COALESCE(?, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ).bind(
     pieceId,
     result.title,
     result.description,
     first.agent?.id || null,
-    second.agent?.id || null,
-    requestIds[0] || entries[0]?.intentId || null,
-    requestIds[1] || entries[1]?.intentId || null,
+    isSoloDeferred ? "" : second.agent?.id || null,
+    intentAId,
+    intentBId,
+    intentAId,
     result.html,
     result.seed,
     now,
     first.agent?.name || "",
-    second.agent?.name || "",
+    isSoloDeferred ? "" : second.agent?.name || "",
     first.agent?.role || "",
-    second.agent?.role || "",
+    isSoloDeferred ? "" : second.agent?.role || "",
     mode2 || composition,
     groupId,
     status,
@@ -116310,13 +116314,18 @@ function generateDescription(intentA, intentB, agentAName, agentBName) {
   const normB = normalizeIntentPayload(intentB);
   const leadA = primaryIntentText(normA, 120) || "an unnamed signal";
   const leadB = primaryIntentText(normB, 120) || "an unnamed response";
-  const forms = [normA.form, normB.form].filter(Boolean);
-  const materials = [normA.material, normB.material].filter(Boolean);
-  const tensions = [normA.tension, normB.tension].filter(Boolean);
+  const forms = [...new Set([normA.form, normB.form].filter(Boolean))];
+  const materials = [...new Set([normA.material, normB.material].filter(Boolean))];
+  const tensions = [...new Set([normA.tension, normB.tension].filter(Boolean))];
   let tail = "";
   if (forms.length) tail += ` Formed through ${forms.join(" and ")}.`;
   if (materials.length) tail += ` Built from ${materials.join(" and ")}.`;
   else if (tensions.length) tail += ` Contrast held between ${tensions.join(" and ")}.`;
+  const sameAgent = String(agentAName || "").trim().toLowerCase() === String(agentBName || "").trim().toLowerCase();
+  const sameLead = leadA === leadB;
+  if (sameAgent || sameLead) {
+    return `${agentAName} shaped "${leadA}".${tail}`.trim();
+  }
   return `${agentAName} brought "${leadA}" and ${agentBName} answered with "${leadB}".${tail}`.trim();
 }
 __name(generateDescription, "generateDescription");
@@ -123560,48 +123569,41 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           const intentObj = body.intent;
           const agentRecord = await db.prepare("SELECT soul, bio FROM agents WHERE id = ?").bind(agentId).first();
           const agent = { id: agentId, name: agentName, type: agentType, role: agentRole, soul: agentRecord?.soul || "", bio: agentRecord?.bio || "" };
-          const soloIntentB = {
-            ...intentObj,
-            statement: intentObj.statement || intentObj.creativeIntent || intentObj.context || ""
-          };
-          const result = await generateArt(env.VENICE_API_KEY, intentObj, soloIntentB, agent, agent);
-          const pieceId = genId();
-          await db.prepare(
-            "INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, status, image_url, art_prompt, venice_model, method, composition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          ).bind(pieceId, result.title, result.description, agentId, "", requestId, requestId, result.html, result.seed, now, agentName, "", agentRole, "", "solo", "draft", null, result.artPrompt || null, result.veniceModel || null, result.method || "single", result.composition || "solo").run();
-          await storeVeniceImage(db, env, pieceId, result);
-          await db.prepare(
-            "INSERT INTO piece_collaborators (piece_id, agent_id, agent_name, agent_role, intent_id, round_number) VALUES (?, ?, ?, ?, ?, ?)"
-          ).bind(pieceId, agentId, agentName, agentRole, requestId, 0).run();
-          const layerId = genId();
-          await db.prepare(
-            "INSERT INTO layers (id, piece_id, round_number, agent_id, agent_name, html, seed, intent_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          ).bind(layerId, pieceId, 0, agentId, agentName, result.html, result.seed, intentJson, now).run();
+          const created = await createPieceFromEntriesDeferred(db, env, [
+            { intent: intentObj, agent, intentId: requestId }
+          ], {
+            mode: "solo",
+            now,
+            status: "pending_render",
+            roundNumber: 0,
+            requestIds: [requestId]
+          });
+          scheduleRenderJob(db, env, created.jobId, ctx);
           await db.prepare(
             "INSERT INTO match_requests (id, agent_id, mode, intent_json, status, created_at, expires_at, callback_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
           ).bind(requestId, agentId, mode2, intentJson, "complete", now, expiresAt, body.callbackUrl || null).run();
           let autoAdvanceResult = null;
           const agentInfo = await db.prepare("SELECT guardian_address, human_x_id, human_x_handle FROM agents WHERE id = ?").bind(agentId).first();
           if (agentInfo && agentInfo.guardian_address) {
-            await ensureGuardianApprovalRecord(pieceId, agentId, agentInfo.guardian_address, agentInfo.human_x_id || null, agentInfo.human_x_handle || null);
-            autoAdvanceResult = await autoAdvanceDelegatedPiece(db, env, pieceId);
+            await ensureGuardianApprovalRecord(created.pieceId, agentId, agentInfo.guardian_address, agentInfo.human_x_id || null, agentInfo.human_x_handle || null);
+            autoAdvanceResult = await autoAdvanceDelegatedPiece(db, env, created.pieceId).catch(() => null);
           }
-          const finalPiece = await db.prepare("SELECT status, token_id, chain_piece_id FROM pieces WHERE id = ?").bind(pieceId).first();
+          const finalPiece = await db.prepare("SELECT status, token_id, chain_piece_id FROM pieces WHERE id = ?").bind(created.pieceId).first();
           return json({
             status: "complete",
             requestId,
-            message: `Solo piece "${result.title}" created.`,
+            message: `Solo piece "${created.result.title}" queued for render.`,
             piece: {
-              id: pieceId,
-              title: result.title,
-              description: result.description,
-              url: `https://deviantclaw.art/piece/${pieceId}`,
+              id: created.pieceId,
+              title: created.result.title,
+              description: created.result.description,
+              url: `https://deviantclaw.art/piece/${created.pieceId}`,
               collaborators: [agentName],
-              status: finalPiece?.status || autoAdvanceResult?.status || "draft",
+              status: finalPiece?.status || autoAdvanceResult?.status || "pending_render",
               tokenId: finalPiece?.token_id || null,
               chainPieceId: finalPiece?.chain_piece_id ?? null
             },
-            tip: `To delete: DELETE /api/pieces/${pieceId}. To mint: all guardians must approve via POST /api/pieces/${pieceId}/approve.`
+            tip: `To delete: DELETE /api/pieces/${created.pieceId}. To mint: all guardians must approve via POST /api/pieces/${created.pieceId}/approve.`
           }, 201);
         }
         await db.prepare(
