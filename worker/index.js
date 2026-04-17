@@ -110845,6 +110845,30 @@ async function veniceImage(apiKey, prompt, opts = {}) {
   return img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : null);
 }
 __name(veniceImage, "veniceImage");
+async function veniceImageWithFallback(apiKey, prompt, opts = {}) {
+  const basePrompt = String(prompt || "").trim();
+  const fallbackPrompt = basePrompt || "Abstract digital artwork, dark background, no text or watermark.";
+  const attempts = [
+    { label: "primary", prompt: basePrompt, model: pickImageModel(opts), size: opts.size || VENICE_IMAGE_SIZE },
+    { label: "fallback", prompt: fallbackPrompt.slice(0, 1400), model: VENICE_IMAGE_MODEL, size: opts.size || VENICE_IMAGE_SIZE },
+    { label: "compact", prompt: fallbackPrompt.slice(0, 520), model: VENICE_IMAGE_MODEL, size: "512x512" },
+    { label: "minimal", prompt: "Abstract cyber-mystic office artwork, dark background, no text, no watermark.", model: VENICE_IMAGE_MODEL, size: "512x512" }
+  ];
+  let lastErr = null;
+  for (const attempt of attempts) {
+    if (!attempt.prompt) continue;
+    try {
+      const image = await veniceImage(apiKey, attempt.prompt, { ...opts, model: attempt.model, size: attempt.size });
+      if (image) return image;
+    } catch (err) {
+      lastErr = err;
+      console.error(`[veniceImageWithFallback] attempt=${attempt.label} failed: ${String(err?.message || err || "unknown")}`);
+    }
+  }
+  if (lastErr) throw lastErr;
+  return null;
+}
+__name(veniceImageWithFallback, "veniceImageWithFallback");
 function buildReactionHTML(imageUrl, title, artists2, date) {
   const artistLine = artists2.map((a) => esc(a)).join(" \xD7 ");
   return `<!DOCTYPE html>
@@ -111269,9 +111293,7 @@ setTimeout(()=>document.getElementById('sig').classList.add('v'),1500);
 }
 __name(buildSplitHTML, "buildSplitHTML");
 function buildCollageHTML(imageUrls, title, artists2, date) {
-  const artistLine = artists2.map((a) => esc(a)).join(" \xD7 ");
   const srcJson = JSON.stringify((imageUrls || []).slice(0, 4).map((u) => String(u || "")));
-  const labelJson = JSON.stringify((artists2 || []).slice(0, 4).map((a) => String(a || "")));
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -111280,146 +111302,139 @@ function buildCollageHTML(imageUrls, title, artists2, date) {
 <title>${esc(title)} \xB7 DeviantClaw</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a0f;overflow:hidden}
-canvas{display:block}
-.loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font:14px monospace;color:rgba(255,255,255,0.3);letter-spacing:2px}
-.sig{position:fixed;bottom:16px;left:20px;z-index:20;pointer-events:none;opacity:0;transition:opacity .8s;font-family:'Courier New',monospace}
-.sig.v{opacity:1}
-.sig-t{font-size:14px;color:rgba(255,255,255,.72);letter-spacing:2px;margin-bottom:4px}
-.sig-a{font-size:11px;color:rgba(255,255,255,.45);letter-spacing:1.5px}
-.sig-g{font-size:10px;color:rgba(255,255,255,.25);letter-spacing:1px;margin-top:6px}
+html,body{width:100%;height:100%}
+body{background:#07090f;overflow:hidden;font-family:'Courier New',monospace}
+.stage{position:fixed;inset:0;isolation:isolate}
+.bg{position:absolute;inset:-3%;z-index:0;overflow:hidden}
+.bg img{width:100%;height:100%;object-fit:cover;filter:blur(18px) saturate(1.08) brightness(.42);transform:scale(1.06)}
+.bg::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(10,16,30,.12),rgba(4,6,12,.76) 72%)}
+.board{position:absolute;inset:2.5vh 3vw;z-index:4}
+.card{position:absolute;overflow:hidden;background:#0b0f19;border:1px solid rgba(226,236,255,.2);box-shadow:0 30px 90px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.03) inset;will-change:transform;transition:transform .26s ease,box-shadow .26s ease,border-color .26s ease}
+.card:hover{box-shadow:0 38px 112px rgba(0,0,0,.62),0 0 0 1px rgba(255,255,255,.08) inset;border-color:rgba(230,241,255,.32)}
+.card img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(1.02) contrast(1.04) brightness(.98)}
+.card::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(145deg,rgba(255,255,255,.08),rgba(255,255,255,0) 26%,rgba(0,0,0,.12) 84%);mix-blend-mode:screen}
+.card::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px)}
+.loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font:13px monospace;color:rgba(255,255,255,.34);letter-spacing:2px;z-index:12}
+@media (max-width: 760px){
+  .board{inset:2vh 2vw}
+}
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
+<div class="stage">
+  <div class="bg"><img id="bgImg" alt=""/></div>
+  <div class="board" id="board"></div>
+</div>
 <div class="loading" id="loadMsg">LOADING COLLABORATORS...</div>
-<div class="sig" id="sig"><div class="sig-t">${esc(title)}</div><div class="sig-a">${artistLine}</div><div class="sig-g">deviantclaw \xB7 ${esc(date)}</div></div>
 
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-let W,H;
-function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
-resize(); window.addEventListener('resize', resize);
-
 const imageSrcs = ${srcJson};
-const labels = ${labelJson};
-const loadedImages = [];
-let imagesLoaded = 0;
+const board = document.getElementById('board');
+const loading = document.getElementById('loadMsg');
+const bgImg = document.getElementById('bgImg');
+const count = Math.max(1, Math.min(imageSrcs.length, 4));
 
-const masks = [
-  function(ctx, W, H) {
-    ctx.beginPath();
-    ctx.moveTo(W*0.02, H*0.02);
-    ctx.bezierCurveTo(W*0.3, H*-0.03, W*0.52, H*0.06, W*0.5, H*0.18);
-    ctx.bezierCurveTo(W*0.48, H*0.3, W*0.38, H*0.42, W*0.28, H*0.48);
-    ctx.bezierCurveTo(W*0.15, H*0.52, W*0.05, H*0.38, W*0.02, H*0.25);
-    ctx.closePath();
-  },
-  function(ctx, W, H) {
-    ctx.beginPath();
-    ctx.moveTo(W*0.48, H*0.02);
-    ctx.bezierCurveTo(W*0.65, H*-0.01, W*0.98, H*0.03, W*0.98, H*0.18);
-    ctx.bezierCurveTo(W*0.98, H*0.35, W*0.88, H*0.5, W*0.72, H*0.48);
-    ctx.bezierCurveTo(W*0.58, H*0.46, W*0.48, H*0.32, W*0.45, H*0.2);
-    ctx.bezierCurveTo(W*0.43, H*0.1, W*0.45, H*0.04, W*0.48, H*0.02);
-    ctx.closePath();
-  },
-  function(ctx, W, H) {
-    ctx.beginPath();
-    ctx.moveTo(W*0.02, H*0.48);
-    ctx.bezierCurveTo(W*0.12, H*0.44, W*0.32, H*0.5, W*0.42, H*0.58);
-    ctx.bezierCurveTo(W*0.5, H*0.64, W*0.48, H*0.82, W*0.38, H*0.92);
-    ctx.bezierCurveTo(W*0.25, H*0.99, W*0.08, H*0.98, W*0.02, H*0.88);
-    ctx.closePath();
-  },
-  function(ctx, W, H) {
-    ctx.beginPath();
-    ctx.moveTo(W*0.52, H*0.52);
-    ctx.bezierCurveTo(W*0.62, H*0.48, W*0.85, H*0.46, W*0.98, H*0.52);
-    ctx.lineTo(W*0.98, H*0.98);
-    ctx.lineTo(W*0.42, H*0.98);
-    ctx.bezierCurveTo(W*0.44, H*0.82, W*0.46, H*0.62, W*0.52, H*0.52);
-    ctx.closePath();
+const layouts = {
+  1: [
+    { x: 9, y: 7, w: 82, h: 84, r: -2.2, z: 2, clip: 'polygon(4% 2%, 98% 5%, 95% 97%, 3% 93%)' }
+  ],
+  2: [
+    { x: 6, y: 6, w: 58, h: 84, r: -5.5, z: 2, clip: 'polygon(5% 2%, 98% 7%, 94% 97%, 2% 93%)' },
+    { x: 38, y: 10, w: 56, h: 82, r: 4.8, z: 3, clip: 'polygon(4% 6%, 99% 3%, 96% 95%, 1% 98%)' }
+  ],
+  3: [
+    { x: 5, y: 5, w: 53, h: 63, r: -4.4, z: 2, clip: 'polygon(4% 2%, 99% 6%, 95% 96%, 2% 92%)' },
+    { x: 43, y: 7, w: 52, h: 62, r: 4.1, z: 3, clip: 'polygon(5% 5%, 98% 2%, 97% 95%, 1% 98%)' },
+    { x: 20, y: 42, w: 64, h: 53, r: -1.5, z: 4, clip: 'polygon(3% 5%, 98% 8%, 96% 96%, 2% 93%)' }
+  ],
+  4: [
+    { x: 4, y: 4, w: 48, h: 49, r: -4.1, z: 2, clip: 'polygon(4% 3%, 98% 5%, 94% 97%, 2% 93%)' },
+    { x: 50, y: 5, w: 46, h: 48, r: 3.9, z: 3, clip: 'polygon(3% 6%, 99% 3%, 97% 94%, 2% 97%)' },
+    { x: 5, y: 49, w: 47, h: 47, r: -2.6, z: 4, clip: 'polygon(5% 4%, 98% 8%, 95% 97%, 1% 93%)' },
+    { x: 49, y: 50, w: 47, h: 46, r: 2.4, z: 5, clip: 'polygon(4% 8%, 99% 4%, 97% 95%, 2% 98%)' }
+  ]
+};
+
+function loadImage(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+function cardHtml(img, i, cfg) {
+  const left = cfg.x + '%';
+  const top = cfg.y + '%';
+  const width = cfg.w + '%';
+  const height = cfg.h + '%';
+  const rotate = cfg.r + 'deg';
+  const z = String(cfg.z || (i + 1));
+  const clip = cfg.clip || 'polygon(3% 3%,97% 4%,96% 97%,2% 96%)';
+  const src = img ? img.src : (imageSrcs[0] || '');
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.left = left;
+  card.style.top = top;
+  card.style.width = width;
+  card.style.height = height;
+  card.style.zIndex = z;
+  card.style.clipPath = clip;
+  card.dataset.baseRot = String(cfg.r || 0);
+  card.dataset.idx = String(i);
+  card.style.transform = 'rotate(' + rotate + ')';
+  card.innerHTML = '<img alt="" src="' + src + '">';
+  return card;
+}
+
+function applyParallax(cards) {
+  let tx = 0, ty = 0;
+  function update() {
+    cards.forEach((card, i) => {
+      const rot = Number(card.dataset.baseRot || 0);
+      const depth = 1 + i * 0.18;
+      const dx = tx * depth;
+      const dy = ty * depth;
+      card.style.transform = 'translate(' + dx.toFixed(2) + 'px,' + dy.toFixed(2) + 'px) rotate(' + rot + 'deg)';
+    });
   }
-];
-
-const circuits = [];
-let time = 0;
-for (let i=0;i<18;i++) circuits.push({x:Math.random(),y:Math.random(),l:18+Math.random()*50,a:Math.random()*Math.PI*2});
-
-function drawAtmosphere(alpha=1){
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  circuits.forEach((c,i)=>{
-    const x = c.x*W, y = c.y*H;
-    const dx = Math.cos(c.a + Math.sin(time*0.8+i)*0.6)*c.l;
-    const dy = Math.sin(c.a + Math.cos(time*0.7+i)*0.6)*c.l;
-    ctx.strokeStyle = i%2? 'rgba(255,160,64,0.16)' : 'rgba(120,140,255,0.16)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+dx,y+dy); ctx.stroke();
+  window.addEventListener('mousemove', (e) => {
+    const nx = e.clientX / window.innerWidth - 0.5;
+    const ny = e.clientY / window.innerHeight - 0.5;
+    tx = nx * 12;
+    ty = ny * 8;
+    update();
   });
-  ctx.restore();
+  window.addEventListener('touchmove', (e) => {
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    const nx = t.clientX / window.innerWidth - 0.5;
+    const ny = t.clientY / window.innerHeight - 0.5;
+    tx = nx * 8;
+    ty = ny * 6;
+    update();
+  }, { passive: true });
 }
 
-function drawTag(i){
-  const positions=[[0.06,0.08],[0.68,0.08],[0.06,0.86],[0.68,0.86]];
-  const p=positions[i]||[0.06,0.08];
-  ctx.fillStyle='rgba(0,0,0,.5)';
-  const t=(labels[i]||'').toUpperCase();
-  ctx.font='10px monospace';
-  const w=Math.max(72,ctx.measureText(t).width+18);
-  const x=W*p[0], y=H*p[1];
-  ctx.fillRect(x,y,w,18);
-  ctx.fillStyle='rgba(255,255,255,.45)';
-  ctx.fillText(t,x+8,y+12);
-}
-
-function drawFrame(){
-  time += 0.02;
-  ctx.fillStyle='#0a0a0f';
-  ctx.fillRect(0,0,W,H);
-  drawAtmosphere(1);
-
-  loadedImages.forEach((img,i)=>{
-    if (!img) return;
-    const m = masks[i] || masks[0];
-    ctx.save();
-    m(ctx,W,H);
-    ctx.clip();
-    const scale = Math.max(W / img.width, H / img.height);
-    const iw = img.width * scale, ih = img.height * scale;
-    ctx.drawImage(img, (W-iw)/2, (H-ih)/2, iw, ih);
-    ctx.restore();
-
-    ctx.save();
-    m(ctx,W,H);
-    ctx.strokeStyle='rgba(255,255,255,0.09)';
-    ctx.lineWidth=1;
-    ctx.stroke();
-    ctx.restore();
-
-    drawTag(i);
-  });
-
-  drawAtmosphere(0.36);
-  requestAnimationFrame(drawFrame);
-}
-
-imageSrcs.forEach((src,i)=>{
-  const img = new Image();
-  img.crossOrigin='anonymous';
-  img.onload=()=>{
-    loadedImages[i]=img;
-    imagesLoaded++;
-    document.getElementById('loadMsg').textContent='LOADING COLLABORATORS... '+imagesLoaded+'/'+imageSrcs.length;
-    if (imagesLoaded===imageSrcs.length){
-      document.getElementById('loadMsg').style.display='none';
-      document.getElementById('sig').classList.add('v');
-      drawFrame();
-    }
-  };
-  img.src=src;
+Promise.all(imageSrcs.map((src) => loadImage(src))).then((images) => {
+  const available = images.filter(Boolean);
+  if (!available.length) {
+    loading.textContent = 'IMAGE LOAD FAILED';
+    return;
+  }
+  bgImg.src = available[0].src;
+  const cfg = layouts[count] || layouts[4];
+  const cards = [];
+  for (let i = 0; i < count; i++) {
+    const img = images[i] || available[i % available.length] || available[0];
+    const card = cardHtml(img, i, cfg[i] || cfg[cfg.length - 1]);
+    board.appendChild(card);
+    cards.push(card);
+  }
+  loading.style.display = 'none';
+  applyParallax(cards);
 });
 <\/script>
 </body>
@@ -111589,7 +111604,7 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     ));
     const allImages = [];
     for (const prompt of perAgentPrompts) {
-      const img = await veniceImage(apiKey, prompt);
+      const img = await veniceImageWithFallback(apiKey, prompt);
       allImages.push(img);
     }
     imageDataUri = allImages[0];
@@ -111598,7 +111613,7 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     if (!imageDataUri) console.error("[veniceGenerate] Primary image generation failed");
     if (perAgentPrompts.length > 1 && !imageDataUriB) console.error("[veniceGenerate] Secondary image (B) generation failed");
   } else {
-    imageDataUri = await veniceImage(apiKey, artPrompt);
+    imageDataUri = await veniceImageWithFallback(apiKey, artPrompt);
   }
   const title = formatArtworkTitle((await veniceText(
     apiKey,
@@ -111748,6 +111763,7 @@ Make a small explorable scene where all of these AI artists exist as pixel chara
 __name(buildGameHTMLStack, "buildGameHTMLStack");
 async function buildGenerativeHTMLStack(apiKey, entries, title) {
   const codeModel = pickCodeModel();
+  const artists = entries.map((entry, i) => entry?.agent?.name || `Agent ${i + 1}`);
   const codeArt = await veniceText(
     apiKey,
     `You are a creative coder making generative art with HTML5 Canvas. Write a COMPLETE, self-contained HTML page.
@@ -111838,12 +111854,12 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
         { maxTokens: 110 }
       )
     ));
-    const images = await Promise.all(prompts.map((prompt) => veniceImage(apiKey, prompt)));
+    const images = await Promise.all(prompts.map((prompt) => veniceImageWithFallback(apiKey, prompt)));
     imageDataUri = images[0];
     imageDataUriB = images[1] || null;
     extraImages = images.slice(2).filter(Boolean);
   } else {
-    imageDataUri = await veniceImage(apiKey, artPrompt);
+    imageDataUri = await veniceImageWithFallback(apiKey, artPrompt);
   }
   const title = formatArtworkTitle((await veniceText(
     apiKey,
@@ -111971,7 +111987,7 @@ async function serveStoredPieceImage(db, env, pieceImageId) {
     if (!object3) return null;
     const headers = new Headers();
     headers.set("Content-Type", record2.content_type || object3.httpMetadata?.contentType || "image/png");
-    headers.set("Cache-Control", "public, max-age=31536000");
+    headers.set("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
     return new Response(object3.body, { headers });
   }
   if (!record2.data_uri) return null;
@@ -111980,12 +111996,13 @@ async function serveStoredPieceImage(db, env, pieceImageId) {
   const [, contentType, b64] = match;
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   return new Response(bytes, {
-    headers: { "Content-Type": contentType, "Cache-Control": "public, max-age=31536000" }
+    headers: { "Content-Type": contentType, "Cache-Control": "public, max-age=300, stale-while-revalidate=86400" }
   });
 }
 __name(serveStoredPieceImage, "serveStoredPieceImage");
 async function storeVeniceImage(db, env, pieceId, result) {
-  if (!result.imageDataUri) {
+  const primarySource = result.imageDataUri || result.imageUrl || null;
+  if (!primarySource) {
     let fixedHtml2 = result.html;
     if (fixedHtml2 && fixedHtml2.includes("{{")) {
       fixedHtml2 = fixedHtml2.replace(/\{\{PIECE_IMAGE_URL[^}]*\}\}/g, "");
@@ -111993,14 +112010,14 @@ async function storeVeniceImage(db, env, pieceId, result) {
     }
     return;
   }
-  await storePieceImageSource(db, env, pieceId, result.imageDataUri);
+  await storePieceImageSource(db, env, pieceId, primarySource);
   const primaryCheck = await db.prepare("SELECT 1 FROM piece_images WHERE piece_id = ?").bind(pieceId).first();
   if (!primaryCheck) {
     console.error(`[storeVeniceImage] Failed to store primary image for piece ${pieceId}`);
     return;
   }
   const extras = [
-    { key: "_b", data: result.imageDataUriB },
+    { key: "_b", data: result.imageDataUriB || result.imageUrlB || null },
     ...(result.extraImages || []).map((d, i) => ({ key: "_" + String.fromCharCode(99 + i), data: d }))
   ];
   const storedExtras = /* @__PURE__ */ new Set();
@@ -112017,7 +112034,7 @@ async function storeVeniceImage(db, env, pieceId, result) {
   }
   let fixedHtml = result.html;
   fixedHtml = fixedHtml.replace("{{PIECE_IMAGE_URL}}", `/api/pieces/${pieceId}/image`);
-  if (storedExtras.has("_b") || result.imageDataUriB) {
+  if (storedExtras.has("_b") || result.imageDataUriB || result.imageUrlB) {
     fixedHtml = fixedHtml.replace("{{PIECE_IMAGE_URL_B}}", `/api/pieces/${pieceId}/image-b`);
   } else {
     fixedHtml = fixedHtml.replace("{{PIECE_IMAGE_URL_B}}", `/api/pieces/${pieceId}/image`);
@@ -112570,15 +112587,37 @@ async function processRenderJobById(db, env, jobId) {
     return { ok: false, error: "Missing render job entries" };
   }
   try {
-    const rendered = await generateArtStack(env.VENICE_API_KEY, entries, {});
+    const firstPassTimeoutRaw = Number(env?.RENDER_TIMEOUT_FIRST_PASS_MS || 24e4);
+    const retryTimeoutRaw = Number(env?.RENDER_TIMEOUT_RETRY_MS || 15e4);
+    const firstPassTimeout = Number.isFinite(firstPassTimeoutRaw) ? Math.max(6e4, Math.min(firstPassTimeoutRaw, 9e5)) : 24e4;
+    const retryTimeout = Number.isFinite(retryTimeoutRaw) ? Math.max(45e3, Math.min(retryTimeoutRaw, 6e5)) : 15e4;
+    const renderTimeout = Number(job.attempt_count || 0) <= 1 ? firstPassTimeout : retryTimeout;
+    const rendered = await withTimeout(
+      () => generateArtStack(env.VENICE_API_KEY, entries, {}),
+      { timeout: renderTimeout, errorInstance: new Error(`Render timed out after ${Math.round(renderTimeout / 1e3)}s`) }
+    );
+    const finalMethod = String(rendered.method || "").toLowerCase();
+    const existingPiece = await db.prepare("SELECT html FROM pieces WHERE id = ?").bind(job.piece_id).first().catch(() => null);
+    let existingHtml = existingPiece?.html;
+    if (existingHtml instanceof ArrayBuffer) existingHtml = new TextDecoder().decode(existingHtml);
+    else if (existingHtml instanceof Uint8Array) existingHtml = new TextDecoder().decode(existingHtml);
+    else if (Array.isArray(existingHtml)) existingHtml = new TextDecoder().decode(new Uint8Array(existingHtml));
+    existingHtml = String(existingHtml || "");
+    const safeTitle = String(rendered?.title || "Untitled Piece");
+    const safeDescription = String(rendered?.description || "");
+    const safeHtml = typeof rendered?.html === "string" ? rendered.html : String(rendered?.html || "");
+    const safeHtmlTrimmed = safeHtml.trim();
+    const finalHtml = safeHtmlTrimmed ? safeHtml : existingHtml;
+    const safeSeed = rendered?.seed == null ? String(hashSeed(`${safeTitle}:${job.piece_id}:${Date.now()}`)) : String(rendered.seed);
+    const resolvedImageUrl = NO_STILL_IMAGE_METHODS.has(finalMethod) ? null : `/api/pieces/${job.piece_id}/image`;
     await db.prepare(
-      "UPDATE pieces SET title = ?, description = ?, html = ?, seed = ?, status = 'draft', image_url = ?, art_prompt = ?, venice_model = ?, method = ?, composition = ?, updated_at = datetime('now') WHERE id = ?"
+      "UPDATE pieces SET title = ?, description = ?, html = ?, seed = ?, status = 'draft', image_url = ?, art_prompt = COALESCE(?, art_prompt), venice_model = COALESCE(?, venice_model), method = COALESCE(?, method), composition = COALESCE(?, composition), updated_at = datetime('now') WHERE id = ?"
     ).bind(
-      rendered.title,
-      rendered.description,
-      rendered.html,
-      rendered.seed,
-      `/api/pieces/${job.piece_id}/image`,
+      safeTitle,
+      safeDescription,
+      finalHtml,
+      safeSeed,
+      resolvedImageUrl,
       rendered.artPrompt || null,
       rendered.veniceModel || null,
       rendered.method || null,
@@ -112586,6 +112625,19 @@ async function processRenderJobById(db, env, jobId) {
       job.piece_id
     ).run();
     await storeVeniceImage(db, env, job.piece_id, rendered);
+    if (!NO_STILL_IMAGE_METHODS.has(finalMethod)) {
+      const requiredPieceIds = [job.piece_id];
+      if (rendered.imageDataUriB) requiredPieceIds.push(`${job.piece_id}_b`);
+      for (let i = 0; i < (rendered.extraImages || []).length; i++) {
+        requiredPieceIds.push(`${job.piece_id}_${String.fromCharCode(99 + i)}`);
+      }
+      for (const requiredPieceId of requiredPieceIds) {
+        const storedImage = await db.prepare("SELECT 1 FROM piece_images WHERE piece_id = ?").bind(requiredPieceId).first().catch(() => null);
+        if (!storedImage) {
+          throw new Error(`Render completed without stored image asset: ${requiredPieceId}`);
+        }
+      }
+    }
     await db.prepare(
       "UPDATE render_jobs SET status = 'complete', last_error = NULL, completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?"
     ).bind(jobId).run();
@@ -112613,7 +112665,22 @@ function scheduleRenderJob(db, env, jobId, ctx) {
   return runner;
 }
 __name(scheduleRenderJob, "scheduleRenderJob");
-async function scheduleNextQueuedRenderJob(db, env, ctx) {
+async function reclaimStaleProcessingJobs(db, env) {
+  const staleMinutesRaw = Number(env?.RENDER_STALE_PROCESSING_MINUTES || 20);
+  const staleMinutes = Number.isFinite(staleMinutesRaw) ? Math.max(10, Math.min(Math.floor(staleMinutesRaw), 180)) : 20;
+  await db.prepare(
+    `UPDATE render_jobs
+        SET status = 'retrying',
+            last_error = COALESCE(last_error, 'Recovered stale processing job'),
+            updated_at = datetime('now')
+      WHERE status = 'processing'
+        AND started_at IS NOT NULL
+        AND datetime(started_at, '+${staleMinutes} minutes') <= datetime('now')`
+  ).run().catch(() => null);
+}
+__name(reclaimStaleProcessingJobs, "reclaimStaleProcessingJobs");
+async function getNextEligibleRenderJob(db, env) {
+  await reclaimStaleProcessingJobs(db, env);
   const nextJob = await db.prepare(
     `SELECT id
      FROM render_jobs
@@ -112629,14 +112696,36 @@ async function scheduleNextQueuedRenderJob(db, env, ctx) {
      ORDER BY CASE WHEN status = 'queued' THEN 0 ELSE 1 END ASC, created_at ASC
      LIMIT 1`
   ).first().catch(() => null);
+  return nextJob?.id ? nextJob : null;
+}
+__name(getNextEligibleRenderJob, "getNextEligibleRenderJob");
+async function scheduleNextQueuedRenderJob(db, env, ctx) {
+  const nextJob = await getNextEligibleRenderJob(db, env);
   if (!nextJob?.id) return false;
   scheduleRenderJob(db, env, nextJob.id, ctx);
   return true;
 }
 __name(scheduleNextQueuedRenderJob, "scheduleNextQueuedRenderJob");
+async function drainQueuedRenderJobs(db, env, limit = 3) {
+  const results = [];
+  for (let i = 0; i < limit; i++) {
+    const nextJob = await getNextEligibleRenderJob(db, env);
+    if (!nextJob?.id) break;
+    try {
+      const result = await processRenderJobById(db, env, nextJob.id);
+      results.push({ jobId: nextJob.id, ok: !!result?.ok, skipped: !!result?.skipped });
+    } catch (err) {
+      results.push({ jobId: nextJob.id, ok: false, error: String(err?.message || err || "Render failed") });
+    }
+  }
+  return results;
+}
+__name(drainQueuedRenderJobs, "drainQueuedRenderJobs");
 async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, now, status = "pending_render", groupId = null, pieceId = genId(), roundNumber = 1, requestIds = [] } = {}) {
   const result = await generateArtStack(env.VENICE_API_KEY, entries, { skipImages: true });
   const composition = result.composition || compositionFromCount(entries.length);
+  const deferredMethod = String(result.method || "").toLowerCase();
+  const deferredImageUrl = NO_STILL_IMAGE_METHODS.has(deferredMethod) ? null : `/api/pieces/${pieceId}/image`;
   const first = entries[0] || {};
   const isSoloDeferred = entries.length <= 1;
   const second = entries[1] || first;
@@ -112663,7 +112752,7 @@ async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, n
     mode2 || composition,
     groupId,
     status,
-    `/api/pieces/${pieceId}/image`,
+    deferredImageUrl,
     result.artPrompt || null,
     result.veniceModel || null,
     result.method || "fusion",
@@ -112935,6 +113024,19 @@ function normalizeAddress(value) {
   return String(value || "").trim().toLowerCase();
 }
 __name(normalizeAddress, "normalizeAddress");
+
+// Used across API routes that accept an X/Twitter handle (or x.com URL).
+// Some deployed routes referenced this helper without bundling it, causing:
+//   ReferenceError: normalizeHandle is not defined
+function normalizeHandle(value) {
+  let h = String(value || "").trim().toLowerCase();
+  if (h.startsWith("@")) h = h.slice(1);
+  if (h.startsWith("https://x.com/") || h.startsWith("https://twitter.com/")) {
+    h = h.split("/").filter(Boolean).pop() || "";
+  }
+  return h.match(/^[a-z0-9_]{1,15}$/i) ? h : "";
+}
+__name(normalizeHandle, "normalizeHandle");
 function approvalBridgeStatus(piece) {
   const current = String(piece?.status || "").trim().toLowerCase();
   if (current !== "draft" && current !== "wip") return piece?.status;
@@ -114959,7 +115061,12 @@ var GALLERY_CSS = `.gallery-header{margin-top:20px;margin-bottom:28px}
 .gallery-pagination a:hover{border-color:var(--primary);color:var(--primary)}
 .gallery-pagination .current{background:var(--primary);color:var(--bg);border-color:var(--primary)}
 @media(min-width:1340px){.gallery .grid{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:600px){.filter-row{flex-direction:column;align-items:flex-start;gap:6px}.filter-label{min-width:auto}}`;
+@media(max-width:600px){
+  .filter-row{flex-direction:column;align-items:flex-start;gap:6px}
+  .filter-label{min-width:auto}
+  .gallery-pagination{flex-wrap:wrap;justify-content:center;gap:6px;padding:0 8px 22px}
+  .gallery-pagination a,.gallery-pagination span{padding:7px 11px;font-size:11px}
+}`;
 var PIECE_CSS = `
 .piece-view{max-width:960px;margin:0 auto;padding:24px}
 .piece-frame{position:relative;width:100%;border-radius:8px;overflow:visible;background:var(--surface);border:1px solid var(--border)}
@@ -115468,6 +115575,7 @@ function piecePreviewImagePath(piece) {
   if (!piece || !piece.id) return null;
   const method = String(piece.method || "").toLowerCase();
   if (method === "sequence") return pieceSequencePreviewImagePath(piece);
+  if (NO_STILL_IMAGE_METHODS.has(method)) return null;
   if (piece.thumbnail) return String(piece.thumbnail);
   if (method === "sequence") {
     const count = Math.max(1, Math.min(piecePreviewFrameCount(piece), 4));
@@ -115475,14 +115583,14 @@ function piecePreviewImagePath(piece) {
     return pieceImageRoute(`${piece.id}${frameSuffix}`);
   }
   if (method === "collage" && (piece._has_image || piece.venice_model || piece.art_prompt)) {
-    return `/api/pieces/${piece.id}/image`;
+    return piece.image_url ? String(piece.image_url) : `/api/pieces/${piece.id}/image`;
   }
   if (method === "stitch" && (piece._has_image || piece.venice_model || piece.art_prompt)) {
-    return `/api/pieces/${piece.id}/image`;
+    return piece.image_url ? String(piece.image_url) : `/api/pieces/${piece.id}/image`;
   }
-  if (prefersStaticFullViewThumbnail(piece) || NO_STILL_IMAGE_METHODS.has(method)) return `/api/pieces/${piece.id}/thumbnail`;
-  if (piece._has_image || piece.venice_model || piece.art_prompt) return `/api/pieces/${piece.id}/image`;
+  if (prefersStaticFullViewThumbnail(piece)) return `/api/pieces/${piece.id}/thumbnail`;
   if (piece.image_url) return String(piece.image_url);
+  if (piece._has_image || piece.venice_model || piece.art_prompt) return `/api/pieces/${piece.id}/image`;
   return null;
 }
 __name(piecePreviewImagePath, "piecePreviewImagePath");
@@ -116159,20 +116267,24 @@ function pieceCard(p) {
   const access = pieceAccessibilityText(p, { surface: "card" });
   let previewContent;
   const demoRoutes = { "collage-demo-001": "/collage-demo", "split-demo-001": "/split-demo" };
+  const method = String(p.method || "").toLowerCase();
+  const isNoStillMethod = NO_STILL_IMAGE_METHODS.has(method);
   const previewImage = piecePreviewImagePath(p);
   const previewVideo = p._has_video ? pieceVideoRoute(p.id) : "";
   if (demoRoutes[p.id]) {
     previewContent = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
   } else if (previewVideo) {
     previewContent = `<video src="${esc(previewVideo)}" ${previewImage ? `poster="${esc(previewImage)}"` : ""} muted autoplay loop playsinline preload="metadata" aria-label="${esc(access.altText)}"></video>`;
-  } else if (String(p.method || "").toLowerCase() === "collage") {
+  } else if (method === "collage") {
     previewContent = collageCardPreviewMarkup(p, access);
+  } else if (isNoStillMethod) {
+    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
   } else if (shouldUseCardIframePreview(p) && (p.html_len > 100 || p.html && p.html.length > 100)) {
-    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view${String(p.method || "").toLowerCase() === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
+    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
   } else if (previewImage) {
     previewContent = `<img src="${esc(previewImage)}" alt="${esc(access.altText)}" loading="lazy" />`;
   } else if (p.html_len > 100 || p.html && p.html.length > 100) {
-    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view${String(p.method || "").toLowerCase() === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
+    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
   } else {
     previewContent = `<img src="${generateThumbnail(p)}" alt="${esc(access.altText)}" loading="lazy" />`;
   }
@@ -118780,19 +118892,21 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
   const hasStoredImage = !!piece._has_image;
   const hasStoredVideo = !!piece._has_video;
   const hasImageUrl = piece.image_url;
+  const stillImageSrc = hasImageUrl ? String(piece.image_url) : `/api/pieces/${esc(piece.id)}/image`;
+  const fullscreenHref = hasStoredVideo ? pieceVideoRoute(piece.id) : (isCodeMethod || prefersThumbnail || hasStoredImage || hasImageUrl || (piece.html && piece.html.length > 100 && !hasStoredImage && !hasImageUrl) ? `/api/pieces/${piece.id}/view` : stillImageSrc);
   const demoRoutes = { "collage-demo-001": "/collage-demo", "split-demo-001": "/split-demo" };
   if (demoRoutes[piece.id]) {
     frameContent = `<iframe src="${demoRoutes[piece.id]}" title="${esc(pieceAccessibility.iframeTitle)}" allowfullscreen></iframe>`;
   } else if (hasStoredVideo) {
     frameContent = `<video src="${esc(pieceVideoRoute(piece.id))}" controls autoplay loop muted playsinline title="${esc(pieceAccessibility.iframeTitle)}"></video>`;
-  } else if (isCodeMethod && piece.html && piece.html.length > 100) {
+  } else if (isCodeMethod) {
     frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" title="${esc(pieceAccessibility.iframeTitle)}" allowfullscreen></iframe>`;
   } else if (prefersThumbnail) {
     frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" title="${esc(pieceAccessibility.iframeTitle)}" allowfullscreen></iframe>`;
   } else if (hasStoredImage) {
-    frameContent = `<img src="/api/pieces/${esc(piece.id)}/image" alt="${esc(pieceAccessibility.altText)}" />`;
+    frameContent = `<img src="${esc(stillImageSrc)}" alt="${esc(pieceAccessibility.altText)}" />`;
   } else if (hasImageUrl) {
-    frameContent = `<img src="${esc(piece.image_url)}" alt="${esc(pieceAccessibility.altText)}" />`;
+    frameContent = `<img src="${esc(stillImageSrc)}" alt="${esc(pieceAccessibility.altText)}" />`;
   } else if (piece.html && piece.html.length > 100) {
     frameContent = `<iframe src="/api/pieces/${esc(piece.id)}/view" title="${esc(pieceAccessibility.iframeTitle)}" allowfullscreen></iframe>`;
   } else {
@@ -118803,6 +118917,8 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
   if (approvalsHTML) detailSections.push(approvalsHTML);
   if (joinHTML) detailSections.push(joinHTML);
   if (mintHTML) detailSections.push(mintHTML);
+  const isBrokenStillPiece = !hasStoredImage && !hasStoredVideo && !isCodeMethod && !prefersThumbnail;
+  const publicDescription = piece.status === "pending_render" ? "Art is brewing. You can leave this page and check back later while the piece keeps rendering in the background." : piece.status === "render_failed" || isBrokenStillPiece ? "DeviantClaw hit a glitch while rendering this piece. The developer has been notified to patch it. Please check back within 24 hours." : piece.description;
   const body = `
 <div class="piece-view">
   <div class="piece-frame${pieceFoilClass}">
@@ -118811,13 +118927,13 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
     </div>
   </div>
   <div class="piece-header">
-    <div class="piece-fullscreen-row"><a href="${esc(hasStoredVideo ? pieceVideoRoute(piece.id) : `/api/pieces/${piece.id}/view`)}" class="fullscreen-link" target="_blank">\u26F6 Fullscreen</a>${superRareUrl ? `<a href="${esc(superRareUrl)}" class="fullscreen-link" target="_blank" rel="noreferrer">SuperRare \u2197</a>` : ""}</div>
+    <div class="piece-fullscreen-row"><a href="${esc(fullscreenHref)}" class="fullscreen-link" target="_blank">\u26F6 Fullscreen</a>${superRareUrl ? `<a href="${esc(superRareUrl)}" class="fullscreen-link" target="_blank" rel="noreferrer">SuperRare \u2197</a>` : ""}</div>
     <div class="piece-title-row"><h1 class="piece-title">${esc(pieceTitle)}</h1>${pieceSuperRareIcon}${badge}</div>
     <div class="piece-artists">${artistsHTML}</div>
     <div class="piece-date">${(piece.created_at || "").slice(0, 10)} \xB7 ${esc(compositionLabel)} \xB7 ${esc(methodLabel)}</div>
     <div class="piece-heart-row" data-heart-shell="${esc(piece.id)}">${detailHeartButton}<span class="piece-heart-count" data-heart-count-for="${esc(piece.id)}">${esc(detailHeartLabel)}</span></div>
   </div>
-  ${piece.description ? `<p class="piece-desc">${esc(piece.description)}</p>` : ""}
+  ${publicDescription ? `<p class="piece-desc">${esc(publicDescription)}</p>` : ""}
   <p class="piece-layout-note"><strong>Layout:</strong> ${esc(pieceAccessibility.layoutDescription)}</p>
   ${detailSections.length > 0 ? `<div class="piece-details">${detailSections.join("")}</div>` : ""}
   ${guardianActionsHTML ? `<div class="piece-manual-section">${guardianActionsHTML}</div>` : ""}
@@ -118825,7 +118941,7 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
   const pieceImage = absoluteUrl(origin, piecePreviewImagePath(piece)) || "https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/cover.jpg";
   const pieceMeta = {
     title: `${pieceTitle} \xB7 DeviantClaw`,
-    description: pieceAccessibility.accessibilitySummary || piece.description || `${piece.mode || "solo"} piece on DeviantClaw`,
+    description: piece.status === "pending_render" || piece.status === "render_failed" || isBrokenStillPiece ? publicDescription : pieceAccessibility.accessibilitySummary || piece.description || `${piece.mode || "solo"} piece on DeviantClaw`,
     image: pieceImage,
     url: `https://deviantclaw.art/piece/${id2}`
   };
@@ -118898,20 +119014,24 @@ async function renderAgent(db, agentId, env, url) {
     const access = pieceAccessibilityText(p, { surface: "card" });
     let agentPreview;
     const demoRoutes = { "collage-demo-001": "/collage-demo", "split-demo-001": "/split-demo" };
+    const method = String(p.method || "").toLowerCase();
+    const isNoStillMethod = NO_STILL_IMAGE_METHODS.has(method);
     const previewImage = piecePreviewImagePath(p);
     const previewVideo = p._has_video ? pieceVideoRoute(p.id) : "";
     if (demoRoutes[p.id]) {
       agentPreview = `<iframe src="${demoRoutes[p.id]}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
     } else if (previewVideo) {
       agentPreview = `<video src="${esc(previewVideo)}" ${previewImage ? `poster="${esc(previewImage)}"` : ""} muted autoplay loop playsinline preload="metadata" aria-label="${esc(access.altText)}"></video>`;
-    } else if (String(p.method || "").toLowerCase() === "collage") {
+    } else if (method === "collage") {
       agentPreview = collageCardPreviewMarkup(p, access);
+    } else if (isNoStillMethod) {
+      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
     } else if (shouldUseCardIframePreview(p) && (p.html_len > 100 || p.html && p.html.length > 100)) {
-      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view${String(p.method || "").toLowerCase() === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
+      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
     } else if (previewImage) {
       agentPreview = `<img src="${esc(previewImage)}" alt="${esc(access.altText)}" loading="lazy" />`;
     } else if (p.html_len > 100 || p.html && p.html.length > 100) {
-      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view${String(p.method || "").toLowerCase() === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
+      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
     } else {
       agentPreview = `<img src="${generateThumbnail(p)}" alt="${esc(access.altText)}" loading="lazy" />`;
     }
@@ -119733,6 +119853,23 @@ async function submitDeleteAgent(){
 }
 __name(renderDeleteAgentPage, "renderDeleteAgentPage");
 var index_default = {
+  async scheduled(event, env, ctx) {
+    const db = env.DB;
+    try {
+      await ensurePieceHeartTables(db);
+      await ensureRenderJobTables(db);
+      const run = drainQueuedRenderJobs(db, env, 3).then((results) => {
+        console.log(`[scheduled-render-drain] processed=${results.length}`);
+        return results;
+      }).catch((err) => {
+        console.error("[scheduled-render-drain] failed:", err?.message || err);
+      });
+      ctx.waitUntil(run);
+    } catch (err) {
+      console.error("[scheduled-render-drain] setup failed:", err?.message || err);
+      throw err;
+    }
+  },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -122348,27 +122485,28 @@ For image work:
         const piece = await db.prepare("SELECT id, title, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?").bind(id2).first();
         if (!piece) return new Response("Not found", { status: 404 });
         const pieceMethod = String(piece.method || "").toLowerCase();
-        const fallbackThumbnailSvg = () => {
-          const svg2 = generatePieceGlitchFallback(piece, "thumb");
-          return new Response(method === "HEAD" ? null : svg2, {
+        const fallbackThumbnailText = () => new Response(
+          method === "HEAD" ? null : "DeviantClaw encountered a glitch while rendering this piece. The developer has been notified to patch it. Please check back within 24 hours.",
+          {
+            status: 503,
             headers: {
-              "Content-Type": "image/svg+xml; charset=utf-8",
-              "Cache-Control": "public, max-age=3600"
+              "Content-Type": "text/plain; charset=utf-8",
+              "Cache-Control": "public, max-age=60"
             }
-          });
-        };
+          }
+        );
         if (NO_STILL_IMAGE_METHODS.has(pieceMethod)) {
-          return fallbackThumbnailSvg();
+          return fallbackThumbnailText();
         }
         const primaryImageExists = await db.prepare("SELECT 1 FROM piece_images WHERE piece_id = ?").bind(id2).first().catch(() => null);
         if (!prefersStaticFullViewThumbnail(piece)) {
-          return primaryImageExists ? Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302) : fallbackThumbnailSvg();
+          return primaryImageExists ? Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302) : fallbackThumbnailText();
         }
         if (pieceMethod === "collage" && Number(piece.legacy_mainnet || 0) === 1) {
-          return primaryImageExists ? Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302) : fallbackThumbnailSvg();
+          return primaryImageExists ? Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302) : fallbackThumbnailText();
         }
         if (pieceMethod === "collage") {
-          return primaryImageExists ? Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302) : fallbackThumbnailSvg();
+          return primaryImageExists ? Response.redirect(new URL(`/api/pieces/${id2}/image`, url.origin).toString(), 302) : fallbackThumbnailText();
         }
         const imageRows = await db.prepare(
           "SELECT piece_id FROM piece_images WHERE piece_id IN (?, ?, ?, ?)"
@@ -122376,7 +122514,7 @@ For image work:
         const imageMap = new Map((imageRows.results || []).filter((r) => r?.piece_id).map((r) => [r.piece_id, pieceImageRoute(r.piece_id)]));
         const imageUrls = [id2, `${id2}_b`, `${id2}_c`, `${id2}_d`].map((pieceId) => imageMap.get(pieceId)).filter(Boolean);
         if (imageUrls.length === 0) {
-          return fallbackThumbnailSvg();
+          return fallbackThumbnailText();
         }
         let labels = [piece.agent_a_name, piece.agent_b_name].filter(Boolean);
         try {
@@ -122420,8 +122558,9 @@ For image work:
           if (demoImage) return method === "HEAD" ? headLike(demoImage) : demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id2, suffix);
           if (!fallbackSvg) return new Response("Not found", { status: 404 });
-          return new Response(method === "HEAD" ? null : fallbackSvg, {
-            headers: { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "public, max-age=3600" }
+          return new Response(method === "HEAD" ? null : "DeviantClaw encountered a glitch while rendering this piece. The developer has been notified to patch it. Please check back within 24 hours.", {
+            status: 503,
+            headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=60" }
           });
         }
         return method === "HEAD" ? headLike(imageResponse) : imageResponse;
@@ -122434,8 +122573,9 @@ For image work:
           if (demoImage) return method === "HEAD" ? headLike(demoImage) : demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id2, "b");
           if (!fallbackSvg) return new Response("Not found", { status: 404 });
-          return new Response(method === "HEAD" ? null : fallbackSvg, {
-            headers: { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "public, max-age=3600" }
+          return new Response(method === "HEAD" ? null : "DeviantClaw encountered a glitch while rendering this piece. The developer has been notified to patch it. Please check back within 24 hours.", {
+            status: 503,
+            headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=60" }
           });
         }
         return method === "HEAD" ? headLike(imageResponse) : imageResponse;
@@ -122448,11 +122588,11 @@ For image work:
           if (demoImage) return method === "HEAD" ? headLike(demoImage) : demoImage;
           const piece = await db.prepare("SELECT id, title, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?").bind(id2).first();
           if (!piece) return new Response("Not found", { status: 404 });
-          const svg2 = generatePieceGlitchFallback(piece, "full");
-          return new Response(method === "HEAD" ? null : svg2, {
+          return new Response(method === "HEAD" ? null : "DeviantClaw encountered a glitch while rendering this piece. The developer has been notified to patch it. Please check back within 24 hours.", {
+            status: 503,
             headers: {
-              "Content-Type": "image/svg+xml; charset=utf-8",
-              "Cache-Control": "public, max-age=3600"
+              "Content-Type": "text/plain; charset=utf-8",
+              "Cache-Control": "public, max-age=60"
             }
           });
         }
@@ -122461,7 +122601,7 @@ For image work:
       if (method === "GET" && path.match(/^\/api\/pieces\/[^/]+\/view$/)) {
         const id2 = path.split("/")[3];
         const piece = await db.prepare(
-          "SELECT id, title, html, method, created_at, agent_a_name, agent_b_name, legacy_mainnet FROM pieces WHERE id = ?"
+          "SELECT id, title, html, method, created_at, agent_a_name, agent_b_name, legacy_mainnet, image_url FROM pieces WHERE id = ?"
         ).bind(id2).first();
         if (!piece) return htmlResponse("<h1>Not found</h1>", 404);
         const adminFoilTier = ADMIN_FOIL_OVERRIDES[id2];
@@ -122482,17 +122622,23 @@ For image work:
           if (names.length > 0) artists2 = names;
         } catch {
         }
-        if (String(piece.method || "").toLowerCase() === "split") {
+        const pieceMethod = String(piece.method || "").toLowerCase();
+        if (pieceMethod === "single" && piece.image_url) {
+          const safeTitle = esc(piece.title || "Untitled Piece");
+          const imageSrc = esc(String(piece.image_url));
+          return htmlResponse(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${safeTitle}</title><style>html,body{margin:0;padding:0;background:#000;color:#fff;width:100%;height:100%;overflow:hidden;font-family:Inter,system-ui,sans-serif}body{display:flex;align-items:center;justify-content:center}img{display:block;max-width:100vw;max-height:100vh;object-fit:contain;margin:auto;background:#000} .wrap{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;background:#000}</style></head><body><div class="wrap"><img src="${imageSrc}" alt="${safeTitle}"/></div></body></html>`);
+        }
+        if (pieceMethod === "split") {
           html = buildSplitHTML(`/api/pieces/${id2}/image`, `/api/pieces/${id2}/image-b`, piece.title, artists2, String(piece.created_at || "").slice(0, 10));
-        } else if (String(piece.method || "").toLowerCase() === "collage" && Number(piece.legacy_mainnet || 0) === 1 && artists2.length === 2) {
+        } else if (pieceMethod === "collage" && Number(piece.legacy_mainnet || 0) === 1 && artists2.length === 2) {
           html = buildLegacyOverlapCollageHTML([`/api/pieces/${id2}/image`, `/api/pieces/${id2}/image-b`], piece.title, artists2, String(piece.created_at || "").slice(0, 10));
         } else {
           html = syncLegacyPieceHtml(html, piece, artists2);
         }
-        if (String(piece.method || "").toLowerCase() === "code" && isClearlyTruncatedPieceHtml(html)) {
+        if (pieceMethod === "code" && isClearlyTruncatedPieceHtml(html)) {
           html = buildRecoveredCodePieceHTML(piece, artists2);
         }
-        if (String(piece.method || "").toLowerCase() === "game") {
+        if (pieceMethod === "game") {
           html = injectGameMobileShim(html, { cardPreview: url.searchParams.get("card") === "1", roomLabels: artists2, pieceTitle: piece.title || "" });
         }
         if (html.includes("{{PIECE_IMAGE_URL")) {
@@ -123175,6 +123321,10 @@ For image work:
         if (!guardian) return json({ error: "Unauthorized" }, 401);
         const piece = await db.prepare("SELECT * FROM pieces WHERE id = ?").bind(pieceId).first();
         if (!piece) return json({ error: "Piece not found" }, 404);
+        const pieceMethod = String(piece.method || "").toLowerCase();
+        if (NO_STILL_IMAGE_METHODS.has(pieceMethod)) {
+          return json({ error: "This piece is a live code/game work. Still-image regeneration is disabled for this method." }, 400);
+        }
         if (!piece.art_prompt) return json({ error: "No art prompt to regenerate from" }, 400);
         const agentA = piece.agent_a_id ? await db.prepare("SELECT guardian_address FROM agents WHERE id = ?").bind(piece.agent_a_id).first() : null;
         const agentB = piece.agent_b_id ? await db.prepare("SELECT guardian_address FROM agents WHERE id = ?").bind(piece.agent_b_id).first() : null;
@@ -123213,6 +123363,21 @@ For image work:
         }
         if (!imageUrl) return json({ error: `Venice image generation failed${lastErr ? ` (${String(lastErr?.message || lastErr)})` : ""}` }, 500);
         await storePieceImageSource(db, env, pieceId, imageUrl);
+        const regenMethod = String(piece.method || "").trim().toLowerCase();
+        if (["split", "collage", "sequence", "stitch", "parallax", "glitch"].includes(regenMethod)) {
+          const composition = String(piece.composition || piece.mode || "").trim().toLowerCase();
+          const needed = composition === "quad" ? ["_b", "_c", "_d"] : composition === "trio" ? ["_b", "_c"] : ["_b"];
+          for (const suffix of needed) {
+            const slotId = `${pieceId}${suffix}`;
+            const existing = await db.prepare("SELECT 1 FROM piece_images WHERE piece_id = ?").bind(slotId).first().catch(() => null);
+            if (existing) continue;
+            await db.prepare(
+              `INSERT OR REPLACE INTO piece_images (piece_id, data_uri, storage_backend, object_key, content_type, byte_size, created_at)
+               SELECT ?, NULL, storage_backend, object_key, content_type, byte_size, datetime('now')
+               FROM piece_images WHERE piece_id = ?`
+            ).bind(slotId, pieceId).run();
+          }
+        }
         await db.prepare("UPDATE pieces SET image_url = ? WHERE id = ?").bind(`/api/pieces/${pieceId}/image`, pieceId).run();
         return json({ ok: true, pieceId, size: size6, imageUrl: `/api/pieces/${pieceId}/image` });
       }
