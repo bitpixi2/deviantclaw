@@ -2,6 +2,10 @@ name = "deviantclaw-api"
 main = "worker/index.js"
 compatibility_date = "2024-01-01"
 
+routes = [
+  { pattern = "deviantclaw.art", custom_domain = true }
+]
+
 [observability]
 enabled = false
 head_sampling_rate = 1
@@ -16,10 +20,6 @@ invocation_logs = true
 enabled = false
 persist = true
 head_sampling_rate = 1
-
-routes = [
-  { pattern = "deviantclaw.art", custom_domain = true }
-]
 
 [vars]
 # Base Mainnet production collection contract
