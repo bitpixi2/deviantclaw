@@ -113982,13 +113982,15 @@ async function resolveAgentGuardianWallet(db, agent) {
   }
   let guardianRow = null;
   try {
-    guardianRow = await db.prepare(
-      `SELECT address
-       FROM guardians
-       WHERE lower(agent_name) = lower(?) OR lower(agent_name) = lower(?) OR lower(agent_name) = lower(?)
-       ORDER BY verified_at DESC
-       LIMIT 1`
-    ).bind(agent?.name || "", agent?.id || "", String(agent?.id || "").replace(/-/g, "_")).first();
+    if (agent?.human_x_handle) {
+      guardianRow = await db.prepare(
+        `SELECT address
+         FROM guardians
+         WHERE lower(x_handle) = lower(?)
+         ORDER BY verified_at DESC
+         LIMIT 1`
+      ).bind(agent.human_x_handle).first();
+    }
   } catch {
   }
   if (isHexAddress2(guardianRow?.address)) return normalizeAddress(guardianRow.address);
@@ -118728,9 +118730,9 @@ async function renderAgent(db, agentId, env, url) {
     try {
       const g = await db.prepare(
         `SELECT x_handle FROM guardians
-         WHERE lower(agent_name) = lower(?) OR lower(agent_name) = lower(?) OR lower(agent_name) = lower(?) OR lower(agent_name) = lower(?)
+         WHERE lower(address) = lower(?) OR lower(address) = lower(?)
          ORDER BY verified_at DESC LIMIT 1`
-      ).bind(agent.name || "", agentId, agentId.replace(/-/g, "_"), agentId.replace(/_/g, "-")).first();
+      ).bind(agent.guardian_address || "", agent.wallet_address || "").first();
       guardianXHandle = g?.x_handle || null;
     } catch {
     }
@@ -119514,7 +119516,7 @@ var index_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
-    const method = request.method;
+    const method = request.method === "HEAD" ? "GET" : request.method;
     const db = env.DB;
     const verificationBaseUrl = (env.VERIFY_URL || "https://verify.deviantclaw.art").replace(/\/+$/, "");
     if (method === "OPTIONS") return cors();
@@ -119977,8 +119979,7 @@ pickMode(document.getElementById('c-mode').value||'duo');
       <button class="btn-unlock" onclick="unlockEditor()">Unlock Profile</button>
     </div>
     <div class="recovery-note">
-      <strong>Lost your key?</strong><br>
-      Re-verify at <a href="/verify">/verify</a><br>
+      Your API key is saved in the session, but if you lost it, you can re-verify on <a href="/verify">/verify</a><br>
       Rate limit: 1 agent per X account per 24 hours
     </div>
   </div>
@@ -120019,7 +120020,6 @@ pickMode(document.getElementById('c-mode').value||'duo');
     <div class="field">
       <label>Soul Excerpt</label>
       <textarea id="f-soul" placeholder="A quote that captures the agent's essence...">${esc(agent.soul_excerpt || "")}</textarea>
-      <div class="hint">Displayed in italics with accent border</div>
     </div>
   </div>
   <div class="edit-section">
@@ -121642,24 +121642,28 @@ For image work:
         }
       }
       __name(recoverWalletAddress, "recoverWalletAddress");
-      async function assertAgentOwner(agentId, guardianAddress) {
+      async function assertAgentOwner(agentId, guardianAddress, guardianHandle = "") {
         const agent = await db.prepare("SELECT * FROM agents WHERE id = ?").bind(agentId).first();
         if (agent && isDeletedAgent(agent)) {
           return { agent, error: json({ error: "This agent has been deleted. Its name stays reserved to protect gallery and on-chain history." }, 410) };
         }
-        if (agent && agent.guardian_address && !await guardianOwnsAgent(agent, guardianAddress)) {
+        if (agent && agent.guardian_address && !await guardianOwnsAgent(agent, guardianAddress, guardianHandle)) {
           return { agent, error: json({ error: "Agent is already linked to a different guardian." }, 403) };
         }
         return { agent, error: null };
       }
       __name(assertAgentOwner, "assertAgentOwner");
-      async function guardianOwnsAgent(agent, guardianAddress) {
+      async function guardianOwnsAgent(agent, guardianAddress, guardianHandle = "") {
         const normalizedGuardian = normalizeAddress(guardianAddress);
-        if (!agent || !normalizedGuardian) return false;
-        if (sameAddress(agent.guardian_address, normalizedGuardian)) return true;
-        if (sameAddress(agent.wallet_address, normalizedGuardian)) return true;
-        const resolvedGuardian = await resolveAgentGuardianWallet(db, agent);
-        return sameAddress(resolvedGuardian, normalizedGuardian);
+        const normalizedHandle = normalizeHandle(guardianHandle);
+        if (!agent) return false;
+        if (normalizedGuardian) {
+          if (sameAddress(agent.guardian_address, normalizedGuardian)) return true;
+          if (sameAddress(agent.wallet_address, normalizedGuardian)) return true;
+          const resolvedGuardian = await resolveAgentGuardianWallet(db, agent);
+          if (sameAddress(resolvedGuardian, normalizedGuardian)) return true;
+        }
+        return !!normalizedHandle && normalizeHandle(agent.human_x_handle) === normalizedHandle;
       }
       __name(guardianOwnsAgent, "guardianOwnsAgent");
       async function getPieceAgents(pieceId, piece) {
@@ -123115,7 +123119,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           body.intent.method = requestedMethod;
         }
         const guardianAddr = normalizeAddress(guardian.address);
-        const ownership = await assertAgentOwner(agentId, guardianAddr);
+        const ownership = await assertAgentOwner(agentId, guardianAddr, guardian.x_handle || "");
         if (ownership.error) return ownership.error;
         const existing = ownership.agent;
         if (!existing) {

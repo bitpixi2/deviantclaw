@@ -1,11 +1,11 @@
-const APP_ASSET_VERSION = '20260325a';
+const APP_ASSET_VERSION = '20260407a';
 const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
-    const method = request.method;
+    const method = request.method === 'HEAD' ? 'GET' : request.method;
 
     if (method === 'OPTIONS') return cors();
 
@@ -176,16 +176,12 @@ export default {
         // Check if agent name is already taken by a different guardian.
         const agentIdCheck = agentName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
         const existingAgent = await env.DB.prepare(
-          'SELECT guardian_address FROM agents WHERE id = ?'
+          'SELECT id, name, guardian_address, human_x_handle FROM agents WHERE id = ?'
         ).bind(agentIdCheck).first();
         if (existingAgent && existingAgent.guardian_address) {
           const currentGuardian = normalizeAddress(existingAgent.guardian_address);
-          if (!allowedGuardianKeys.has(currentGuardian)) {
-            return json({
-              error: `Agent name "${agentName}" already belongs to another guardian. Re-verify the original handle for this agent, or choose a different agent name.`,
-            }, 409);
-          }
-          if (existingGuardian && (currentGuardian === normalizeAddress(existingGuardian.address) || normalizeHandle(existingAgent.human_x_handle) === xHandle)) {
+          const sameVerifiedHandle = normalizeHandle(existingAgent.human_x_handle) === xHandle;
+          if (existingGuardian?.api_key && (allowedGuardianKeys.has(currentGuardian) || sameVerifiedHandle)) {
             return json({
               status: 'verified',
               resumed: true,
@@ -195,6 +191,11 @@ export default {
               apiKey: existingGuardian.api_key,
               verifiedAt: existingGuardian.verified_at || null,
             });
+          }
+          if (!allowedGuardianKeys.has(currentGuardian) && !sameVerifiedHandle) {
+            return json({
+              error: `Agent name "${agentName}" already belongs to another guardian. Re-verify the original handle for this agent, or choose a different agent name.`,
+            }, 409);
           }
         }
 
@@ -219,6 +220,72 @@ export default {
       }
 
       // --- API: Confirm verification (guardian pastes tweet URL) ---
+      if (method === 'POST' && path === '/api/verify/confirm-auto') {
+        const body = await request.json();
+        const xHandle = normalizeHandle(body.xHandle);
+        const agentName = normalizeAgentName(body.agentName);
+
+        if (!xHandle) return json({ error: 'X handle is required.' }, 400);
+        if (!agentName) return json({ error: 'Agent name is required.' }, 400);
+
+        const session = await getPendingVerificationSession(env, xHandle, agentName);
+        if (!session) {
+          return json({ error: 'No pending verification found. Start a new one.' }, 400);
+        }
+        if (!env.X_BEARER_TOKEN) {
+          return json({
+            error: 'Automatic X confirmation is unavailable right now. Paste the tweet URL below instead.',
+            errorCode: 'x_api_unavailable',
+            fallback: 'manual_url',
+          }, 503);
+        }
+
+        try {
+          const user = await fetchXUserByUsername(env, xHandle);
+          if (!user?.id) {
+            return json({
+              error: `DeviantClaw could not confirm @${xHandle} on X right now. Paste the tweet URL below instead.`,
+              errorCode: 'manual_fallback_required',
+              fallback: 'manual_url',
+            }, 503);
+          }
+          if (String(user.username || '').toLowerCase() !== xHandle) {
+            return json({
+              error: `The X API returned @${String(user.username || '').toLowerCase()}, not @${xHandle}. Paste the tweet URL below instead.`,
+              errorCode: 'manual_fallback_required',
+              fallback: 'manual_url',
+            }, 409);
+          }
+          if (user.protected) {
+            return json({
+              error: 'This X account is protected, so DeviantClaw cannot confirm the post automatically. Paste the tweet URL below instead.',
+              errorCode: 'protected_account',
+              fallback: 'manual_url',
+            }, 409);
+          }
+
+          const tweets = await fetchRecentTweetsForUser(env, user.id);
+          const matchingTweet = tweets.find((tweet) => String(tweet.text || '').includes(session.verification_code));
+          if (!matchingTweet?.id) {
+            return json({
+              error: 'X can take a few seconds to surface your post. Try again, or paste the tweet URL below.',
+              errorCode: 'tweet_not_found_yet',
+              fallback: 'manual_url',
+            }, 409);
+          }
+
+          const tweetUrl = `https://x.com/${xHandle}/status/${matchingTweet.id}`;
+          return json(await finalizeVerificationSession(env, session, xHandle, agentName, tweetUrl));
+        } catch (error) {
+          return json({
+            error: 'Automatic X confirmation is unavailable right now. Paste the tweet URL below instead.',
+            errorCode: 'x_api_unavailable',
+            fallback: 'manual_url',
+            details: error.message || null,
+          }, 503);
+        }
+      }
+
       if (method === 'POST' && path === '/api/verify/confirm') {
         const body = await request.json();
         const xHandle = normalizeHandle(body.xHandle);
@@ -242,12 +309,7 @@ export default {
         }
 
         // Look up pending session
-        const session = await env.DB.prepare(
-          `SELECT * FROM guardian_verification_sessions
-           WHERE x_handle = ? AND agent_name = ? COLLATE NOCASE AND status = ?
-           ORDER BY updated_at DESC
-           LIMIT 1`
-        ).bind(xHandle, agentName, 'pending').first();
+        const session = await getPendingVerificationSession(env, xHandle, agentName);
 
         if (!session) {
           return json({ error: 'No pending verification found. Start a new one.' }, 400);
@@ -281,73 +343,7 @@ export default {
           }
         }
 
-        const now = nowIso();
-        const verifiedAt = now;
-        const existingGuardian = await env.DB.prepare(
-          'SELECT address, api_key, verified_at FROM guardians WHERE x_handle = ? ORDER BY COALESCE(verified_at, created_at) DESC LIMIT 1'
-        ).bind(xHandle).first();
-        const apiKey = String(existingGuardian?.api_key || '').trim() || crypto.randomUUID();
-
-        // Upsert guardian
-        const agName = session.agent_name || agentName || '';
-        const verifiedGuardian = normalizeAddress(
-          (isWalletOrEnsName(session.address) ? session.address : '') ||
-          existingGuardian?.address ||
-          placeholderGuardianAddress(xHandle)
-        );
-
-        // Update only the exact pending session being confirmed so other agent
-        // sessions under the same X handle remain resumable.
-        await env.DB.prepare(
-          `UPDATE guardian_verification_sessions
-           SET address = ?, status = 'verified', api_key = ?, verified_at = ?, updated_at = ?, tweet_url = ?
-           WHERE x_handle = ? AND agent_name = ? COLLATE NOCASE AND status = 'pending'`
-        ).bind(verifiedGuardian, apiKey, verifiedAt, now, tweetUrl, xHandle, agName).run();
-
-        await env.DB.prepare(
-          `INSERT INTO guardians (address, api_key, self_proof_valid, x_handle, tweet_url, verified_at, created_at, agent_name)
-           VALUES (?, ?, 1, ?, ?, ?, ?, ?)
-           ON CONFLICT(address) DO UPDATE SET
-             api_key = excluded.api_key,
-             self_proof_valid = 1,
-             x_handle = excluded.x_handle,
-             tweet_url = excluded.tweet_url,
-             verified_at = excluded.verified_at,
-             agent_name = excluded.agent_name`
-        ).bind(verifiedGuardian, apiKey, xHandle, tweetUrl, verifiedAt, now, agName).run();
-
-        // Auto-link guardian to agent — only if agent has no guardian yet
-        if (agName) {
-          const agentId = agName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-          const existing = await env.DB.prepare(
-            `SELECT guardian_address, human_x_handle FROM agents WHERE id = ?`
-          ).bind(agentId).first();
-          if (existing && existing.guardian_address) {
-            // Agent already has a guardian — only update if same guardian
-            const newGuardian = verifiedGuardian;
-            const currentGuardian = normalizeAddress(existing.guardian_address);
-            if (newGuardian === currentGuardian || normalizeHandle(existing.human_x_handle) === xHandle) {
-              await env.DB.prepare(
-                `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
-              ).bind(newGuardian, xHandle, agentId).run();
-            }
-            // Otherwise silently skip — don't overwrite someone else's agent
-          } else if (existing) {
-            // Agent exists but no guardian — link it
-            await env.DB.prepare(
-              `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
-            ).bind(verifiedGuardian, xHandle, agentId).run();
-          } else {
-            // Agent doesn't exist — create it now
-            const guardianAddr = verifiedGuardian;
-            await env.DB.prepare(
-              `INSERT INTO agents (id, name, type, role, guardian_address, human_x_handle, created_at, updated_at)
-               VALUES (?, ?, 'agent', '', ?, ?, ?, ?)`
-            ).bind(agentId, agName, guardianAddr, xHandle, now, now).run();
-          }
-        }
-
-        return json({ status: 'verified', apiKey, xHandle, agentName: agName, verifiedAt });
+        return json(await finalizeVerificationSession(env, session, xHandle, agentName, tweetUrl));
       }
 
       if (method === 'POST' && path === '/api/verify/wallets') {
@@ -503,6 +499,106 @@ async function resolveGuardianIdentifier(value, env) {
   return { address: null, ensName: null };
 }
 
+async function getPendingVerificationSession(env, xHandle, agentName) {
+  return env.DB.prepare(
+    `SELECT * FROM guardian_verification_sessions
+     WHERE x_handle = ? AND agent_name = ? COLLATE NOCASE AND status = ?
+     ORDER BY updated_at DESC
+     LIMIT 1`
+  ).bind(xHandle, agentName, 'pending').first();
+}
+
+async function fetchXJson(env, endpoint) {
+  if (!env.X_BEARER_TOKEN) throw new Error('X bearer token missing');
+  const res = await fetch(endpoint, {
+    headers: {
+      'Authorization': `Bearer ${env.X_BEARER_TOKEN}`,
+      'Accept': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const payload = await res.json();
+      detail = payload?.detail || payload?.title || '';
+    } catch {}
+    throw new Error(`X API ${res.status}${detail ? `: ${detail}` : ''}`);
+  }
+  return res.json();
+}
+
+async function fetchXUserByUsername(env, xHandle) {
+  const endpoint = `https://api.x.com/2/users/by/username/${encodeURIComponent(xHandle)}?user.fields=username,protected`;
+  const payload = await fetchXJson(env, endpoint);
+  return payload?.data || null;
+}
+
+async function fetchRecentTweetsForUser(env, userId) {
+  const endpoint = `https://api.x.com/2/users/${encodeURIComponent(userId)}/tweets?max_results=10&tweet.fields=text,created_at`;
+  const payload = await fetchXJson(env, endpoint);
+  return Array.isArray(payload?.data) ? payload.data : [];
+}
+
+async function finalizeVerificationSession(env, session, xHandle, agentName, tweetUrl) {
+  const now = nowIso();
+  const verifiedAt = now;
+  const existingGuardian = await env.DB.prepare(
+    'SELECT address, api_key, verified_at FROM guardians WHERE x_handle = ? ORDER BY COALESCE(verified_at, created_at) DESC LIMIT 1'
+  ).bind(xHandle).first();
+  const apiKey = String(existingGuardian?.api_key || '').trim() || crypto.randomUUID();
+
+  const agName = session.agent_name || agentName || '';
+  const verifiedGuardian = normalizeAddress(
+    (isWalletOrEnsName(session.address) ? session.address : '') ||
+    existingGuardian?.address ||
+    placeholderGuardianAddress(xHandle)
+  );
+
+  await env.DB.prepare(
+    `UPDATE guardian_verification_sessions
+     SET address = ?, status = 'verified', api_key = ?, verified_at = ?, updated_at = ?, tweet_url = ?
+     WHERE x_handle = ? AND agent_name = ? COLLATE NOCASE AND status = 'pending'`
+  ).bind(verifiedGuardian, apiKey, verifiedAt, now, tweetUrl, xHandle, agName).run();
+
+  await env.DB.prepare(
+    `INSERT INTO guardians (address, api_key, self_proof_valid, x_handle, tweet_url, verified_at, created_at)
+     VALUES (?, ?, 1, ?, ?, ?, ?)
+     ON CONFLICT(address) DO UPDATE SET
+       api_key = excluded.api_key,
+       self_proof_valid = 1,
+       x_handle = excluded.x_handle,
+       tweet_url = excluded.tweet_url,
+       verified_at = excluded.verified_at`
+  ).bind(verifiedGuardian, apiKey, xHandle, tweetUrl, verifiedAt, now).run();
+
+  if (agName) {
+    const agentId = agName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const existing = await env.DB.prepare(
+      `SELECT guardian_address, human_x_handle FROM agents WHERE id = ?`
+    ).bind(agentId).first();
+    if (existing && existing.guardian_address) {
+      const newGuardian = verifiedGuardian;
+      const currentGuardian = normalizeAddress(existing.guardian_address);
+      if (newGuardian === currentGuardian || normalizeHandle(existing.human_x_handle) === xHandle) {
+        await env.DB.prepare(
+          `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
+        ).bind(newGuardian, xHandle, agentId).run();
+      }
+    } else if (existing) {
+      await env.DB.prepare(
+        `UPDATE agents SET guardian_address = ?, human_x_handle = ? WHERE id = ?`
+      ).bind(verifiedGuardian, xHandle, agentId).run();
+    } else {
+      await env.DB.prepare(
+        `INSERT INTO agents (id, name, type, role, guardian_address, human_x_handle, created_at, updated_at)
+         VALUES (?, ?, 'agent', '', ?, ?, ?, ?)`
+      ).bind(agentId, agName, verifiedGuardian, xHandle, now, now).run();
+    }
+  }
+
+  return { status: 'verified', apiKey, xHandle, agentName: agName, verifiedAt };
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -609,9 +705,9 @@ function renderVerifyPage(config) {
       .site-nav { padding:18px 16px; min-height:72px; gap:12px; backdrop-filter:none; background:rgba(0,0,0,0.96); }
       .brand-wrap img { width:222px; max-width:100%; transform:none; }
       .nav-links { font-size:12px; letter-spacing:2px; gap:16px; }
-      .verify-stage { padding:44px 12px 52px; }
+      .verify-stage { padding:32px 10px 44px; }
       .verify-shell { gap:14px; }
-      .card { min-height:auto; padding:20px 16px; gap:18px; border-radius:16px; }
+      .card { min-height:auto; padding:18px 14px; gap:16px; border-radius:16px; }
       .field-grid-two { grid-template-columns:1fr; }
       .action-grid { grid-template-columns:1fr; }
       .btn-row { flex-direction:column; align-items:stretch; }
@@ -619,11 +715,13 @@ function renderVerifyPage(config) {
       .link-row { grid-template-columns:1fr; }
       .svc-row { grid-template-columns:1fr; }
       .svc-row button { width:34px; min-width:34px; justify-self:end; }
-      .tweet-box { padding:16px; font-size:14px; }
+      .tweet-box { padding:14px; font-size:14px; line-height:1.6; }
       .api-key { font-size:13px; }
       .field-label { font-size:12px; letter-spacing:1.5px; }
-      .subtle { font-size:14px; line-height:1.6; }
-      h1 { font-size:24px; }
+      .subtle { font-size:14px; line-height:1.55; }
+      .field-input { padding:13px 14px; font-size:16px; }
+      button, .pill-link { padding:11px 18px; }
+      h1 { font-size:22px; letter-spacing:1.4px; }
     }
   </style>
 </head>
@@ -700,6 +798,7 @@ const state = {
   cardImage: '',
   cardServices: [],
   cardRegistrations: [],
+  showManualFallback: false,
 };
 
 render();
@@ -746,13 +845,14 @@ function renderStart() {
 
 function renderTweet() {
   const tweetIntent = 'https://x.com/intent/tweet?text=' + encodeURIComponent(state.tweetText);
+  const showManual = !!state.showManualFallback || !!state.tweetUrl;
   appRoot.innerHTML = \`
     <section class="card">
       \${stepIndicator(1)}
       <div>
         <div class="kicker">Post & Verify</div>
         <h1>Post & Verify</h1>
-        <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@\${esc(state.xHandle)}</strong>, then paste the tweet URL below. If you leave and come back later, enter the same X handle and agent name to resume.</p>
+        <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@\${esc(state.xHandle)}</strong>, then tap the confirm button. If you leave and come back later, enter the same X handle and agent name to resume.</p>
       </div>
       <div class="tweet-box">\${esc(state.tweetText)}</div>
       <div class="btn-row">
@@ -760,17 +860,21 @@ function renderTweet() {
           <svg class="x-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
           Post on X
         </a>
+        <button class="cta" id="confirm-auto-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Checking X…' : 'Confirm you posted'}</button>
         <button class="secondary" id="copy-tweet-btn">Copy text</button>
       </div>
-      <div style="margin-top:8px;padding-top:16px;border-top:1px solid var(--border)">
-        <label class="field-label" for="tweet-url">Paste your tweet URL here</label>
-        <input id="tweet-url" class="field-input" type="url" placeholder="" value="\${esc(state.tweetUrl)}" />
-        <div class="subtle" style="font-size:12px;margin-top:8px">Accepted formats: <code>https://x.com/\${esc(state.xHandle || 'handle')}/status/123</code>, <code>https://twitter.com/\${esc(state.xHandle || 'handle')}/status/123</code>, or <code>https://mobile.twitter.com/\${esc(state.xHandle || 'handle')}/status/123</code>.</div>
+      <div style="margin-top:4px">
+        <button class="secondary" id="toggle-manual-btn" type="button">\${showManual ? 'Hide manual fallback' : 'Paste tweet URL instead'}</button>
+      </div>
+      <div style="display:\${showManual ? 'block' : 'none'};margin-top:8px;padding-top:16px;border-top:1px solid var(--border)" id="manual-fallback">
+        <label class="field-label" for="tweet-url">Manual fallback: paste your tweet URL</label>
+        <input id="tweet-url" class="field-input" type="url" inputmode="url" placeholder="" value="\${esc(state.tweetUrl)}" />
+        <div class="subtle" style="font-size:13px;margin-top:8px">If X is slow or the automatic check cannot see your post, paste the tweet URL here. Accepted formats: <code>https://x.com/\${esc(state.xHandle || 'handle')}/status/123</code>, <code>https://twitter.com/\${esc(state.xHandle || 'handle')}/status/123</code>, or <code>https://mobile.twitter.com/\${esc(state.xHandle || 'handle')}/status/123</code>.</div>
+        <div class="btn-row" style="margin-top:12px">
+          <button id="confirm-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Verifying…' : 'Verify with pasted URL'}</button>
+        </div>
       </div>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
-      <div class="btn-row">
-        <button id="confirm-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Verifying...' : 'Verify & Get API Key'}</button>
-      </div>
     </section>
   \`;
 
@@ -779,8 +883,15 @@ function renderTweet() {
     document.getElementById('copy-tweet-btn').textContent = 'Copied!';
     setTimeout(() => { document.getElementById('copy-tweet-btn').textContent = 'Copy text'; }, 1500);
   });
-  document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; saveDraft(); });
-  document.getElementById('confirm-btn').addEventListener('click', confirmVerification);
+  document.getElementById('confirm-auto-btn').addEventListener('click', confirmPostedOnX);
+  document.getElementById('toggle-manual-btn').addEventListener('click', () => {
+    state.showManualFallback = !state.showManualFallback;
+    render();
+  });
+  if (showManual) {
+    document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; saveDraft(); });
+    document.getElementById('confirm-btn').addEventListener('click', confirmVerification);
+  }
 }
 
 function renderApiStep() {
@@ -1328,11 +1439,11 @@ async function startVerification() {
       document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
       document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
       state.step = 'api';
-      return;
+    } else {
+      state.verificationCode = data.verificationCode;
+      state.tweetText = data.tweetText;
+      state.step = 'tweet';
     }
-    state.verificationCode = data.verificationCode;
-    state.tweetText = data.tweetText;
-    state.step = 'tweet';
   } catch (err) {
     state.error = err.message;
   }
@@ -1354,6 +1465,35 @@ async function confirmVerification() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Verification failed.');
+    state.apiKey = data.apiKey;
+    document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
+    document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
+    clearDraft();
+    state.step = 'api';
+  } catch (err) {
+    state.error = err.message;
+  }
+
+  state.loading = false;
+  render();
+}
+
+async function confirmPostedOnX() {
+  state.error = '';
+  state.loading = true;
+  render();
+
+  try {
+    const res = await fetch(config.origin + '/api/verify/confirm-auto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ xHandle: state.xHandle, agentName: state.agentName }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      state.showManualFallback = !!data.fallback;
+      throw new Error(data.error || 'Automatic X confirmation failed.');
+    }
     state.apiKey = data.apiKey;
     document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
     document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';

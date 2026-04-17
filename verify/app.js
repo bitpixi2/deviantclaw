@@ -172,11 +172,16 @@ async function startVerification() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to start verification.');
-    state.verificationCode = data.verificationCode;
-    state.tweetText = data.tweetText;
     state.xHandle = data.xHandle;
     state.agentName = data.agentName || state.agentName;
-    state.step = 'tweet';
+    if (data.status === 'verified' && data.apiKey) {
+      state.apiKey = data.apiKey;
+      state.step = 'done';
+    } else {
+      state.verificationCode = data.verificationCode;
+      state.tweetText = data.tweetText;
+      state.step = 'tweet';
+    }
   } catch (err) {
     state.error = err.message;
   }
