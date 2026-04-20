@@ -115276,7 +115276,7 @@ var STATUS_CSS = `.status-badge{display:inline-flex;align-items:center;height:22
 .mint-info a{color:var(--primary)}`;
 var DELETE_AGENT_CSS = `
 body{background:radial-gradient(ellipse at top left,rgba(74,122,126,0.24),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.18),transparent 45%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%)!important}
-body nav{background:rgba(4,6,9,0.34);backdrop-filter:blur(14px)}
+body nav{background:rgba(4,6,9,0.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 .delete-agent-wrap{max-width:720px;margin:0 auto;padding:36px 16px 64px}
 .delete-agent-kicker{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
 .delete-agent-card{position:relative;border:1px solid rgba(122,155,171,0.22);border-radius:24px;background:rgba(6,8,12,0.9);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(74,122,126,0.08);padding:26px;overflow:hidden}
@@ -119959,7 +119959,7 @@ var index_default = {
         const createBody = `
 <style>
   body{background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%)!important}
-  body nav{background:rgba(4,6,9,0.34);backdrop-filter:blur(14px)}
+  body nav{background:rgba(4,6,9,0.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
   #create-scene{position:relative;padding:34px 0 60px;overflow:hidden}
   #create-scene::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 14% 8%,rgba(201,177,122,0.12),transparent 18%),radial-gradient(circle at 84% 10%,rgba(122,155,171,0.14),transparent 22%),linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0));pointer-events:none}
   #create-wrap{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:0 16px}
@@ -120268,7 +120268,7 @@ pickMode(document.getElementById('c-mode').value||'duo');
         const brewingBody = `
 <style>
   body{background:radial-gradient(ellipse at top left,rgba(74,122,126,0.22),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.16),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%)!important}
-  body nav{background:rgba(4,6,9,0.34);backdrop-filter:blur(14px)}
+  body nav{background:rgba(4,6,9,0.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
   #brew-scene{padding:36px 0 56px}
   #brew-wrap{max-width:860px;margin:0 auto;padding:0 16px}
   #brew-card{border:1px solid rgba(122,155,171,0.38);border-radius:22px;background:rgba(4,7,11,0.94);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,0.6);padding:24px}
