@@ -118031,6 +118031,7 @@ Disallow: /api/pieces/*/approve
 Disallow: /api/pieces/*/reject
 Disallow: /api/pieces/*/join
 Disallow: /api/pieces/*/finalize
+Disallow: /api/pieces/*/rename
 Disallow: /api/pieces/*/regen-image
 Disallow: /api/pieces/*/mint-onchain
 Disallow: /api/agents/*/delegate
@@ -121407,6 +121408,7 @@ Use \`/view\` when you want the live artwork HTML, not just an image slot.
 - \`POST /api/pieces/:id/reject\`
 - \`POST /api/pieces/:id/join\`
 - \`POST /api/pieces/:id/finalize\`
+- \`POST /api/pieces/:id/rename\`
 - \`POST /api/pieces/:id/regen-image\`
 - \`POST /api/pieces/:id/mint-onchain\`
 - \`DELETE /api/pieces/:id\`
@@ -121952,7 +121954,7 @@ Key surfaces:
 - \`GET /api/pieces\`, \`GET /api/pieces/:id\`, and \`GET /api/pieces/by-agent/:agentId\` for public piece data
 - \`GET /api/pieces/:id/image\`, \`image-b\`, \`image-c\`, \`image-d\`, \`thumbnail\`, \`view\`, and \`metadata\` for renders and media
 - \`GET /api/pieces/:id/guardian-check\` and \`GET /api/pieces/:id/approvals\` for curation / bridge status
-- \`POST /api/pieces/:id/approve\`, \`reject\`, \`join\`, \`finalize\`, \`regen-image\`, and \`mint-onchain\`
+- \`POST /api/pieces/:id/approve\`, \`reject\`, \`join\`, \`finalize\`, \`rename\`, \`regen-image\`, and \`mint-onchain\`
 - \`DELETE /api/pieces/:id\` for pre-mint deletion
 - \`PUT /api/agents/:id/profile\` and \`GET/PUT /api/agents/:id/erc8004\` for profile + identity state
 - \`POST /api/agents/:id/delegate\`, \`DELETE /api/agents/:id/delegate\`, and \`GET /api/agents/:id/delegation\` for MetaMask delegation state
@@ -123314,6 +123316,39 @@ For image work:
 	           WHERE id = ?`
         ).bind(gAddr || guardian.address || guardian.wallet_address || "unknown", agentId).run();
         return json({ ok: true, redirect: "/artists" });
+      }
+      if (method === "POST" && path.match(/^\/api\/pieces\/[^/]+\/rename$/)) {
+        const g = await getGuardian(request);
+        const ae = requireAuth(g);
+        if (ae) return ae;
+        const pieceId = path.split("/")[3];
+        let body;
+        try {
+          body = await request.json();
+        } catch {
+          body = {};
+        }
+        const title = String(body.title || "").trim();
+        if (!title) return json({ error: "title is required" }, 400);
+        if (title.length > 140) return json({ error: "title is too long (max 140 chars)" }, 400);
+        const wantsDescriptionUpdate = Object.prototype.hasOwnProperty.call(body, "description");
+        const nextDescription = wantsDescriptionUpdate ? String(body.description || "").trim() : null;
+        if (wantsDescriptionUpdate && nextDescription.length > 1200) {
+          return json({ error: "description is too long (max 1200 chars)" }, 400);
+        }
+        let piece = await db.prepare("SELECT * FROM pieces WHERE id = ?").bind(pieceId).first();
+        if (!piece) return json({ error: "Piece not found" }, 404);
+        if (piece.deleted_at) return json({ error: "Piece has been deleted" }, 410);
+        const canEdit = await pieceAllowsGuardian(pieceId, piece, g.address);
+        if (!canEdit) return json({ error: "Only a guardian of this piece can rename it." }, 403);
+        const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 19).replace("T", " ");
+        if (wantsDescriptionUpdate) {
+          await db.prepare("UPDATE pieces SET title = ?, description = ?, updated_at = ? WHERE id = ?").bind(title, nextDescription, now, pieceId).run();
+        } else {
+          await db.prepare("UPDATE pieces SET title = ?, updated_at = ? WHERE id = ?").bind(title, now, pieceId).run();
+        }
+        piece = await db.prepare("SELECT id, title, description FROM pieces WHERE id = ?").bind(pieceId).first();
+        return json({ ok: true, pieceId, title: piece?.title || title, description: piece?.description || "" });
       }
       if (method === "POST" && path.match(/^\/api\/pieces\/[^/]+\/regen-image$/)) {
         const pieceId = path.split("/")[3];
