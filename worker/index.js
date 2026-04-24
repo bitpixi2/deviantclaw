@@ -113037,6 +113037,16 @@ function normalizeHandle(value) {
   return h.match(/^[a-z0-9_]{1,15}$/i) ? h : "";
 }
 __name(normalizeHandle, "normalizeHandle");
+
+function canonicalizeAgentId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return raw;
+  const lower = raw.toLowerCase();
+  // Guardrail: prevent case-sensitive duplicate agents for Phosphor.
+  if (lower === "phosphor") return "phosphor";
+  return raw;
+}
+__name(canonicalizeAgentId, "canonicalizeAgentId");
 function approvalBridgeStatus(piece) {
   const current = String(piece?.status || "").trim().toLowerCase();
   if (current !== "draft" && current !== "wip") return piece?.status;
@@ -118950,6 +118960,12 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
 }
 __name(renderPiece, "renderPiece");
 async function renderAgent(db, agentId, env, url) {
+  const canonicalAgentId = canonicalizeAgentId(agentId);
+  if (canonicalAgentId && canonicalAgentId !== agentId) {
+    const next = new URL(url?.toString?.() || `https://deviantclaw.art/agent/${encodeURIComponent(canonicalAgentId)}`);
+    next.pathname = `/agent/${encodeURIComponent(canonicalAgentId)}`;
+    return Response.redirect(next.toString(), 302);
+  }
   if (agentId === "adm") {
     return Response.redirect("https://deviantclaw.art/agent/astral-dream-machine", 302);
   }
@@ -119885,6 +119901,19 @@ var index_default = {
         return null;
       };
       __name(requireAuth, "requireAuth");
+
+      // Agent id canonicalization (prevents case-sensitive duplicates like /agent/Phosphor).
+      if ((method === "GET" || method === "HEAD") && path.startsWith("/agent/")) {
+        const parts = path.split("/").filter(Boolean);
+        const rawAgentId = parts[1] || "";
+        const canonicalAgentId = canonicalizeAgentId(rawAgentId);
+        if (canonicalAgentId && canonicalAgentId !== rawAgentId) {
+          const next = new URL(url.toString());
+          parts[1] = canonicalAgentId;
+          next.pathname = "/" + parts.join("/");
+          return Response.redirect(next.toString(), 302);
+        }
+      }
       if (method === "GET" && (path === "/verify" || path === "/verified")) {
         const target = new URL(path, `${verificationBaseUrl}/`);
         target.search = url.search;
@@ -123132,7 +123161,7 @@ For image work:
         });
       }
       if (method === "GET" && path.match(/^\/api\/pieces\/by-agent\/[^/]+$/)) {
-        const agentId = path.split("/")[4];
+        const agentId = canonicalizeAgentId(path.split("/")[4]);
         const pieces = await db.prepare(
           `SELECT DISTINCT p.id, p.title, p.description, p.agent_a_id, p.agent_b_id, p.created_at, p.agent_a_name, p.agent_b_name, p.status, p.mode, p.image_url
            FROM pieces p LEFT JOIN piece_collaborators pc ON pc.piece_id = p.id
@@ -123578,7 +123607,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         });
       }
       if (method === "POST" && path.match(/^\/api\/agents\/[^/]+\/delegate-prepare$/)) {
-        const agentId = path.split("/")[3];
+        const agentId = canonicalizeAgentId(path.split("/")[3]);
         let body;
         try {
           body = await request.json();
@@ -123604,7 +123633,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         }
       }
       if (method === "POST" && path.match(/^\/api\/agents\/[^/]+\/delegate$/)) {
-        const agentId = path.split("/")[3];
+        const agentId = canonicalizeAgentId(path.split("/")[3]);
         let body;
         try {
           body = await request.json();
@@ -123701,7 +123730,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         }
       }
       if (method === "DELETE" && path.match(/^\/api\/agents\/[^/]+\/delegate$/)) {
-        const agentId = path.split("/")[3];
+        const agentId = canonicalizeAgentId(path.split("/")[3]);
         let body;
         try {
           body = await request.json();
@@ -123738,7 +123767,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         }
       }
       if (method === "GET" && path.match(/^\/api\/agents\/[^/]+\/delegation$/)) {
-        const agentId = path.split("/")[3];
+        const agentId = canonicalizeAgentId(path.split("/")[3]);
         const agent = await db.prepare("SELECT * FROM agents WHERE id = ?").bind(agentId).first();
         if (!agent) return json({ error: "Agent not found" }, 404);
         const wallet = url.searchParams.get("wallet") || "";
@@ -123757,7 +123786,8 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         if (body.guardianAddress && !sameAddress(body.guardianAddress, guardian.address)) {
           return json({ error: "guardianAddress does not match the authenticated guardian." }, 403);
         }
-        const agentId = body.agentId;
+        const agentId = canonicalizeAgentId(body.agentId);
+        body.agentId = agentId;
         const agentName = body.agentName;
         const agentType = body.agentType || "agent";
         const agentRole = body.agentRole || "";
