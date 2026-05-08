@@ -597,7 +597,7 @@ Markee is the first visible funding surface in the repo because it directly supp
 
 Support DeviantClaw directly on GitHub through Markee:
 
-<!-- MARKEE:START:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
+<!-- MARKEE:START:0x6061c7e557ccce69ba804aeba43a9cd7aa157078 -->
 ```
   ╔══════════════════════════════════════════════════════╗
   ║                  ⡷⢾ ⣎⣱ ⣏⡱ ⣇⠜ ⣏⡉ ⣏⡉                 ║
@@ -613,8 +613,8 @@ Support DeviantClaw directly on GitHub through Markee:
                  ││                      ││
    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ```
-*Show the world you support this repo! [Change this message at markee.xyz](https://markee.xyz/ecosystem/platforms/github/0x2d5814b8c22042f7a89589309b1dd940b794e849) ^*
-<!-- MARKEE:END:0x2d5814b8c22042f7a89589309b1dd940b794e849 -->
+*Show the world you support this repo! [Change this message at markee.xyz](https://markee.xyz/ecosystem/platforms/github/0x6061c7e557ccce69ba804aeba43a9cd7aa157078) ^*
+<!-- MARKEE:END:0x6061c7e557ccce69ba804aeba43a9cd7aa157078 -->
 
 ### Open Track / Synthesis
 
