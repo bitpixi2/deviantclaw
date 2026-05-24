@@ -110860,13 +110860,14 @@ async function veniceImageWithFallback(apiKey, prompt, opts = {}) {
     try {
       const image = await veniceImage(apiKey, attempt.prompt, { ...opts, model: attempt.model, size: attempt.size });
       if (image) return image;
+      console.error(`[veniceImageWithFallback] attempt=${attempt.label} returned no asset`);
     } catch (err) {
       lastErr = err;
       console.error(`[veniceImageWithFallback] attempt=${attempt.label} failed: ${String(err?.message || err || "unknown")}`);
     }
   }
   if (lastErr) throw lastErr;
-  return null;
+  throw new Error("Venice image generation returned no asset");
 }
 __name(veniceImageWithFallback, "veniceImageWithFallback");
 function buildReactionHTML(imageUrl, title, artists2, date) {
@@ -111610,10 +111611,11 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     imageDataUri = allImages[0];
     imageDataUriB = allImages[1];
     if (allImages.length > 2) extraImages = allImages.slice(2);
-    if (!imageDataUri) console.error("[veniceGenerate] Primary image generation failed");
-    if (perAgentPrompts.length > 1 && !imageDataUriB) console.error("[veniceGenerate] Secondary image (B) generation failed");
+    if (!imageDataUri) throw new Error("Primary image generation returned no asset for split/collage render");
+    if (perAgentPrompts.length > 1 && !imageDataUriB) throw new Error("Secondary image generation returned no asset for split/collage render");
   } else {
     imageDataUri = await veniceImageWithFallback(apiKey, artPrompt);
+    if (!imageDataUri) throw new Error("Primary image generation returned no asset");
   }
   const title = formatArtworkTitle((await veniceText(
     apiKey,
@@ -111664,7 +111666,7 @@ Artists: ${artists2.join(", ")}`,
   const composition = isCollab ? artists2.length > 2 ? artists2.length > 3 ? "quad" : "trio" : "duo" : "solo";
   const usedImageModel = noImageMethods.includes(method) ? null : imageDataUri ? "multi-model-pool" : null;
   const storedModel = noImageMethods.includes(method) ? codeModelUsed || VENICE_CODE_MODEL : usedImageModel || VENICE_IMAGE_MODEL;
-  return { title, description, html, seed, imageDataUri, imageDataUriB, artPrompt, veniceModel: storedModel, collabMode: method, method, composition };
+  return { title, description, html, seed, imageDataUri, imageDataUriB, extraImages, artPrompt, veniceModel: storedModel, collabMode: method, method, composition };
 }
 __name(veniceGenerate, "veniceGenerate");
 async function generateArt(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
@@ -111694,6 +111696,26 @@ function methodPoolForCount(count) {
   return ["single", "code"];
 }
 __name(methodPoolForCount, "methodPoolForCount");
+function validMethodsForComposition(composition) {
+  const normalized = String(composition || "").trim().toLowerCase();
+  if (normalized === "quad") return methodPoolForCount(4);
+  if (normalized === "trio") return methodPoolForCount(3);
+  if (normalized === "duo") return methodPoolForCount(2);
+  return methodPoolForCount(1);
+}
+__name(validMethodsForComposition, "validMethodsForComposition");
+function defaultMethodForComposition(composition) {
+  const methods = validMethodsForComposition(composition);
+  return methods.includes("single") ? "single" : methods[0] || "single";
+}
+__name(defaultMethodForComposition, "defaultMethodForComposition");
+function normalizeMethodForComposition(method, composition) {
+  const normalizedMethod = String(method || "").trim().toLowerCase();
+  const valid = validMethodsForComposition(composition);
+  if (normalizedMethod && valid.includes(normalizedMethod)) return normalizedMethod;
+  return defaultMethodForComposition(composition);
+}
+__name(normalizeMethodForComposition, "normalizeMethodForComposition");
 function pickStackMethod(entries, preferredMethod = "") {
   const pool = methodPoolForCount(entries.length);
   const normalizedPreferred = String(preferredMethod || "").trim().toLowerCase();
@@ -111945,13 +111967,22 @@ async function storePieceImageSource(db, env, pieceImageId, imageSource) {
   if (!env?.PIECE_IMAGES) throw new Error("R2 binding PIECE_IMAGES is not configured");
   const resolved = await resolveImageSourceToBytes(imageSource);
   if (!resolved) return false;
+  if (!resolved.bytes?.byteLength) {
+    throw new Error(`Resolved image source was empty for piece asset: ${pieceImageId}`);
+  }
   const objectKey = pieceImageObjectKey(pieceImageId);
   await env.PIECE_IMAGES.put(objectKey, resolved.bytes, {
     httpMetadata: { contentType: resolved.contentType }
   });
-  await db.prepare(
+  const write = await db.prepare(
     'INSERT OR REPLACE INTO piece_images (piece_id, data_uri, storage_backend, object_key, content_type, byte_size, created_at) VALUES (?, NULL, ?, ?, ?, ?, datetime("now"))'
   ).bind(pieceImageId, "r2", objectKey, resolved.contentType, resolved.bytes.byteLength).run();
+  const storedRow = await db.prepare(
+    "SELECT piece_id, object_key, byte_size FROM piece_images WHERE piece_id = ?"
+  ).bind(pieceImageId).first().catch(() => null);
+  if (!storedRow) {
+    throw new Error(`Image asset row missing immediately after insert for ${pieceImageId} (changes=${Number(write?.meta?.changes || 0)})`);
+  }
   return true;
 }
 __name(storePieceImageSource, "storePieceImageSource");
@@ -111967,6 +111998,59 @@ function pieceVideoRoute(pieceId) {
   return `/api/pieces/${String(pieceId || "").trim()}/video`;
 }
 __name(pieceVideoRoute, "pieceVideoRoute");
+function renderPendingPlaceholderSvg(title = "Rendering", slotLabel = "") {
+  const safeTitle = esc(String(title || "Rendering").trim() || "Rendering");
+  const safeSlot = esc(String(slotLabel || "").trim());
+  const letters = "rendering...".split("").map((ch, i) => {
+    const begin = (i * 0.08).toFixed(2);
+    const safe = ch === " " ? "&#160;" : esc(ch);
+    return `<tspan opacity="0.18">${safe}<animate attributeName="opacity" values="0.18;1;0.18" dur="1.4s" begin="${begin}s" repeatCount="indefinite"/></tspan>`;
+  }).join("");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" role="img" aria-label="${safeTitle} is still rendering">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0b10"/>
+      <stop offset="100%" stop-color="#141822"/>
+    </linearGradient>
+    <linearGradient id="logoGrad" x1="200" y1="360" x2="1000" y2="760" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#EDF3F6"/>
+      <stop offset="28%" stop-color="#A8C6CF"/>
+      <stop offset="62%" stop-color="#B896A8"/>
+      <stop offset="100%" stop-color="#D3C18E"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="1200" fill="url(#bg)"/>
+  <g opacity="0.22" stroke="#2a3144" fill="none">
+    <path d="M180 280 C360 220, 840 220, 1020 280"/>
+    <path d="M180 600 C360 540, 840 540, 1020 600"/>
+    <path d="M180 920 C360 860, 840 860, 1020 920"/>
+  </g>
+  <g opacity="0.55">
+    <path d="M160 350 C320 280, 420 440, 600 380 S880 280, 1040 350" stroke="#A8C6CF" stroke-width="4" fill="none">
+      <animate attributeName="stroke-opacity" values="0.35;0.95;0.35" dur="2.2s" repeatCount="indefinite"/>
+    </path>
+    <path d="M160 815 C300 755, 470 915, 620 835 S900 755, 1040 815" stroke="#B896A8" stroke-width="3" fill="none">
+      <animate attributeName="stroke-opacity" values="0.25;0.8;0.25" dur="2.6s" repeatCount="indefinite"/>
+    </path>
+  </g>
+  <text x="600" y="490" text-anchor="middle" fill="#d7deef" font-family="'Courier New', monospace" font-size="42" letter-spacing="2">${safeTitle}</text>
+  ${safeSlot ? `<text x="600" y="548" text-anchor="middle" fill="#97a2bb" font-family="'Courier New', monospace" font-size="24" letter-spacing="3">${safeSlot}</text>` : ""}
+  <text x="600" y="650" text-anchor="middle" fill="url(#logoGrad)" font-family="'Courier New', monospace" font-size="68" letter-spacing="3">${letters}</text>
+  <text x="600" y="728" text-anchor="middle" fill="#a7b0c3" font-family="'Courier New', monospace" font-size="28" letter-spacing="2">please check back shortly</text>
+</svg>`;
+}
+__name(renderPendingPlaceholderSvg, "renderPendingPlaceholderSvg");
+function pendingPlaceholderResponse(title = "Rendering", slotLabel = "", method = "GET") {
+  return new Response(method === "HEAD" ? null : renderPendingPlaceholderSvg(title, slotLabel), {
+    status: 200,
+    headers: {
+      "Content-Type": "image/svg+xml; charset=utf-8",
+      "Cache-Control": "public, max-age=15, stale-while-revalidate=60"
+    }
+  });
+}
+__name(pendingPlaceholderResponse, "pendingPlaceholderResponse");
 async function readPieceImageRecord(db, pieceImageId) {
   return db.prepare(
     "SELECT piece_id, data_uri, storage_backend, object_key, content_type, byte_size, created_at FROM piece_images WHERE piece_id = ?"
@@ -112535,7 +112619,7 @@ async function createPieceFromEntries(db, env, entries, { mode: mode2, now, stat
     result.imageUrl || null,
     result.artPrompt || null,
     result.veniceModel || null,
-    result.method || "fusion",
+    normalizeMethodForComposition(result.method, composition),
     composition,
     roundNumber
   ).run();
@@ -112755,7 +112839,7 @@ async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, n
     deferredImageUrl,
     result.artPrompt || null,
     result.veniceModel || null,
-    result.method || "fusion",
+    normalizeMethodForComposition(result.method, composition),
     composition,
     roundNumber
   ).run();
@@ -115256,6 +115340,7 @@ var AGENT_CSS = `
 var STATUS_CSS = `.status-badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.055);color:#eef3f8;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap;vertical-align:middle}
 .status-wip{color:#ffd78d;border-color:rgba(255,193,88,0.52);background:rgba(182,122,18,0.28)}
 .status-proposed{color:#eedbff;border-color:rgba(184,151,255,0.5);background:rgba(115,79,184,0.3)}
+.status-rendering{color:#f3ddec;border-color:rgba(184,150,168,0.48);background:rgba(133,92,116,0.28)}
 .status-approved{color:#dcffd5;border-color:rgba(126,214,110,0.5);background:rgba(58,127,48,0.3)}
 .status-minted{color:#d8f7ff;border-color:rgba(110,215,245,0.52);background:rgba(32,126,154,0.3)}
 .status-rejected{color:#ffd2d8;border-color:rgba(228,110,132,0.48);background:rgba(134,44,60,0.28)}
@@ -115789,18 +115874,23 @@ function codeArtPerformanceIssues(html) {
   if (lineCount > 650) issues.push(`too many lines (${lineCount})`);
   if (charCount > 18e3) issues.push(`too many characters (${charCount})`);
   if (rafCount > 2) issues.push(`too many animation loops (${rafCount})`);
-  if (fillTextCount > 12) issues.push(`too much text drawing (${fillTextCount})`);
+  if (fillTextCount > 0) issues.push(`visible canvas text drawing (${fillTextCount})`);
   if (sqrtCount > 12) issues.push(`too many sqrt distance checks (${sqrtCount})`);
   if (nestedLoopHit) issues.push("nested loops in hot path");
   return issues;
 }
 __name(codeArtPerformanceIssues, "codeArtPerformanceIssues");
+function stripCanvasTextDrawing(html) {
+  return String(html || "").replace(/\b([A-Za-z_$][\w$]*\.)?fillText\s*\([^;]*\);?/g, "");
+}
+__name(stripCanvasTextDrawing, "stripCanvasTextDrawing");
 function normalizeGeneratedCodeHtml(code, title) {
   let cleanCode = String(code || "").replace(/^```html?\n?/i, "").replace(/\n?```$/i, "").trim();
   if (!cleanCode.toLowerCase().includes("<!doctype") && !cleanCode.toLowerCase().includes("<html")) {
     cleanCode = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0f;overflow:hidden}</style></head><body>${cleanCode}</body></html>`;
   }
-  return cleanCode.replace(/<div[^>]*id=['"]sig['"][^>]*>[\s\S]*?<\/div>\s*(<\/div>\s*)*(<script>[\s\S]*?<\/script>)?/gi, "");
+  cleanCode = cleanCode.replace(/<div[^>]*id=['"]sig['"][^>]*>[\s\S]*?<\/div>\s*(<\/div>\s*)*(<script>[\s\S]*?<\/script>)?/gi, "");
+  return stripCanvasTextDrawing(cleanCode);
 }
 __name(normalizeGeneratedCodeHtml, "normalizeGeneratedCodeHtml");
 async function enforceCodeArtPerformance(apiKey, html, { title, artists: artists2 = [] } = {}) {
@@ -115817,6 +115907,7 @@ Additional rules:
 - Preserve the same overall concept, mood, and interaction style.
 - Replace nested loops and all-pairs checks with cheaper structures or simpler motion.
 - Prefer fewer objects, fewer draw calls, and cheaper geometry.
+- Remove all visible text, labels, captions, signatures, numbers, and credits from the artwork surface.
 - Output ONLY a complete HTML page. No explanation. No markdown fences.`,
     `Title: "${title || "Artwork"}"
 Artists: ${artists2.join(", ") || "Unknown"}
@@ -116242,7 +116333,7 @@ __name(statusBadge, "statusBadge");
 function pieceStatusBadge(piece) {
   const status = effectivePieceStatus(piece);
   if (status === "wip") return statusBadge("wip", "WIP");
-  if (status === "pending_render") return statusBadge("proposed", "Rendering");
+  if (status === "pending_render") return statusBadge("rendering", "Rendering");
   if (status === "render_failed") return statusBadge("rejected", "Render Failed");
   if (status === "proposed") return statusBadge("proposed", "Proposed");
   if (status === "pending-base-approval") return statusBadge("proposed", "Awaiting Base Approval");
@@ -116618,7 +116709,7 @@ function blenderGenerate(intentA, intentB, agentA, agentB) {
       artHTML = generateParticleNetwork(intentA, intentB, agentA, agentB, title, date, seed, colors, params, interactions);
       break;
   }
-  return { title, description, html: artHTML, seed };
+  return { title, description, html: artHTML, seed, method: "code", composition: compositionFromCount((agentA?.name && agentB?.name && agentA?.name !== agentB?.name) ? 2 : 1) };
 }
 __name(blenderGenerate, "blenderGenerate");
 function generateParticleNetwork(intentA, intentB, agentA, agentB, title, date, seed, colors, params, interactions) {
@@ -116897,7 +116988,7 @@ draw();
 __name(generateMinimalLines, "generateMinimalLines");
 function generateTextFlow(intentA, intentB, agentA, agentB, title, date, seed, colors) {
   const words = `${intentA.statement || ""} ${intentB.statement || ""}`.split(/\s+/).filter((w) => w.length > 2);
-  const wordList = words.slice(0, 40).map((w) => `'${esc(w)}'`).join(",");
+  const signalData = words.slice(0, 40).map((w) => `{l:${Math.min(18, w.length)},a:${hashSeed(w) % 360}}`).join(",");
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} \xB7 DeviantClaw</title>
@@ -116919,17 +117010,19 @@ window.addEventListener('resize',resize);
 let _s=${seed};
 function R(){_s=(_s+0x6d2b79f5)|0;let t=Math.imul(_s^(_s>>>15),1|_s);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;}
 
-const words=[${wordList}];
-const textParticles=[];
+const signals=[${signalData}];
+const particles=[];
 const C1='${colors.c1}';
 const C2='${colors.c2}';
 
-for(let i=0;i<words.length;i++){
-  textParticles.push({
-    word:words[i],
+for(let i=0;i<Math.max(18,signals.length);i++){
+  const sig=signals[i%Math.max(1,signals.length)]||{l:8,a:i*17};
+  particles.push({
+    len:sig.l,
+    angle:sig.a*Math.PI/180,
     x:R()*W,y:R()*H,
     vx:(R()-0.5)*0.8,vy:(R()-0.5)*0.8,
-    size:10+R()*18,
+    size:4+sig.l*0.9+R()*10,
     alpha:0.3+R()*0.5,
     color:R()<0.5?C1:C2
   });
@@ -116942,7 +117035,7 @@ function draw(){
   ctx.fillStyle='rgba(10,10,15,0.08)';
   ctx.fillRect(0,0,W,H);
 
-  textParticles.forEach(p=>{
+  particles.forEach(p=>{
     const dx=mouseX-p.x,dy=mouseY-p.y;
     const d=Math.sqrt(dx*dx+dy*dy);
     if(d<200&&d>1){
@@ -116958,10 +117051,19 @@ function draw(){
     if(p.y<-100)p.y=H+100;
     if(p.y>H+100)p.y=-100;
 
-    ctx.font=p.size+'px Courier New';
-    ctx.fillStyle=p.color;
+    ctx.save();
+    ctx.translate(p.x,p.y);
+    ctx.rotate(p.angle+Math.sin(p.x*0.005+p.y*0.004)*0.35);
+    ctx.strokeStyle=p.color;
     ctx.globalAlpha=p.alpha;
-    ctx.fillText(p.word,p.x,p.y);
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(-p.size*0.5,0);
+    ctx.lineTo(p.size*0.5,0);
+    ctx.moveTo(0,-p.size*0.18);
+    ctx.lineTo(0,p.size*0.18);
+    ctx.stroke();
+    ctx.restore();
     ctx.globalAlpha=1;
   });
 
@@ -116984,11 +117086,11 @@ function generateDataViz(intentA, intentB, agentA, agentB, title, date, seed, co
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   }
   __name(R, "R");
-  const bars = [];
-  for (let i = 0; i < 12; i++) {
-    bars.push({ value: 20 + R() * 60, color: i % 2 === 0 ? colors.c1 : colors.c2 });
+  const pulses = [];
+  for (let i = 0; i < 18; i++) {
+    pulses.push({ value: 20 + R() * 60, color: i % 2 === 0 ? colors.c1 : colors.c2, phase: R() * Math.PI * 2 });
   }
-  const barData = bars.map((b) => `{v:${b.value.toFixed(1)},c:'${b.color}'}`).join(",");
+  const pulseData = pulses.map((b) => `{v:${b.value.toFixed(1)},c:'${b.color}',p:${b.phase.toFixed(3)}}`).join(",");
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} \xB7 DeviantClaw</title>
@@ -117007,7 +117109,7 @@ function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerH
 resize();
 window.addEventListener('resize',resize);
 
-const bars=[${barData}];
+const pulses=[${pulseData}];
 let offset=0;
 
 let mouseX=0;
@@ -117017,28 +117119,36 @@ function draw(){
   ctx.fillStyle='#0a0a0f';
   ctx.fillRect(0,0,W,H);
 
-  const barWidth=W/bars.length;
+  const step=W/pulses.length;
   const maxHeight=H*0.7;
 
-  bars.forEach((bar,i)=>{
-    const x=i*barWidth;
-    const targetHeight=(bar.v/100)*maxHeight;
-    const mouseInfluence=Math.max(0,1-(Math.abs(mouseX-(x+barWidth/2))/200));
+  pulses.forEach((pulse,i)=>{
+    const x=i*step+step/2;
+    const targetHeight=(pulse.v/100)*maxHeight;
+    const mouseInfluence=Math.max(0,1-(Math.abs(mouseX-x)/220));
     const height=targetHeight*(1+mouseInfluence*0.3);
+    const y=H-height-70;
 
-    ctx.fillStyle=bar.c;
-    ctx.globalAlpha=0.7+mouseInfluence*0.3;
-    ctx.fillRect(x+barWidth*0.1,H-height-60,barWidth*0.8,height);
+    ctx.strokeStyle=pulse.c;
+    ctx.globalAlpha=0.45+mouseInfluence*0.35;
+    ctx.lineWidth=1.2+mouseInfluence*1.8;
+    ctx.beginPath();
+    ctx.moveTo(x,H-54);
+    for(let j=0;j<8;j++){
+      const t=j/7;
+      const wobble=Math.sin(offset*3+pulse.p+j*0.9)*step*0.18;
+      ctx.lineTo(x+wobble,H-54-height*t);
+    }
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x,y,4+mouseInfluence*6,0,Math.PI*2);
+    ctx.stroke();
     ctx.globalAlpha=1;
-
-    ctx.fillStyle='rgba(255,255,255,0.3)';
-    ctx.font='10px Courier New';
-    ctx.fillText(Math.round(bar.v),x+barWidth/2-10,H-height-70);
   });
 
   offset+=0.002;
-  bars.forEach(bar=>{
-    bar.v=50+Math.sin(offset+bars.indexOf(bar)*0.5)*30;
+  pulses.forEach((pulse,i)=>{
+    pulse.v=50+Math.sin(offset+pulse.p+i*0.17)*30;
   });
 
   requestAnimationFrame(draw);
@@ -117176,10 +117286,19 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace}
 (function(){
 const svg=document.getElementById('container');
 const shapes=[${shapeData}];
+let W=window.innerWidth,H=window.innerHeight;
+function resize(){
+  W=window.innerWidth;H=window.innerHeight;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+}
+resize();
+window.addEventListener('resize',resize);
+function tx(s){return (s.x*W/100).toFixed(1);}
+function ty(s){return (s.y*H/100).toFixed(1);}
 
 shapes.forEach(s=>{
   const g=document.createElementNS('http://www.w3.org/2000/svg','g');
-  g.setAttribute('transform','translate('+s.x+'% '+s.y+'%)');
+  g.setAttribute('transform','translate('+tx(s)+' '+ty(s)+') rotate('+s.r+')');
   
   let poly;
   if(s.t==='triangle'){
@@ -117210,7 +117329,7 @@ shapes.forEach(s=>{
 function animate(){
   shapes.forEach(s=>{
     s.r+=s.sp;
-    s.element.setAttribute('transform','translate('+s.x+'% '+s.y+'%) rotate('+s.r+')');
+    s.element.setAttribute('transform','translate('+tx(s)+' '+ty(s)+') rotate('+s.r+')');
   });
   requestAnimationFrame(animate);
 }
@@ -118945,7 +119064,6 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
     <div class="piece-heart-row" data-heart-shell="${esc(piece.id)}">${detailHeartButton}<span class="piece-heart-count" data-heart-count-for="${esc(piece.id)}">${esc(detailHeartLabel)}</span></div>
   </div>
   ${publicDescription ? `<p class="piece-desc">${esc(publicDescription)}</p>` : ""}
-  <p class="piece-layout-note"><strong>Layout:</strong> ${esc(pieceAccessibility.layoutDescription)}</p>
   ${detailSections.length > 0 ? `<div class="piece-details">${detailSections.join("")}</div>` : ""}
   ${guardianActionsHTML ? `<div class="piece-manual-section">${guardianActionsHTML}</div>` : ""}
 </div>`;
@@ -122585,6 +122703,8 @@ For image work:
         const suffix = parts[4].replace("image-", "");
         const imageResponse = await serveStoredPieceImage(db, env, id2 + "_" + suffix);
         if (!imageResponse) {
+          const piece = await db.prepare("SELECT id, title, status FROM pieces WHERE id = ?").bind(id2).first().catch(() => null);
+          if (piece?.status === "pending_render") return pendingPlaceholderResponse(piece.title || "Rendering", `slot ${String(suffix || "").toUpperCase()}`, method);
           const demoImage = await getLegacySplitDemoImageResponse(id2, suffix);
           if (demoImage) return method === "HEAD" ? headLike(demoImage) : demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id2, suffix);
@@ -122600,6 +122720,8 @@ For image work:
         const id2 = path.split("/")[3];
         const imageResponse = await serveStoredPieceImage(db, env, id2 + "_b");
         if (!imageResponse) {
+          const piece = await db.prepare("SELECT id, title, status FROM pieces WHERE id = ?").bind(id2).first().catch(() => null);
+          if (piece?.status === "pending_render") return pendingPlaceholderResponse(piece.title || "Rendering", "slot B", method);
           const demoImage = await getLegacySplitDemoImageResponse(id2, "b");
           if (demoImage) return method === "HEAD" ? headLike(demoImage) : demoImage;
           const fallbackSvg = await getPieceSlotFallback(db, id2, "b");
@@ -122617,8 +122739,9 @@ For image work:
         if (!imageResponse) {
           const demoImage = await getLegacySplitDemoImageResponse(id2, "");
           if (demoImage) return method === "HEAD" ? headLike(demoImage) : demoImage;
-          const piece = await db.prepare("SELECT id, title, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?").bind(id2).first();
+          const piece = await db.prepare("SELECT id, title, status, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?").bind(id2).first();
           if (!piece) return new Response("Not found", { status: 404 });
+          if (piece.status === "pending_render") return pendingPlaceholderResponse(piece.title || "Rendering", "", method);
           return new Response(method === "HEAD" ? null : "DeviantClaw encountered a glitch while rendering this piece. The developer has been notified to patch it. Please check back within 24 hours.", {
             status: 503,
             headers: {
@@ -123442,7 +123565,8 @@ For image work:
             ).bind(slotId, pieceId).run();
           }
         }
-        await db.prepare("UPDATE pieces SET image_url = ? WHERE id = ?").bind(`/api/pieces/${pieceId}/image`, pieceId).run();
+        const normalizedMethod = normalizeMethodForComposition(piece.method, piece.composition || piece.mode);
+        await db.prepare("UPDATE pieces SET image_url = ?, method = ?, status = CASE WHEN status = 'render_failed' THEN 'draft' ELSE status END, updated_at = datetime('now') WHERE id = ?").bind(`/api/pieces/${pieceId}/image`, normalizedMethod, pieceId).run();
         return json({ ok: true, pieceId, size: size6, imageUrl: `/api/pieces/${pieceId}/image` });
       }
       if (method === "GET" && path === "/api/admin/deferred-payouts") {
@@ -123597,10 +123721,12 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           await storeVeniceImage(db, env, pieceId, { html: piece.html, imageDataUri, imageDataUriB });
           repairs.push("store_venice_image_ran");
         }
+        const normalizedMethod = normalizeMethodForComposition(piece.method, piece.composition || piece.mode);
+        await db.prepare("UPDATE pieces SET method = ?, status = CASE WHEN status = 'render_failed' THEN 'draft' ELSE status END, updated_at = datetime('now') WHERE id = ?").bind(normalizedMethod, pieceId).run();
         return json({
           ok: true,
           pieceId,
-          method: piece.method,
+          method: normalizedMethod,
           repairs,
           images: { a: !!imgA || !!imageDataUri, b: !!imgB || !!imageDataUriB },
           message: repairs.length > 0 ? `Repaired: ${repairs.join(", ")}` : "No repairs needed"
