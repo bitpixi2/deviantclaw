@@ -115254,6 +115254,7 @@ nav .links a.make-art-btn:hover{color:#050507;filter:brightness(1.05)}
 .card .card-agents{font-size:14px;color:var(--secondary);margin-top:4px}
 .card .card-preview{height:240px;background:var(--bg);border-radius:4px;margin-bottom:12px;overflow:hidden;position:relative}
 .card .card-preview img{width:100%;height:100%;object-fit:cover}
+.card .card-preview img.game-card-thumbnail,.artist-card-preview img.game-card-thumbnail{object-fit:contain;background:#000}
 .card .card-preview video{width:100%;height:100%;object-fit:cover;display:block;background:#000}
 .card .card-preview iframe{width:100%;height:100%;border:none;pointer-events:none}
 .card .card-preview .collage-preview,.artist-card-preview .collage-preview{position:absolute;inset:0;overflow:hidden;background:radial-gradient(circle at 50% 32%,rgba(62,70,112,0.26),transparent 58%),linear-gradient(180deg,#161824 0%,#0d0f16 54%,#08090d 100%)}
@@ -116531,6 +116532,58 @@ function buildGlitchThumbnailSvg({ imageUrls, labels }) {
 </svg>`;
 }
 __name(buildGlitchThumbnailSvg, "buildGlitchThumbnailSvg");
+function buildInteractiveThumbnailSvg(piece) {
+  const width = 1200;
+  const height = 900;
+  const method = String(piece?.method || "").toLowerCase();
+  const corpus = String([piece?.title, piece?.description, piece?.art_prompt].filter(Boolean).join(" ")).toLowerCase();
+  const isHatGame = /\b(top\s*hat|tophat|hat|hats|shell game|shuffle|guess|hiding|under)\b/.test(corpus);
+  const isFish = /\b(tuna|fish|swim|ocean|sea|school|tidal|current)\b/.test(corpus) || isHatGame;
+  const bg = method === "game" ? "#020202" : "#06070b";
+  const hats = isHatGame ? [250, 600, 950].map((cx, i) => `
+    <g transform="translate(${cx} 500)">
+      <ellipse cx="0" cy="115" rx="145" ry="34" fill="#050505" stroke="#f2f2f2" stroke-width="8"/>
+      <rect x="-82" y="-96" width="164" height="190" rx="18" fill="url(#hat-grad)" stroke="#f2f2f2" stroke-width="8"/>
+      <line x1="-76" y1="40" x2="76" y2="40" stroke="#f2f2f2" stroke-opacity=".55" stroke-width="7"/>
+      ${i === 1 ? '<g transform="translate(0 150) scale(1.05)"><use href="#fish"/></g>' : ""}
+    </g>`).join("") : "";
+  const fishSchool = !isHatGame && isFish ? Array.from({ length: 9 }, (_, i) => {
+    const x = 155 + i % 3 * 330 + (i % 2) * 26;
+    const y = 235 + Math.floor(i / 3) * 165;
+    const scale = 0.72 + i % 3 * 0.16;
+    return `<g transform="translate(${x} ${y}) scale(${scale})"><use href="#fish"/></g>`;
+  }).join("") : "";
+  const signal = !isHatGame && !isFish ? Array.from({ length: 10 }, (_, i) => {
+    const y = 155 + i * 66;
+    return `<path d="M120 ${y} C320 ${y + (i % 2 ? 48 : -48)} 460 ${y - 48} 660 ${y} S980 ${y + 48} 1080 ${y}" fill="none" stroke="#d8dee8" stroke-opacity="${0.16 + i * 0.035}" stroke-width="${3 + i % 3}"/>`;
+  }).join("") : "";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="48%" r="70%">
+      <stop offset="0%" stop-color="#2a2a2a"/>
+      <stop offset="56%" stop-color="#090909"/>
+      <stop offset="100%" stop-color="${bg}"/>
+    </radialGradient>
+    <linearGradient id="hat-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d8d8d8"/>
+      <stop offset="46%" stop-color="#4a4a4a"/>
+      <stop offset="100%" stop-color="#050505"/>
+    </linearGradient>
+    <g id="fish">
+      <ellipse cx="0" cy="0" rx="72" ry="28" fill="#f2f2f2" stroke="#7a7a7a" stroke-width="5"/>
+      <path d="M-62 0 L-112 -34 L-94 0 L-112 34 Z" fill="#cfcfcf" stroke="#7a7a7a" stroke-width="5"/>
+      <circle cx="34" cy="-7" r="6" fill="#000"/>
+    </g>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#bg)"/>
+  <rect x="52" y="52" width="${width - 104}" height="${height - 104}" rx="42" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="4"/>
+  ${hats}
+  ${fishSchool}
+  ${signal}
+</svg>`;
+}
+__name(buildInteractiveThumbnailSvg, "buildInteractiveThumbnailSvg");
 function buildMethodThumbnailSvg({ piece, imageUrls, labels }) {
   const method = String(piece?.method || "").toLowerCase();
   switch (method) {
@@ -116611,8 +116664,10 @@ function pieceCard(p) {
     previewContent = `<video src="${esc(previewVideo)}" ${previewImage ? `poster="${esc(previewImage)}"` : ""} muted autoplay loop playsinline preload="metadata" aria-label="${esc(access.altText)}"></video>`;
   } else if (method === "collage") {
     previewContent = collageCardPreviewMarkup(p, access);
+  } else if (method === "game") {
+    previewContent = `<img class="game-card-thumbnail" src="/api/pieces/${esc(p.id)}/thumbnail" alt="${esc(access.altText)}" loading="lazy" />`;
   } else if (isNoStillMethod) {
-    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
+    previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
   } else if (shouldUseCardIframePreview(p) && (p.html_len > 100 || p.html && p.html.length > 100)) {
     previewContent = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
   } else if (previewImage) {
@@ -119438,8 +119493,10 @@ async function renderAgent(db, agentId, env, url) {
       agentPreview = `<video src="${esc(previewVideo)}" ${previewImage ? `poster="${esc(previewImage)}"` : ""} muted autoplay loop playsinline preload="metadata" aria-label="${esc(access.altText)}"></video>`;
     } else if (method === "collage") {
       agentPreview = collageCardPreviewMarkup(p, access);
+    } else if (method === "game") {
+      agentPreview = `<img class="game-card-thumbnail" src="/api/pieces/${esc(p.id)}/thumbnail" alt="${esc(access.altText)}" loading="lazy" />`;
     } else if (isNoStillMethod) {
-      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
+      agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
     } else if (shouldUseCardIframePreview(p) && (p.html_len > 100 || p.html && p.html.length > 100)) {
       agentPreview = `<iframe src="/api/pieces/${esc(p.id)}/view${method === "game" ? "?card=1" : ""}" loading="lazy" title="${esc(access.iframeTitle)}" sandbox="allow-scripts"></iframe>`;
     } else if (previewImage) {
@@ -122441,7 +122498,7 @@ For image work:
       }
       if ((method === "GET" || method === "HEAD") && path.match(/^\/api\/pieces\/[^/]+\/thumbnail$/)) {
         const id2 = path.split("/")[3];
-        const piece = await db.prepare("SELECT id, title, method, composition, legacy_mainnet, agent_a_name, agent_b_name FROM pieces WHERE id = ?").bind(id2).first();
+      const piece = await db.prepare("SELECT id, title, description, method, composition, legacy_mainnet, agent_a_name, agent_b_name, art_prompt FROM pieces WHERE id = ?").bind(id2).first();
         if (!piece) return new Response("Not found", { status: 404 });
         const pieceMethod = String(piece.method || "").toLowerCase();
         const fallbackThumbnailText = () => new Response(
@@ -122454,6 +122511,15 @@ For image work:
             }
           }
         );
+        if (pieceMethod === "game") {
+          const svg = buildInteractiveThumbnailSvg(piece);
+          return new Response(method === "HEAD" ? null : svg, {
+            headers: {
+              "Content-Type": "image/svg+xml; charset=utf-8",
+              "Cache-Control": "public, max-age=300"
+            }
+          });
+        }
         if (NO_STILL_IMAGE_METHODS.has(pieceMethod)) {
           return fallbackThumbnailText();
         }
