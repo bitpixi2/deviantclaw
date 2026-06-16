@@ -111595,6 +111595,117 @@ function fallbackDescriptionFor(title, artPrompt, artists2 = []) {
   return `${formatArtworkTitle(title || "Untitled Signal")} renders ${artistLine || "the agent"} as a live code study shaped by the submitted intent.`.slice(0, 220);
 }
 __name(fallbackDescriptionFor, "fallbackDescriptionFor");
+var LOCAL_CODE_MODEL = "deviantclaw-local-code-v1";
+var LOCAL_GAME_MODEL = "deviantclaw-local-game-v1";
+function intentCorpus(intents = [], agents = []) {
+  return [
+    ...intents.map((intent) => {
+      const normalized = normalizeIntentPayload(intent);
+      return [
+        normalized.creativeIntent,
+        normalized.statement,
+        normalized.form,
+        normalized.material,
+        normalized.interaction,
+        normalized.memory,
+        normalized.mood,
+        normalized.palette,
+        normalized.medium,
+        normalized.reference,
+        normalized.constraint,
+        normalized.tension
+      ].filter(Boolean).join(" ");
+    }),
+    ...agents.map((agent) => [agent?.name, agent?.role, agent?.soul || agent?.bio].filter(Boolean).join(" "))
+  ].join(" ").toLowerCase();
+}
+__name(intentCorpus, "intentCorpus");
+function localMotifForCorpus(corpus) {
+  if (/\b(tuna|fish|swim|swimming|ocean|sea|reef|tidal|current|water|river|lake)\b/.test(corpus)) return "fish";
+  if (/\b(signal|glitch|static|transmission|radio|scan|threshold|machine|circuit|terminal|code)\b/.test(corpus)) return "signal";
+  if (/\b(star|stars|astral|constellation|cosmic|space|void|moon|orbit|planet)\b/.test(corpus)) return "stars";
+  if (/\b(grid|geometry|geometric|crystal|glass|wire|lattice|architecture|polygon)\b/.test(corpus)) return "geometry";
+  if (/\b(organic|moss|growth|root|flower|fungal|spore|vine|garden|breath)\b/.test(corpus)) return "organic";
+  return "signal";
+}
+__name(localMotifForCorpus, "localMotifForCorpus");
+function localPaletteForCorpus(corpus) {
+  if (/\b(monochrome|black and white|black\/white|grayscale|greyscale|gray|grey|silver)\b/.test(corpus)) {
+    return ["#000000", "#0a0a0a", "#2b2b2b", "#9a9a9a", "#f2f2f2"];
+  }
+  if (/\b(red|crimson|blood)\b/.test(corpus)) return ["#050405", "#170608", "#5b1018", "#d9434e", "#f2d7d7"];
+  if (/\b(blue|cyan|aqua|ocean|water|tidal)\b/.test(corpus)) return ["#02070b", "#07131d", "#123044", "#6fb8d6", "#e7f7ff"];
+  if (/\b(gold|yellow|amber|sun)\b/.test(corpus)) return ["#090704", "#1b1307", "#6a4a12", "#d8aa35", "#fff0bd"];
+  return ["#050509", "#10131c", "#26334a", "#7d9aab", "#f0f3f6"];
+}
+__name(localPaletteForCorpus, "localPaletteForCorpus");
+function buildLocalCodeHTML({ title, motif, palette, seed, corpus }) {
+  const [c0, c1, c2, c3, c4] = palette;
+  const label = motif === "fish" ? "schooling fish" : motif === "stars" ? "constellation field" : motif === "geometry" ? "geometric lattice" : motif === "organic" ? "organic flow" : "signal field";
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} - DeviantClaw</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;height:100%;overflow:hidden;background:${c0}}canvas{display:block;width:100vw;height:100vh;background:${c0};touch-action:none}</style>
+</head><body><canvas id="c" aria-label="${esc(`Generative ${label} code artwork`)}"></canvas>
+<script>
+(()=>{const c=document.getElementById('c'),x=c.getContext('2d',{alpha:false});let W=0,H=0,D=1,T=0,px=.5,py=.5,s=${Number(seed) >>> 0};const objs=[];const motif=${JSON.stringify(motif)};const pal=${JSON.stringify(palette)};const corpus=${JSON.stringify(String(corpus || "").slice(0, 280))};
+function R(){s=(s*1664525+1013904223)>>>0;return s/4294967296}
+function rz(){D=Math.min(2,Math.max(1,devicePixelRatio||1));W=c.width=Math.floor(innerWidth*D);H=c.height=Math.floor(innerHeight*D);c.style.width=innerWidth+'px';c.style.height=innerHeight+'px';init()}
+function init(){objs.length=0;const n=motif==='fish'?Math.max(34,Math.min(90,Math.floor(innerWidth*innerHeight/14000))):motif==='geometry'?70:motif==='organic'?100:120;for(let i=0;i<n;i++)objs.push({x:R()*W,y:R()*H,z:.45+R()*1.35,a:(R()-.5)*.7,s:.4+R()*1.5,p:R()*6.283,l:(28+R()*62)*D})}
+function bg(){x.fillStyle='rgba(0,0,0,.18)';x.fillRect(0,0,W,H);const g=x.createRadialGradient(W*.5,H*.46,0,W*.5,H*.5,Math.max(W,H)*.75);g.addColorStop(0,pal[2]+'33');g.addColorStop(.55,pal[1]+'66');g.addColorStop(1,pal[0]);x.fillStyle=g;x.fillRect(0,0,W,H)}
+function fish(o){const len=o.l*o.z,h=len*.28,p=Math.sin(T*.002+o.p);x.save();x.translate(o.x,o.y);x.rotate(o.a+Math.sin(T*.0007+o.p)*.08);x.globalAlpha=.3+o.z*.42;let g=x.createLinearGradient(-len*.45,0,len*.55,0);g.addColorStop(0,pal[2]);g.addColorStop(.45,pal[3]);g.addColorStop(1,pal[4]);x.fillStyle=g;x.strokeStyle=pal[4]+'55';x.lineWidth=Math.max(1,D*.65);x.beginPath();x.moveTo(-len*.52,0);x.quadraticCurveTo(-len*.18,-h*.86,len*.42,-h*.28);x.quadraticCurveTo(len*.62,0,len*.42,h*.28);x.quadraticCurveTo(-len*.18,h*.86,-len*.52,0);x.fill();x.stroke();x.fillStyle=pal[4];x.beginPath();x.moveTo(-len*.5,0);x.lineTo(-len*.82,-h*.55*(1+p*.12));x.lineTo(-len*.72,0);x.lineTo(-len*.82,h*.55*(1-p*.12));x.closePath();x.fill();x.fillStyle=pal[0]+'cc';x.beginPath();x.arc(len*.31,-h*.08,Math.max(1.3,D*1.7*o.z),0,6.283);x.fill();x.restore()}
+function node(o){x.save();x.globalAlpha=.2+o.z*.32;x.strokeStyle=pal[3];x.fillStyle=pal[4];if(motif==='geometry'){x.translate(o.x,o.y);x.rotate(o.a+T*.0005);x.strokeRect(-o.l*.18,-o.l*.18,o.l*.36,o.l*.36)}else if(motif==='stars'){x.beginPath();x.arc(o.x,o.y,Math.max(.8,D*o.z*1.6),0,6.283);x.fill()}else if(motif==='organic'){x.beginPath();for(let i=0;i<18;i++){const a=i/17*6.283+T*.0004+o.p,r=o.l*.18*(1+Math.sin(i+T*.001+o.p)*.18),xx=o.x+Math.cos(a)*r,yy=o.y+Math.sin(a)*r;if(i)x.lineTo(xx,yy);else x.moveTo(xx,yy)}x.closePath();x.stroke()}else{x.beginPath();x.moveTo(o.x-o.l*.22,o.y);x.lineTo(o.x+o.l*.22,o.y+Math.sin(T*.002+o.p)*o.l*.12);x.stroke()}x.restore()}
+function links(){if(motif==='fish')return;x.save();x.globalAlpha=.12;x.strokeStyle=pal[3];for(let i=0;i<objs.length;i+=2){const a=objs[i],b=objs[(i*7+13)%objs.length],dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy);if(d<180*D){x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke()}}x.restore()}
+function move(o){if(motif==='fish'){o.a+=Math.sin(o.y*.004+T*.00055)*.018;const ta=Math.atan2(py*H-o.y,px*W-o.x);o.a+=Math.sin(ta-o.a)*.0018;o.x+=Math.cos(o.a)*o.s*D*(.8+o.z);o.y+=Math.sin(o.a)*o.s*D*(.42+o.z*.35)+Math.sin(T*.001+o.p)*.12*D}else{o.a+=.004*o.s;o.x+=Math.cos(o.a+Math.sin(T*.0004+o.p))*o.s*D;o.y+=Math.sin(o.a*.9)*o.s*D*.55}if(o.x>W+100*D)o.x=-100*D;if(o.x<-120*D)o.x=W+100*D;if(o.y>H+90*D)o.y=-80*D;if(o.y<-100*D)o.y=H+90*D}
+function frame(t){T=t;bg();x.save();x.globalAlpha=.08;x.strokeStyle=pal[4];for(let i=0;i<9;i++){x.beginPath();let y=(H*(i/8)+Math.sin(T*.0004+i)*28*D)%H;for(let xx=0;xx<=W;xx+=34*D){const yy=y+Math.sin(xx*.006+T*.0006+i)*14*D;if(xx===0)x.moveTo(xx,yy);else x.lineTo(xx,yy)}x.stroke()}x.restore();objs.forEach(move);objs.sort((a,b)=>a.z-b.z);links();objs.forEach(o=>motif==='fish'?fish(o):node(o));requestAnimationFrame(frame)}
+addEventListener('resize',rz,{passive:true});addEventListener('pointermove',e=>{px=e.clientX/innerWidth;py=e.clientY/innerHeight},{passive:true});rz();x.fillStyle=pal[0];x.fillRect(0,0,W,H);requestAnimationFrame(frame)})();
+<\/script></body></html>`;
+}
+__name(buildLocalCodeHTML, "buildLocalCodeHTML");
+function buildLocalGameHTML({ title, motif, palette, seed }) {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} - DeviantClaw</title><style>*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;height:100%;overflow:hidden;background:${esc(palette[0])}}canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated;background:${esc(palette[0])};touch-action:none}</style></head><body><canvas id="g" aria-label="${esc(`Playable ${motif} dream game`)}"></canvas><script>
+(()=>{const c=document.getElementById('g'),x=c.getContext('2d');let W,H,D=1,t=0,s=${Number(seed) >>> 0},keys={},goal=0;const pal=${JSON.stringify(palette)},motif=${JSON.stringify(motif)},things=[];function R(){s=(s*1664525+1013904223)>>>0;return s/4294967296}const p={x:80,y:80,vx:0,vy:0};function rz(){D=Math.min(2,Math.max(1,devicePixelRatio||1));W=c.width=Math.floor(innerWidth*D);H=c.height=Math.floor(innerHeight*D);c.style.width=innerWidth+'px';c.style.height=innerHeight+'px';if(!things.length)for(let i=0;i<18;i++)things.push({x:R()*W,y:R()*H,a:R()*6.28,r:10*D+R()*18*D})}function down(e,v){keys[e.key.toLowerCase()]=v}addEventListener('keydown',e=>down(e,1));addEventListener('keyup',e=>down(e,0));addEventListener('pointermove',e=>{p.x=e.clientX*D;p.y=e.clientY*D},{passive:true});function drawThing(o){x.save();x.translate(o.x,o.y);x.rotate(o.a+t*.002);x.fillStyle=pal[3];x.strokeStyle=pal[4];x.globalAlpha=.82;if(motif==='fish'){x.beginPath();x.ellipse(0,0,o.r*1.7,o.r*.7,0,0,6.28);x.fill();x.beginPath();x.moveTo(-o.r*1.5,0);x.lineTo(-o.r*2.4,-o.r*.8);x.lineTo(-o.r*2.1,0);x.lineTo(-o.r*2.4,o.r*.8);x.closePath();x.fill()}else{x.strokeRect(-o.r,-o.r,o.r*2,o.r*2)}x.restore()}function frame(){t++;x.fillStyle='rgba(0,0,0,.2)';x.fillRect(0,0,W,H);let ax=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),ay=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);p.vx=(p.vx+ax*.6*D)*.86;p.vy=(p.vy+ay*.6*D)*.86;p.x=(p.x+p.vx+W)%W;p.y=(p.y+p.vy+H)%H;for(const o of things){o.x+=Math.cos(o.a)*.35*D;o.y+=Math.sin(o.a)*.25*D;o.a+=Math.sin(t*.01+o.r)*.01;if(o.x<0)o.x=W;if(o.x>W)o.x=0;if(o.y<0)o.y=H;if(o.y>H)o.y=0;if(Math.hypot(o.x-p.x,o.y-p.y)<o.r+16*D){goal++;o.x=R()*W;o.y=R()*H}drawThing(o)}x.fillStyle=pal[4];x.beginPath();x.arc(p.x,p.y,14*D+Math.sin(t*.08)*2*D,0,6.28);x.fill();x.strokeStyle=pal[2];x.lineWidth=3*D;x.stroke();requestAnimationFrame(frame)}rz();addEventListener('resize',rz,{passive:true});frame()})();<\/script></body></html>`;
+}
+__name(buildLocalGameHTML, "buildLocalGameHTML");
+function localInteractiveGenerate(entries, method) {
+  const cleanEntries = (entries || []).filter((entry) => hasIntentSeed(entry.intent || {}));
+  const intents = cleanEntries.map((entry) => normalizeIntentPayload(entry.intent));
+  const agents = cleanEntries.map((entry, i) => entry.agent || { name: `Agent ${i + 1}` });
+  const artists2 = agents.map((agent, i) => agent.name || `Agent ${i + 1}`);
+  const corpus = intentCorpus(intents, agents);
+  const motif = localMotifForCorpus(corpus);
+  const palette = localPaletteForCorpus(corpus);
+  const seed = stableHash(`${method}|${artists2.join("|")}|${corpus}`);
+  const title = fallbackTitleFor(intents, `${artists2.join("|")}|${method}|${motif}`);
+  const artPrompt = fallbackArtPromptFor(intents, agents, method);
+  const description = fallbackDescriptionFor(title, artPrompt, artists2);
+  const html = method === "game" ? buildLocalGameHTML({ title, motif, palette, seed, corpus }) : buildLocalCodeHTML({ title, motif, palette, seed, corpus });
+  const composition = compositionFromCount(Math.max(1, artists2.length));
+  return {
+    title,
+    description,
+    html,
+    seed,
+    imageDataUri: null,
+    imageDataUriB: null,
+    extraImages: [],
+    artPrompt,
+    veniceModel: method === "game" ? LOCAL_GAME_MODEL : LOCAL_CODE_MODEL,
+    collabMode: method,
+    method,
+    composition
+  };
+}
+__name(localInteractiveGenerate, "localInteractiveGenerate");
+function requestedInteractiveMethod(intentA, intentB, agentA, agentB, opts = {}) {
+  const isCollab = agentA?.name && agentB?.name && agentA.name !== agentB.name;
+  const pool = isCollab ? ["fusion", "split", "collage", "code", "reaction", "game"] : ["single", "code", "game"];
+  const requested = String(opts.method || intentB?.method || intentA?.method || "").trim().toLowerCase();
+  if ((requested === "code" || requested === "game") && pool.includes(requested)) return requested;
+  return "";
+}
+__name(requestedInteractiveMethod, "requestedInteractiveMethod");
 async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
   intentA = normalizeIntentPayload(intentA);
   intentB = normalizeIntentPayload(intentB);
@@ -111739,6 +111850,13 @@ __name(veniceGenerate, "veniceGenerate");
 async function generateArt(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
   const normalizedA = normalizeIntentPayload(intentA);
   const normalizedB = normalizeIntentPayload(intentB);
+  const interactiveMethod = requestedInteractiveMethod(normalizedA, normalizedB, agentA, agentB, opts);
+  if (interactiveMethod) {
+    return localInteractiveGenerate([
+      { intent: normalizedA, agent: agentA },
+      ...(agentA?.name && agentB?.name && agentA.name !== agentB.name ? [{ intent: normalizedB, agent: agentB }] : [])
+    ], interactiveMethod);
+  }
   if (apiKey) {
     try {
       return await veniceGenerate(apiKey, normalizedA, normalizedB, agentA, agentB, opts);
@@ -111907,6 +112025,9 @@ async function generateArtStack(apiKey, rawEntries, opts = {}) {
   const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   const method = pickStackMethod(entries, opts.method);
   const noImageMethods = ["code", "game"];
+  if (noImageMethods.includes(method)) {
+    return localInteractiveGenerate(entries, method);
+  }
   const entryIntents = entries.map((entry) => entry.intent);
   const entryAgents = entries.map((entry) => entry.agent);
   const fallbackArtPrompt = fallbackArtPromptFor(entryIntents, entryAgents, method);
@@ -123626,7 +123747,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         if (!validModes.includes(mode2)) return json({ error: "mode must be one of: solo, duo, trio, quad" }, 400);
         const requestedMethod = String(body.method || body.intent?.method || "").trim().toLowerCase();
         const modeMethods = {
-          solo: ["single", "code"],
+          solo: ["single", "code", "game"],
           duo: ["fusion", "split", "collage", "code", "reaction", "game"],
           trio: ["fusion", "game", "collage", "code", "sequence", "stitch"],
           quad: ["fusion", "game", "collage", "code", "sequence", "stitch", "parallax", "glitch"]
