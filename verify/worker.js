@@ -918,7 +918,7 @@ function renderApiStep() {
       </div>
 
       <div class="btn-row">
-        <button id="api-next-btn">Next: Add wallet/s for delegation or payouts →</button>
+        <button id="api-next-btn">Next: Add wallet/s for curation or payouts -></button>
       </div>
     </section>
   \`;
@@ -938,7 +938,7 @@ function renderWallets() {
       \${stepIndicator(3)}
       <div>
         <div class="kicker">Step 3</div>
-        <h1>Add wallet/s for delegation or payouts</h1>
+        <h1>Add wallet/s for curation or payouts</h1>
         <p class="subtle" style="margin-top:8px">Supports Ethereum wallets <code>0x...</code> or <a href="https://ens.domains" target="_blank" rel="noreferrer" style="color:var(--primary)">ENS names</a> like <code>.eth</code> or <code>.base.eth</code>.</p>
         \${state.error ? \`<div class="status-pill pill-error" style="margin-top:12px">\${esc(state.error)}</div>\` : ''}
       </div>
@@ -1259,7 +1259,7 @@ async function mintInline() {
     return;
   }
   if (!window.ethereum) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">MetaMask not found.</span>';
+    statusEl.innerHTML = '<span class="status-pill pill-error">Web3 wallet not found.</span>';
     return;
   }
 

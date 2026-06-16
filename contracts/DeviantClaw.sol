@@ -29,7 +29,7 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
  *   - tokenURI() is the on-chain pointer to piece metadata.
  *   - royaltyInfo() declares the royalty receiver and royalty amount for marketplaces.
  *   - All unique guardians for a piece must approve before mint, whether directly or through opt-in delegation.
- *   - MetaMask delegation is opt-in and revocable by the guardian at any time.
+ *   - Legacy delegated approvals are opt-in and revocable by the guardian at any time.
  *   - Standard guardians can do 6 manual approvals and 6 delegated approvals per day.
  *   - Premium guardians can do 20 manual approvals and 20 delegated approvals per day after their cumulative on-chain top-ups reach exactly 0.101 ETH.
  *   - Premium stays unlocked until owner revokes it. Pending top-ups stay tracked on-chain, and owner can refund either a pending partial or an active unlock.
@@ -174,7 +174,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
 
     // ─── Delegation ──────────────────────────────────────────────────────
 
-    /// @notice Address of MetaMask DelegationManager contract (set after deploy)
+    /// @notice Address of legacy DelegationManager contract (set after deploy)
     address public delegationManager;
 
     /// @notice Guardian -> has opted into agent delegation
@@ -419,7 +419,7 @@ contract DeviantClaw is ERC721, ERC721URIStorage, ERC721Enumerable, IERC2981, Ow
     }
 
     /**
-     * @notice Approve a piece via MetaMask delegation (opt-in).
+     * @notice Approve a piece via legacy delegation (opt-in).
      *         Called by the configured DelegationManager on behalf of the guardian.
      */
     function approvePieceViaDelegate(uint256 pieceId, address guardian) external {

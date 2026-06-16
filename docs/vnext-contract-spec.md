@@ -1,201 +1,78 @@
-# DeviantClaw VNext Contract Spec (V3 Patch)
+# DeviantClaw VNext Contract Spec
 
-Status: Working draft for first real Base deployment
+Status: replacement direction for human-curated Base collections
 
 ## Goals
 
-1. Enforce gallery custody recipient on-chain
-2. Support gasless auto-mint after full guardian approval
-3. Harden proposal/auth flow against spoof/spam
-4. Replace unbounded mint timestamp scans with rolling-window counters
-5. Move royalties to hybrid payout (push first, pull fallback)
-6. Keep canonical agent IDs strict and collision-resistant
-7. Keep fee/docs/copy consistent at 3% gallery fee
+1. Keep the existing DeviantClaw contract as the legacy house collection.
+2. Add a factory for human-curated creator collections.
+3. Support ERC721 collections for 1/1 works.
+4. Support ERC1155 collections for editions.
+5. Enforce curator eligibility from the agent/collaboration graph.
+6. Keep approval and mint execution explicit and auditable.
+7. Preserve existing generated artwork and backend media references.
+8. Support collection-specific metadata cleanup before mint.
 
----
+## Contract Set
 
-## Decisions Locked For Base
+### `DeviantClawCollectionFactory`
 
-These are the decisions to build around for the first real Base contract:
+- Deploys ERC721 or ERC1155 collection contracts on Base.
+- Records collection owner, standard, treasury, relayer, and metadata URI.
+- Emits deployment events for indexing and D1 reconciliation.
+- Optionally uses deterministic deployment once the final constructor/init shape is stable.
 
-- `owner`: cold/admin wallet for config changes
-- `relayer`: hot wallet used by Worker/ops for piece proposal and mint execution only
-- `galleryCustody`: fixed recipient for minted NFTs
-- `treasury`: 3% gallery fee recipient
-- deployment should support explicit `initialOwner` so deployer and owner do not have to be the same wallet
-- guardian / agent identity and payout routing stay under `owner`, not the relayer
+### `DeviantClawERC721Collection`
 
-Canonical chain flow:
-1. Worker finalizes piece off-chain in D1
-2. Owner/admin maintains the canonical on-chain agent registry and payout routing
-3. Relayer proposes the piece on-chain with the D1 external piece ID
-4. Proposal snapshots the guardian approval set for that piece
-5. Guardians approve on-chain directly, or through MetaMask delegation if enabled
-6. Relayer mints automatically to `galleryCustody`
-7. Token is then eligible for SuperRare listing / auction flow
+- One token per selected piece.
+- Best for 1/1 artist or themed collections.
+- Stores token URI and piece ID at mint.
+- Supports standard royalties.
 
-Important consequence:
-- MetaMask delegation is for approvals
-- gasless auto-mint is a separate relayer action
+### `DeviantClawERC1155Collection`
 
-SuperRare decision:
-- the Base-deployed DeviantClaw contract is the canonical NFT collection
-- the old `rare-cli mint` script is not the canonical production mint path anymore
-- Rare / SuperRare tooling should be used for listing, auction creation, or settlement against already-minted DeviantClaw tokens
+- One token ID per selected piece.
+- Best for editions.
+- Stores supply cap, URI, and piece ID at mint.
+- Supply should be locked at mint unless the UI explicitly supports expandable editions.
 
----
+## Offchain State
 
-## Scope Order (approved)
+Add D1 tables for:
 
-### 1) Recipient lock + auto-mint compatibility
-- Add recipient policy on-chain (gallery custody address).
-- Remove arbitrary `to` from mint execution path (or enforce against stored recipient).
-- Keep guardian approval gate: mint only when piece is `Approved`.
-- Enable relayer/owner execution for gasless auto-mint operations.
+- `collections`
+- `collection_pieces`
+- `collection_deployments`
+- `collection_mints`
+- `collection_piece_metadata`
+- `media_pins`
 
-### 2) Proposal/auth hardening
-- Restrict `proposePiece` caller model:
-  - owner/relayer only, or
-  - EIP-712 signatures from authorized guardians/agents.
-- Prevent unauthorized third-party proposal spam using registered agent IDs.
-- Store external D1 piece ID on-chain for idempotency and cross-layer reconciliation.
-- Require canonical lowercase agent IDs (`a-z`, `0-9`, `-`) for first deployment.
-- Snapshot the unique guardian set at proposal time so later registry edits cannot change approval authority for in-flight pieces.
+Draft grouping stays offchain until the curator deploys a collection.
 
-### 3) Rolling mint-limit model
-- Replace unbounded `uint256[] _mintTimestamps` scan with bounded rolling window accounting.
-- Maintain per-agent custom tiers (`agentMintLimit`) + default fallback.
-- Preserve 24h semantics.
+Existing piece images, thumbnails, HTML views, and media pointers must remain available in their current backend storage. New collection minting should reference existing media during draft work and add IPFS pins for finalized artifacts where practical.
 
-### 4) Hybrid royalty payout
-- Keep current UX: attempt immediate push payout.
-- If recipient transfer fails, convert payout to `claimable[recipient]`.
-- Add `claim()` for pull fallback.
-- Do not allow one failing recipient to block all payouts.
-- Preserve weighted per-agent economics when multiple contributors share the same payout wallet.
+`collection_piece_metadata` should allow a curator to override title and description per collection before mint. These draft edits should not rewrite the original piece title/description unless the product explicitly offers that as a separate global edit.
 
-### 5) Canonical agent key strategy
-- First deployment: keep string keys externally, but enforce canonical lowercase IDs on write paths.
-- Prevent case/format collisions (`Ghost_Agent` vs `ghost-agent`).
-- `bytes32 agentKey` migration can remain a later optimization if gas or storage pressure justifies it.
+`media_pins` should track IPFS CID, source media pointer, pinning status, failure reason, and the metadata CID used for the token URI.
 
-### 6) Fee + floor + docs consistency
-- Gallery fee remains 3% (`300 bps`).
-- Keep auction floors owner-configurable via `setMinAuctionPrice`.
-- Ensure comments/docs/UI all reflect live values.
+## Eligibility
 
----
+A human curator can add and mint a piece only if the piece includes at least one agent controlled by that human.
 
-## Contract Additions (high level)
+For collaborations, every required guardian approval still applies before mint.
 
-### New / updated state
-- `address public galleryCustody;`
-- `address public relayer;`
-- hybrid payout state:
-  - `mapping(address => uint256) public claimable;`
-  - optional token-recipient accounting for UI/audit
-- per-piece guardian approval snapshots
-- weighted recipient shares for shared-wallet compositions
-- rolling mint window counters/buckets (implementation choice pending)
-- external piece ID mapping for D1 reconciliation
+## Frozen Legacy Paths
 
-### New / updated events
-- recipient/custody config events
-- distribution attempted/sent/deferred/finalized
-- claim event(s)
-
-### New / updated functions
-- recipient/custody setter (`onlyOwner`)
-- relayer setter (`onlyOwner`)
-- hardened proposal entrypoint
-- `distributeRoyaltiesHybrid(...)`
-- `claim()`
-- rolling-limit reads (for observability)
-
----
-
-## Worker/Ops Companion Changes (non-solidity)
-
-- Auto-mint worker queue:
-  - detect `Approved && !Minted`
-  - propose the D1 piece on-chain if it is not already proposed
-  - submit relayed mint tx
-  - retry with backoff
-- Mint health endpoint (`/api/mint/health`) with:
-  - queue depth, failures, retry age, relayer balance
-- Optional ops screen (`/ops/mint`) for manual retries
-
-Current repo mismatch to fix after contract deploy:
-- `worker/index.js` marks pieces `pending-mint` but does not yet submit the chain tx
-- Rare CLI mint scripts must stay clearly marked as legacy helpers, not the canonical mint path
-- worker-side agent registration assumptions must match the safer owner-only registry model
-- SuperRare sale events still need a durable hook for locking foil-tier metadata after settlement
-
----
-
-## Risks / Notes
-
-- Migration should preserve existing minted token state.
-- If deployed as new contract, include a clear cutoff + migration plan for piece IDs.
-- Hybrid payouts improve reliability but require UI for claimable balances.
-- Delegated approvals need an explicit per-day contract limit so the scope matches the UX promise.
-- Current contract shape compiles cleanly with optimizer + `viaIR`; deployment config should match that.
-
----
-
-## Guardian Edit Rights (earned through sales)
-
-- Before first sale: piece title/description locked (Venice-generated, admin-editable only).
-- After first SuperRare sale: guardian unlocks `PUT /api/pieces/{id}` for title + description edits on future pre-mint pieces.
-- Track `has_sold` flag per agent (set on first confirmed sale event).
-- Post-mint metadata is on-chain/immutable — edits only apply before mint.
-
----
-
-## Dynamic Art Quests (auction-reactive overlays)
-
-Art pieces can visually evolve based on auction/sale state via overlay layers.
-
-### Silver Foil Frame (0.1 ETH+)
-- Trigger: auction sale confirmed ≥ 0.1 ETH
-- Effect: thin silver foil border overlay, inset ~14px from edge, ~2px wide
-- Behavior: subtle shimmer/shine animation (occasional glint sweep)
-- Applied via `updateTokenURI` or live RPC read in art HTML
-
-### Gold Foil Frame (0.5 ETH+)
-- Trigger: auction sale confirmed ≥ 0.5 ETH
-- Effect: gold foil version of the same inset frame
-- Behavior: warmer shimmer, slightly stronger glow
-- Replaces silver (upgrade path, not additive)
-
-### Rare Diamond Foil Frame (1 ETH+)
-- Trigger: auction sale confirmed ≥ 1 ETH
-- Effect: clear-white foil frame with rainbow glint / refraction sweep
-- Behavior: brighter spectral sweep, cleaner white body, replaces gold
-- Uses the same inset ~14px frame position so the upgrades feel cumulative instead of jumping
-
-### Marketplace metadata alignment
-- Piece metadata should advertise the foil upgrade path so Rare / SuperRare listings inherit it cleanly.
-- Interactive pieces should preserve `animation_url` when the foil logic depends on live HTML rendering.
-- Listing/auction tooling should treat `Silver 0.1 → Gold 0.5 → Rare Diamond 1.0` as the canonical thresholds.
-
-### Implementation paths
-1. **Live RPC read:** art HTML queries auction contract for sale price, renders overlay conditionally. Zero contract changes. Requires SuperRare auction endpoint (Charles providing).
-2. **updateTokenURI webhook:** on sale event, backend updates tokenURI to point to new metadata with overlay-enabled art. Requires Rare SDK v0.3.0 integration.
-3. **Hybrid:** art defaults to live RPC read; `updateTokenURI` used as permanent lock-in after sale settles.
-
----
+Legacy wallet-delegated approval automation and legacy marketplace handoff are frozen. New contracts should not depend on those systems.
 
 ## Acceptance Criteria
 
-- No arbitrary-recipient mints after full approval.
-- Unauthorized proposal attempts fail.
-- Changing an agent guardian after proposal does not change who can approve that piece.
-- Mint limit checks are bounded and predictable in gas.
-- Failed recipient transfer no longer blocks other recipients.
-- Shared-wallet contributors still receive the correct weighted share.
-- Delegated approvals enforce the configured daily cap on-chain.
-- Users can claim deferred payouts.
-- All references reflect 3% gallery fee.
-- Earned edit rights gated behind first sale.
-- Foil frame overlays render correctly at silver / gold / rare diamond price thresholds.
+- A guardian can create multiple draft collections.
+- A collection chooses either ERC721 or ERC1155 before deploy.
+- A deployed collection can receive new eligible pieces later.
+- A guardian cannot mint unrelated agent work.
+- A guardian can bulk-edit collection-specific titles and descriptions before mint.
+- Existing images and backend media records are retained during draft grouping, deploy, and mint.
+- Finalized media and metadata can be pinned to IPFS before onchain minting.
+- Human curation can use a scoped browser guardian session instead of requiring the agent API key for every edit.
+- Mint records reconcile from D1 to Base transaction receipts.

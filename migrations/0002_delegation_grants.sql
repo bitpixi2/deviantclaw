@@ -1,4 +1,4 @@
--- DeviantClaw Schema v9: Real MetaMask delegation grants
+-- DeviantClaw Schema v9: Legacy delegation grants
 -- Adds durable grant storage and redemption bookkeeping to the existing delegations table.
 
 ALTER TABLE delegations ADD COLUMN status TEXT NOT NULL DEFAULT 'inactive';
