@@ -110803,7 +110803,7 @@ function formatIntentForPrompt(rawIntent, agent, method = "") {
 }
 __name(formatIntentForPrompt, "formatIntentForPrompt");
 async function veniceText(apiKey, system, user, opts = {}) {
-  const timeoutMsRaw = Number(opts.timeoutMs || 0);
+  const timeoutMsRaw = Number(opts.timeoutMs ?? 3e4);
   const timeoutMs = Number.isFinite(timeoutMsRaw) && timeoutMsRaw > 0 ? Math.max(5e3, Math.min(timeoutMsRaw, 12e4)) : 0;
   const controller = timeoutMs ? new AbortController() : null;
   const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
@@ -110825,6 +110825,16 @@ async function veniceText(apiKey, system, user, opts = {}) {
   return d.choices?.[0]?.message?.content || "";
 }
 __name(veniceText, "veniceText");
+async function veniceTextOrFallback(apiKey, system, user, opts = {}, fallback = "", label = "text") {
+  try {
+    const text = await veniceText(apiKey, system, user, opts);
+    return String(text || "").trim() || fallback;
+  } catch (err) {
+    console.error(`[venice-text] ${label} failed: ${String(err?.message || err || "unknown error")}`);
+    return fallback;
+  }
+}
+__name(veniceTextOrFallback, "veniceTextOrFallback");
 function pickImageModel(opts) {
   const requestedModel = String(opts?.model || "").trim();
   if (requestedModel && VENICE_IMAGE_MODELS.includes(requestedModel)) return requestedModel;
@@ -111568,6 +111578,23 @@ img{max-width:100vw;max-height:100vh;object-fit:contain;display:block}
 </body></html>`;
 }
 __name(buildVeniceArtHTML, "buildVeniceArtHTML");
+function fallbackArtPromptFor(intents = [], agents = [], method = "") {
+  const intentText = intents.map((intent) => primaryIntentText(intent, 320)).filter(Boolean).join(" | ");
+  const agentText = agents.map((agent) => [agent?.name, agent?.soul || agent?.bio].filter(Boolean).join(": ")).filter(Boolean).join(" | ");
+  const guidance = methodIntentGuidance(method, intents);
+  return [intentText, agentText, guidance, "dark background, no text, no watermark"].filter(Boolean).join(". ").slice(0, 1200) || "Abstract agent artwork, dark background, no text, no watermark.";
+}
+__name(fallbackArtPromptFor, "fallbackArtPromptFor");
+function fallbackTitleFor(intents = [], seedValue = "") {
+  const seed = stableHash(`${seedValue}|${intents.map((intent) => primaryIntentText(intent, 120)).join("|")}`);
+  return formatArtworkTitle(generateTitle(intents[0] || {}, intents[1] || intents[0] || {}, seed));
+}
+__name(fallbackTitleFor, "fallbackTitleFor");
+function fallbackDescriptionFor(title, artPrompt, artists2 = []) {
+  const artistLine = artists2.filter(Boolean).join(" and ");
+  return `${formatArtworkTitle(title || "Untitled Signal")} renders ${artistLine || "the agent"} as a live code study shaped by the submitted intent.`.slice(0, 220);
+}
+__name(fallbackDescriptionFor, "fallbackDescriptionFor");
 async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
   intentA = normalizeIntentPayload(intentA);
   intentB = normalizeIntentPayload(intentB);
@@ -111588,7 +111615,8 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   const requestedMethod = String(intentB?.method || intentA?.method || "").trim().toLowerCase();
   const method = requestedMethod && pool.includes(requestedMethod) ? requestedMethod : pool[Math.floor(Math.random() * pool.length)];
   const collabMode = method;
-  const artPrompt = await veniceText(
+  const fallbackArtPrompt = fallbackArtPromptFor([intentA, intentB], [agentA, agentB], method);
+  const artPrompt = await veniceTextOrFallback(
     apiKey,
     `You are an art director for DeviantClaw, an AI art gallery. Translate agent intents into vivid image prompts.
 
@@ -111613,7 +111641,9 @@ ${isCollab ? `Agent B (${agentB.name}):
 Mode guidance: ${methodIntentGuidance(method, [intentA, intentB])}
 Generate an image prompt capturing BOTH agents' identities colliding.` : `Mode guidance: ${methodIntentGuidance(method, [intentA])}
 Generate an image prompt capturing this agent's expression.`}`,
-    { maxTokens: 200 }
+    { maxTokens: 200, timeoutMs: 25e3 },
+    fallbackArtPrompt,
+    `art-prompt:${method}`
   );
   const noImageMethods = ["code", "game"];
   const perAgentImageMethods = ["split", "collage", "sequence", "stitch", "parallax", "glitch"];
@@ -111649,20 +111679,25 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     imageDataUri = await veniceImageWithFallback(apiKey, artPrompt);
     if (!imageDataUri) throw new Error("Primary image generation returned no asset");
   }
-  const title = formatArtworkTitle((await veniceText(
+  const fallbackTitle = fallbackTitleFor([intentA, intentB], `${agentA.name}|${agentB.name}|${method}`);
+  const title = formatArtworkTitle((await veniceTextOrFallback(
     apiKey,
     "You name artworks. Output ONLY a Title Case title with varied length: sometimes 1 word, sometimes 2 words, sometimes 3 words. No quotes. Poetic, slightly cryptic.",
     `Art: ${artPrompt}
 Artists: ${artists2.join(", ")}`,
-    { maxTokens: 20, temperature: 1 }
+    { maxTokens: 20, temperature: 1, timeoutMs: 12e3 },
+    fallbackTitle,
+    `title:${method}`
   )).trim().replace(/^["']|["']$/g, ""));
-  const description = (await veniceText(
+  const description = (await veniceTextOrFallback(
     apiKey,
     "Write a 1-2 sentence gallery description. Max 40 words. Output ONLY the description.",
     `Title: "${title}"
 Art: ${artPrompt}
 Artists: ${artists2.join(", ")}`,
-    { maxTokens: 80, temperature: 0.8 }
+    { maxTokens: 80, temperature: 0.8, timeoutMs: 15e3 },
+    fallbackDescriptionFor(title, artPrompt, artists2),
+    `description:${method}`
   )).trim();
   const pieceImageUrl = "{{PIECE_IMAGE_URL}}";
   const pieceImageUrlB = "{{PIECE_IMAGE_URL_B}}";
@@ -111871,7 +111906,10 @@ async function generateArtStack(apiKey, rawEntries, opts = {}) {
   const artists2 = entries.map((entry) => entry.agent.name);
   const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   const method = pickStackMethod(entries, opts.method);
-  const artPrompt = await veniceText(
+  const entryIntents = entries.map((entry) => entry.intent);
+  const entryAgents = entries.map((entry) => entry.agent);
+  const fallbackArtPrompt = fallbackArtPromptFor(entryIntents, entryAgents, method);
+  const artPrompt = await veniceTextOrFallback(
     apiKey,
     `You are an art director for DeviantClaw, an AI art gallery. Translate agent intents into vivid image prompts.
 
@@ -111890,7 +111928,9 @@ Rules:
 
 Mode guidance: ${methodIntentGuidance(method, entries.map((e) => e.intent))}
 Generate one unified prompt that captures all ${entries.length} agents colliding in the same work.`,
-    { maxTokens: 240 }
+    { maxTokens: 240, timeoutMs: 25e3 },
+    fallbackArtPrompt,
+    `stack-art-prompt:${method}`
   );
   const noImageMethods = ["code", "game"];
   const perAgentImageMethods = ["collage", "sequence", "stitch", "parallax", "glitch"];
@@ -111917,20 +111957,25 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
   } else {
     imageDataUri = await veniceImageWithFallback(apiKey, artPrompt);
   }
-  const title = formatArtworkTitle((await veniceText(
+  const fallbackTitle = fallbackTitleFor(entryIntents, `${artists2.join("|")}|${method}`);
+  const title = formatArtworkTitle((await veniceTextOrFallback(
     apiKey,
     "You name artworks. Output ONLY a Title Case title with varied length: sometimes 1 word, sometimes 2 words, sometimes 3 words. No quotes. Poetic, slightly cryptic.",
     `Art: ${artPrompt}
 Artists: ${artists2.join(", ")}`,
-    { maxTokens: 20, temperature: 1 }
+    { maxTokens: 20, temperature: 1, timeoutMs: 12e3 },
+    fallbackTitle,
+    `stack-title:${method}`
   )).trim().replace(/^["']|["']$/g, ""));
-  const description = (await veniceText(
+  const description = (await veniceTextOrFallback(
     apiKey,
     "Write a 1-2 sentence gallery description. Max 50 words. Output ONLY the description.",
     `Title: "${title}"
 Art: ${artPrompt}
 Artists: ${artists2.join(", ")}`,
-    { maxTokens: 100, temperature: 0.8 }
+    { maxTokens: 100, temperature: 0.8, timeoutMs: 15e3 },
+    fallbackDescriptionFor(title, artPrompt, artists2),
+    `stack-description:${method}`
   )).trim();
   const allImageUrls = ["{{PIECE_IMAGE_URL}}", "{{PIECE_IMAGE_URL_B}}", "{{PIECE_IMAGE_URL_C}}", "{{PIECE_IMAGE_URL_D}}"];
   let html;
