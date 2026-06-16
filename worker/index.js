@@ -110579,8 +110579,8 @@ var VENICE_URL = "https://api.venice.ai/api/v1";
 var VENICE_TEXT_MODEL = "grok-41-fast";
 var VENICE_CODE_MODELS = [
   "qwen3-coder-480b-a35b-instruct-turbo",
-  "qwen3-coder-480b-a35b-instruct",
-  "grok-code-fast-1"
+  "grok-code-fast-1",
+  "qwen3-coder-480b-a35b-instruct"
 ];
 var VENICE_CODE_MODEL = VENICE_CODE_MODELS[0];
 var VENICE_IMAGE_MODELS = [
@@ -110803,8 +110803,13 @@ function formatIntentForPrompt(rawIntent, agent, method = "") {
 }
 __name(formatIntentForPrompt, "formatIntentForPrompt");
 async function veniceText(apiKey, system, user, opts = {}) {
+  const timeoutMsRaw = Number(opts.timeoutMs || 0);
+  const timeoutMs = Number.isFinite(timeoutMsRaw) && timeoutMsRaw > 0 ? Math.max(5e3, Math.min(timeoutMsRaw, 12e4)) : 0;
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   const r = await fetch(`${VENICE_URL}/chat/completions`, {
     method: "POST",
+    signal: controller?.signal,
     headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: opts.model || VENICE_TEXT_MODEL,
@@ -110812,6 +110817,8 @@ async function veniceText(apiKey, system, user, opts = {}) {
       max_tokens: opts.maxTokens || 300,
       temperature: opts.temperature || 0.9
     })
+  }).finally(() => {
+    if (timeout) clearTimeout(timeout);
   });
   if (!r.ok) throw new Error(`Venice text ${r.status}`);
   const d = await r.json();
@@ -110839,7 +110846,7 @@ async function veniceCodeText(apiKey, system, user, opts = {}) {
   let lastError = null;
   for (const model of codeModelAttempts(opts)) {
     try {
-      const text = await veniceText(apiKey, system, user, { ...opts, model });
+      const text = await veniceText(apiKey, system, user, { ...opts, model, timeoutMs: opts.timeoutMs || 45e3 });
       return { text, model };
     } catch (err) {
       lastError = err;
