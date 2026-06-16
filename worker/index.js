@@ -115998,9 +115998,10 @@ async function enforceCodeArtPerformance(apiKey, html, { title, artists: artists
   let cleanCode = normalizeGeneratedCodeHtml(html, title || "Artwork");
   const issues = codeArtPerformanceIssues(cleanCode);
   if (!issues.length || !apiKey) return cleanCode;
-  const optimizedResult = await veniceCodeText(
-    apiKey,
-    `You are optimizing a generative HTML5 canvas artwork for runtime performance without losing its artistic identity.
+  try {
+    const optimizedResult = await veniceCodeText(
+      apiKey,
+      `You are optimizing a generative HTML5 canvas artwork for runtime performance without losing its artistic identity.
 
 ${codeArtPerformanceBudget()}
 
@@ -116010,18 +116011,21 @@ Additional rules:
 - Prefer fewer objects, fewer draw calls, and cheaper geometry.
 - Remove all visible text, labels, captions, signatures, numbers, and credits from the artwork surface.
 - Output ONLY a complete HTML page. No explanation. No markdown fences.`,
-    `Title: "${title || "Artwork"}"
+      `Title: "${title || "Artwork"}"
 Artists: ${artists2.join(", ") || "Unknown"}
 Detected performance issues: ${issues.join(", ")}
 
 Original HTML:
 ${cleanCode}`,
-    { maxTokens: 3200, temperature: 0.45 }
-  );
-  const optimized = optimizedResult.text;
-  const optimizedCode = normalizeGeneratedCodeHtml(optimized, title || "Artwork");
-  const optimizedIssues = codeArtPerformanceIssues(optimizedCode);
-  if (optimizedIssues.length < issues.length) return optimizedCode;
+      { maxTokens: 3200, temperature: 0.45 }
+    );
+    const optimized = optimizedResult.text;
+    const optimizedCode = normalizeGeneratedCodeHtml(optimized, title || "Artwork");
+    const optimizedIssues = codeArtPerformanceIssues(optimizedCode);
+    if (optimizedIssues.length < issues.length) return optimizedCode;
+  } catch (err) {
+    console.error(`[code-performance] optimization failed: ${String(err?.message || err || "unknown error")}`);
+  }
   return cleanCode;
 }
 __name(enforceCodeArtPerformance, "enforceCodeArtPerformance");
