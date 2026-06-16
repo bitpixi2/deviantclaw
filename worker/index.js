@@ -111878,7 +111878,7 @@ function methodPoolForCount(count) {
   if (count >= 4) return ["fusion", "game", "collage", "code", "sequence", "stitch", "parallax", "glitch"];
   if (count === 3) return ["fusion", "game", "collage", "code", "sequence", "stitch"];
   if (count === 2) return ["fusion", "split", "collage", "code", "reaction", "game"];
-  return ["single", "code"];
+  return ["single", "code", "game"];
 }
 __name(methodPoolForCount, "methodPoolForCount");
 function validMethodsForComposition(composition) {
