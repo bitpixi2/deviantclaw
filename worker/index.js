@@ -110830,6 +110830,25 @@ function pickCodeModel(opts) {
   return VENICE_CODE_MODEL;
 }
 __name(pickCodeModel, "pickCodeModel");
+function codeModelAttempts(opts = {}) {
+  const first = pickCodeModel(opts);
+  return [first, ...VENICE_CODE_MODELS.filter((model) => model !== first)];
+}
+__name(codeModelAttempts, "codeModelAttempts");
+async function veniceCodeText(apiKey, system, user, opts = {}) {
+  let lastError = null;
+  for (const model of codeModelAttempts(opts)) {
+    try {
+      const text = await veniceText(apiKey, system, user, { ...opts, model });
+      return { text, model };
+    } catch (err) {
+      lastError = err;
+      console.error(`[venice-code] model=${model} failed: ${String(err?.message || err || "unknown error")}`);
+    }
+  }
+  throw lastError || new Error("Venice code generation failed for all configured code models");
+}
+__name(veniceCodeText, "veniceCodeText");
 async function veniceImage(apiKey, prompt, opts = {}) {
   const selectedModel = pickImageModel(opts);
   const r = await fetch(`${VENICE_URL}/images/generations`, {
@@ -111003,8 +111022,7 @@ __name(injectGameMobileShim, "injectGameMobileShim");
 async function buildGameHTML(apiKey, intentA, intentB, agentA, agentB, title, artists2, date) {
   const artistLine = artists2.map((a) => esc(a)).join(" \xD7 ");
   const charCount = artists2.length;
-  const codeModel = pickCodeModel();
-  const gameCode = await veniceText(
+  const gameResult = await veniceCodeText(
     apiKey,
     `You are a retro game developer making a Game Boy Color-style mini game in HTML5 Canvas.
 
@@ -111038,8 +111056,10 @@ ${artists2.map((a, i) => {
     }).join("\n")}
 
 Make a small explorable scene where these AI artists exist as pixel characters. Their dialogue reflects their artistic intent AND their core identity. Each character's obsession must be evident in the world (e.g. if one is about paperclips, paperclips are everywhere in their area). If an agent expressed something abstract, poetic, or memory-driven, interpret it as a visual theme in their area. ${methodIntentGuidance("game", [intentA, intentB])} The world should feel like their identities co-shaping one strange place.`,
-    { model: codeModel, maxTokens: 4e3, temperature: 0.85 }
+    { maxTokens: 4e3, temperature: 0.85 }
   );
+  const gameCode = gameResult.text;
+  const codeModel = gameResult.model;
   let clean2 = gameCode.replace(/^```html?\n?/i, "").replace(/\n?```$/i, "").trim();
   if (!clean2.toLowerCase().includes("<!doctype") && !clean2.toLowerCase().includes("<html")) {
     clean2 = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title></head><body>${clean2}</body></html>`;
@@ -111476,8 +111496,7 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;min-
 __name(buildLegacyOverlapCollageHTML, "buildLegacyOverlapCollageHTML");
 async function buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists2, date) {
   const artistLine = artists2.map((a) => esc(a)).join(" \xD7 ");
-  const codeModel = pickCodeModel();
-  const codeArt = await veniceText(
+  const codeResult = await veniceCodeText(
     apiKey,
     `You are a creative coder making generative art with HTML5 Canvas. Write a COMPLETE, self-contained HTML page.
 
@@ -111508,8 +111527,10 @@ If an agent expressed something abstract \u2014 a feeling, a poem, a memory \u20
 Prefer form over legacy tension when deciding layout, pacing, interaction, or reveal logic. VARIETY: Make this look and feel DIFFERENT from any previous piece. Experiment with unusual layouts, unexpected color choices, novel interaction patterns.
 
 Create a generative art piece that captures the collision between these two perspectives. Title: "${title}".`,
-    { model: codeModel, maxTokens: 3200, temperature: 0.9 }
+    { maxTokens: 3200, temperature: 0.9 }
   );
+  const codeArt = codeResult.text;
+  const codeModel = codeResult.model;
   const cleanCode = await enforceCodeArtPerformance(apiKey, codeArt, { title, artists: artists2 });
   return { html: cleanCode, model: codeModel };
 }
@@ -111740,8 +111761,7 @@ function formatEntriesForPrompt(entries, method) {
 }
 __name(formatEntriesForPrompt, "formatEntriesForPrompt");
 async function buildGameHTMLStack(apiKey, entries, title, artists2, date) {
-  const codeModel = pickCodeModel();
-  const gameCode = await veniceText(
+  const gameResult = await veniceCodeText(
     apiKey,
     `You are a retro game developer making a Game Boy Color-style mini game in HTML5 Canvas.
 
@@ -111775,8 +111795,10 @@ ${entries.map((entry, i) => {
 
 ${methodIntentGuidance("game", entries.map((e) => e.intent))}
 Make a small explorable scene where all of these AI artists exist as pixel characters. Their dialogue reflects their artistic intent and core identity. Each character's obsession must be visible in the world, and the world should feel like all of their identities are co-shaping one strange place.`,
-    { model: codeModel, maxTokens: 4e3, temperature: 0.85 }
+    { maxTokens: 4e3, temperature: 0.85 }
   );
+  const gameCode = gameResult.text;
+  const codeModel = gameResult.model;
   let clean2 = gameCode.replace(/^```html?\n?/i, "").replace(/\n?```$/i, "").trim();
   if (!clean2.toLowerCase().includes("<!doctype") && !clean2.toLowerCase().includes("<html")) {
     clean2 = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title></head><body>${clean2}</body></html>`;
@@ -111788,9 +111810,8 @@ Make a small explorable scene where all of these AI artists exist as pixel chara
 }
 __name(buildGameHTMLStack, "buildGameHTMLStack");
 async function buildGenerativeHTMLStack(apiKey, entries, title) {
-  const codeModel = pickCodeModel();
   const artists = entries.map((entry, i) => entry?.agent?.name || `Agent ${i + 1}`);
-  const codeArt = await veniceText(
+  const codeResult = await veniceCodeText(
     apiKey,
     `You are a creative coder making generative art with HTML5 Canvas. Write a COMPLETE, self-contained HTML page.
 
@@ -111811,8 +111832,10 @@ ${formatEntriesForPrompt(entries, "code")}
 
 ${methodIntentGuidance("code", entries.map((e) => e.intent))}
 IMPORTANT: Every agent's core identity must be visibly present. Prefer form over legacy tension when deciding layout, pacing, interaction, and reveal logic. Build a single generative system that feels like all of these voices are colliding at once. Title: "${title}".`,
-    { model: codeModel, maxTokens: 3200, temperature: 0.9 }
+    { maxTokens: 3200, temperature: 0.9 }
   );
+  const codeArt = codeResult.text;
+  const codeModel = codeResult.model;
   const cleanCode = await enforceCodeArtPerformance(apiKey, codeArt, { title, artists });
   return {
     html: cleanCode,
@@ -115919,7 +115942,7 @@ async function enforceCodeArtPerformance(apiKey, html, { title, artists: artists
   let cleanCode = normalizeGeneratedCodeHtml(html, title || "Artwork");
   const issues = codeArtPerformanceIssues(cleanCode);
   if (!issues.length || !apiKey) return cleanCode;
-  const optimized = await veniceText(
+  const optimizedResult = await veniceCodeText(
     apiKey,
     `You are optimizing a generative HTML5 canvas artwork for runtime performance without losing its artistic identity.
 
@@ -115937,8 +115960,9 @@ Detected performance issues: ${issues.join(", ")}
 
 Original HTML:
 ${cleanCode}`,
-    { model: pickCodeModel(), maxTokens: 3200, temperature: 0.45 }
+    { maxTokens: 3200, temperature: 0.45 }
   );
+  const optimized = optimizedResult.text;
   const optimizedCode = normalizeGeneratedCodeHtml(optimized, title || "Artwork");
   const optimizedIssues = codeArtPerformanceIssues(optimizedCode);
   if (optimizedIssues.length < issues.length) return optimizedCode;
