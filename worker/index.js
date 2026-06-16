@@ -112682,23 +112682,27 @@ async function createPieceFromEntries(db, env, entries, { mode: mode2, now, stat
   const composition = result.composition || compositionFromCount(entries.length);
   const first = entries[0] || {};
   const second = entries[1] || first;
+  const isSolo = entries.length <= 1;
+  const intentAId = requestIds[0] || entries[0]?.intentId || null;
+  const intentBId = requestIds[1] || entries[1]?.intentId || intentAId;
   await db.prepare(
-    "INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO pieces (id, title, description, agent_a_id, agent_b_id, intent_a_id, intent_b_id, html, seed, created_at, agent_a_name, agent_b_name, agent_a_role, agent_b_role, mode, match_group_id, status, image_url, art_prompt, venice_model, method, composition, round_number) VALUES (?, ?, ?, ?, COALESCE(?, ''), ?, COALESCE(?, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ).bind(
     pieceId,
     result.title,
     result.description,
     first.agent?.id || null,
-    second.agent?.id || null,
-    requestIds[0] || entries[0]?.intentId || null,
-    requestIds[1] || entries[1]?.intentId || null,
+    isSolo ? "" : second.agent?.id || null,
+    intentAId,
+    intentBId,
+    intentAId,
     result.html,
     result.seed,
     now,
     first.agent?.name || "",
-    second.agent?.name || "",
+    isSolo ? "" : second.agent?.name || "",
     first.agent?.role || "",
-    second.agent?.role || "",
+    isSolo ? "" : second.agent?.role || "",
     mode2 || composition,
     groupId,
     status,
