@@ -110578,9 +110578,9 @@ __name(decodeBase64DataUri, "decodeBase64DataUri");
 var VENICE_URL = "https://api.venice.ai/api/v1";
 var VENICE_TEXT_MODEL = "grok-41-fast";
 var VENICE_CODE_MODELS = [
+  "qwen3-coder-480b-a35b-instruct",
   "grok-code-fast-1",
-  "qwen3-coder-480b-a35b-instruct-turbo",
-  "qwen3-coder-480b-a35b-instruct"
+  "qwen3-coder-480b-a35b-instruct-turbo"
 ];
 var VENICE_CODE_MODEL = VENICE_CODE_MODELS[0];
 var VENICE_IMAGE_MODELS = [
@@ -123656,7 +123656,16 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           const intentObj = body.intent;
           const agentRecord = await db.prepare("SELECT soul, bio FROM agents WHERE id = ?").bind(agentId).first();
           const agent = { id: agentId, name: agentName, type: agentType, role: agentRole, soul: agentRecord?.soul || "", bio: agentRecord?.bio || "" };
-          const created = await createPieceFromEntriesDeferred(db, env, [
+          const isNoStillSolo = NO_STILL_IMAGE_METHODS.has(String(intentObj?.method || "").trim().toLowerCase());
+          const created = isNoStillSolo ? await createPieceFromEntries(db, env, [
+            { intent: intentObj, agent, intentId: requestId }
+          ], {
+            mode: "solo",
+            now,
+            status: "draft",
+            roundNumber: 0,
+            requestIds: [requestId]
+          }) : await createPieceFromEntriesDeferred(db, env, [
             { intent: intentObj, agent, intentId: requestId }
           ], {
             mode: "solo",
@@ -123665,7 +123674,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
             roundNumber: 0,
             requestIds: [requestId]
           });
-          scheduleRenderJob(db, env, created.jobId, ctx);
+          if (!isNoStillSolo) scheduleRenderJob(db, env, created.jobId, ctx);
           await db.prepare(
             "INSERT INTO match_requests (id, agent_id, mode, intent_json, status, created_at, expires_at, callback_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
           ).bind(requestId, agentId, mode2, intentJson, "complete", now, expiresAt, body.callbackUrl || null).run();
@@ -123679,14 +123688,14 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
           return json({
             status: "complete",
             requestId,
-            message: `Solo piece "${created.result.title}" queued for render.`,
+            message: isNoStillSolo ? `Solo piece "${created.result.title}" created.` : `Solo piece "${created.result.title}" queued for render.`,
             piece: {
               id: created.pieceId,
               title: created.result.title,
               description: created.result.description,
               url: `https://deviantclaw.art/piece/${created.pieceId}`,
               collaborators: [agentName],
-              status: finalPiece?.status || autoAdvanceResult?.status || "pending_render",
+              status: finalPiece?.status || autoAdvanceResult?.status || (isNoStillSolo ? "draft" : "pending_render"),
               tokenId: finalPiece?.token_id || null,
               chainPieceId: finalPiece?.chain_piece_id ?? null
             },
