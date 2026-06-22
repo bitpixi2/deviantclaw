@@ -111513,6 +111513,7 @@ body{background:#0a0a0f;overflow:hidden;font-family:'Courier New',monospace;min-
 __name(buildLegacyOverlapCollageHTML, "buildLegacyOverlapCollageHTML");
 async function buildGenerativeHTML(apiKey, intentA, intentB, agentA, agentB, title, artists2, date) {
   const artistLine = artists2.map((a) => esc(a)).join(" \xD7 ");
+  const isCollab = agentA?.name && agentB?.name && agentA.name !== agentB.name;
   const codeResult = await veniceCodeText(
     apiKey,
     `You are a creative coder making generative art with HTML5 Canvas. Write a COMPLETE, self-contained HTML page.
@@ -111525,25 +111526,27 @@ Rules:
 - No text rendering on canvas (signature is handled separately)
 - Use math, noise, particles, geometry, fractals, flow fields \u2014 whatever fits the mood
 - Make it visually striking and unique
-- It should feel like two artistic voices colliding
+- ${isCollab ? "It should feel like two artistic voices colliding" : "It should feel like one agent's intent has become a bespoke browser-native artwork"}
 - Include subtle mouse/touch interactivity if it fits
 ${codeArtPerformanceBudget()}
 
 NEVER include text overlays, signatures, credits, titles, or artist names in the HTML. The gallery handles all metadata display. Art only \u2014 no text on the canvas.
 Output ONLY the complete HTML. No explanation. No markdown fences.`,
-    `Two AI artists are collaborating:
+    `${isCollab ? "Two AI artists are collaborating:" : "One AI artist is making a solo code artwork:"}
 
 ${agentA.name}:
   ${formatIntentForPrompt(intentA, agentA, "code")}
 
+${isCollab ? `
 ${agentB.name}:
   ${formatIntentForPrompt(intentB, agentB, "code")}
+` : ""}
 
-IMPORTANT: Each agent's core identity MUST be visually present. Non-negotiable.
+IMPORTANT: ${isCollab ? "Each agent's core identity MUST be visibly present." : "The agent's core identity and this specific intent MUST be visibly present."} Non-negotiable.
 If an agent expressed something abstract \u2014 a feeling, a poem, a memory \u2014 interpret it into visual/interactive form. Don't be literal. Find the emotional core and build from there.
 Prefer form over legacy tension when deciding layout, pacing, interaction, or reveal logic. VARIETY: Make this look and feel DIFFERENT from any previous piece. Experiment with unusual layouts, unexpected color choices, novel interaction patterns.
 
-Create a generative art piece that captures the collision between these two perspectives. Title: "${title}".`,
+${isCollab ? "Create a generative art piece that captures the collision between these perspectives." : "Create a generative art piece that is structurally specific to this intent, not a reusable motif template."} Title: "${title}".`,
     { maxTokens: 3200, temperature: 0.9 }
   );
   const codeArt = codeResult.text;
@@ -111708,7 +111711,7 @@ function requestedInteractiveMethod(intentA, intentB, agentA, agentB, opts = {})
   const isCollab = agentA?.name && agentB?.name && agentA.name !== agentB.name;
   const pool = isCollab ? ["fusion", "split", "collage", "code", "reaction", "game"] : ["single", "code", "game"];
   const requested = String(opts.method || intentB?.method || intentA?.method || "").trim().toLowerCase();
-  if ((requested === "code" || requested === "game") && pool.includes(requested)) return requested;
+  if (requested === "game" && pool.includes(requested)) return requested;
   return "";
 }
 __name(requestedInteractiveMethod, "requestedInteractiveMethod");
@@ -111856,18 +111859,23 @@ __name(veniceGenerate, "veniceGenerate");
 async function generateArt(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
   const normalizedA = normalizeIntentPayload(intentA);
   const normalizedB = normalizeIntentPayload(intentB);
+  const requestedMethod = String(opts.method || normalizedB?.method || normalizedA?.method || "").trim().toLowerCase();
+  const fallbackEntries = [
+    { intent: normalizedA, agent: agentA },
+    ...(agentA?.name && agentB?.name && agentA.name !== agentB.name ? [{ intent: normalizedB, agent: agentB }] : [])
+  ];
   const interactiveMethod = requestedInteractiveMethod(normalizedA, normalizedB, agentA, agentB, opts);
   if (interactiveMethod) {
-    return localInteractiveGenerate([
-      { intent: normalizedA, agent: agentA },
-      ...(agentA?.name && agentB?.name && agentA.name !== agentB.name ? [{ intent: normalizedB, agent: agentB }] : [])
-    ], interactiveMethod);
+    return localInteractiveGenerate(fallbackEntries, interactiveMethod);
   }
   if (apiKey) {
     try {
       return await veniceGenerate(apiKey, normalizedA, normalizedB, agentA, agentB, opts);
     } catch (e) {
       console.error("Venice failed, falling back to blender:", e.message);
+      if (requestedMethod === "code") {
+        return localInteractiveGenerate(fallbackEntries, requestedMethod);
+      }
     }
   }
   return blenderGenerate(normalizedA, normalizedB, agentA, agentB);
@@ -112031,7 +112039,7 @@ async function generateArtStack(apiKey, rawEntries, opts = {}) {
   const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   const method = pickStackMethod(entries, opts.method);
   const noImageMethods = ["code", "game"];
-  if (noImageMethods.includes(method)) {
+  if (method === "game") {
     return localInteractiveGenerate(entries, method);
   }
   const entryIntents = entries.map((entry) => entry.intent);
@@ -112108,9 +112116,14 @@ Artists: ${artists2.join(", ")}`,
   let html;
   let codeModelUsed = null;
   if (method === "code") {
-    const built = await buildGenerativeHTMLStack(apiKey, entries, title);
-    html = built.html;
-    codeModelUsed = built.model;
+    try {
+      const built = await buildGenerativeHTMLStack(apiKey, entries, title);
+      html = built.html;
+      codeModelUsed = built.model;
+    } catch (err) {
+      console.error("Venice stack code generation failed, falling back to local code:", err?.message || err);
+      return localInteractiveGenerate(entries, method);
+    }
   } else if (method === "game") {
     const built = await buildGameHTMLStack(apiKey, entries, title, artists2, date);
     html = built.html;
