@@ -115216,7 +115216,7 @@ var HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1px
 .brand-link:hover{opacity:1;transform:translateY(-1px)}
 .brand-link img,.brand-link svg{display:block;width:auto;max-width:190px;height:44px;object-fit:contain;filter:brightness(0) invert(1) contrast(1.06);mix-blend-mode:screen}
 .brand-x img{height:30px;width:30px;filter:brightness(0) invert(1)}
-.brand-base img{height:36px;max-width:176px;filter:none;mix-blend-mode:normal}
+.brand-base img{height:28px;max-width:142px;filter:none;mix-blend-mode:normal}
 .brand-ens img{height:28px}
 .brand-protocol img{height:42px;max-width:244px}
 .feature-promo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),520px));justify-content:center;gap:20px}
@@ -115235,7 +115235,7 @@ var HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1px
   .brand-link{min-width:96px;min-height:38px}
   .brand-link img,.brand-link svg{max-width:130px;height:34px}
   .brand-x svg{height:24px;width:24px}
-  .brand-base img{height:28px;max-width:134px}
+  .brand-base img{height:22px;max-width:112px}
   .brand-ens img{height:23px}
   .brand-protocol img{height:34px;max-width:198px}
   .feature-promo-grid{grid-template-columns:1fr}
