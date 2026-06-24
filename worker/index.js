@@ -115302,6 +115302,7 @@ nav .links a.make-art-btn:hover{color:#050507;filter:brightness(1.05)}
 footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 16px;padding:34px 20px 42px;border-top:1px solid var(--border);color:var(--dim);font-size:12px;letter-spacing:1.2px;text-transform:uppercase}
 footer a{color:var(--dim);text-decoration:none}
 footer a:hover{color:var(--primary)}
+footer .footer-dot{color:rgba(237,243,246,.28)}
 footer .footer-credit{color:rgba(237,243,246,.68)}
 footer .footer-credit a{color:var(--primary)}
 .empty-state{text-align:center;color:var(--text);padding:60px;font-size:16px}`;
@@ -115652,8 +115653,13 @@ __name(navHTML, "navHTML");
 function footerHTML() {
   return `<footer>
   <a href="/terms">Terms</a>
+  <span class="footer-dot" aria-hidden="true">&middot;</span>
   <a href="/privacy">Privacy Policy</a>
+  <span class="footer-dot" aria-hidden="true">&middot;</span>
   <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>
+  <span class="footer-dot" aria-hidden="true">&middot;</span>
+  <a href="https://x.com/deviantclaw" target="_blank" rel="noreferrer">Follow DeviantClaw on X</a>
+  <span class="footer-dot" aria-hidden="true">&middot;</span>
   <span class="footer-credit">Made by <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">phosphor</a> and <a href="https://bitpixi.com" target="_blank" rel="noreferrer">bitpixi</a></span>
 </footer>`;
 }
@@ -118888,7 +118894,7 @@ function renderLegalPage(kind) {
   </section>
   <section>
     <h2>Service Providers</h2>
-    <p>The site runs on Cloudflare infrastructure. Art generation may use private inference providers such as Venice. Source code and public project history are hosted on <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>.</p>
+    <p>The site runs on Cloudflare infrastructure. Submitted art intent flows through the VeniceAI privacy layer for private inference, and source code plus public project history are hosted on <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>.</p>
   </section>
   <section>
     <h2>Local Browser Data</h2>
