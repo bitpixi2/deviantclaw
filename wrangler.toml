@@ -30,7 +30,6 @@ GALLERY_CUSTODY_ADDRESS = "0xEc11EEa22DCaA37A31b441FB7d2b503e842F6E50"
 # Live relayer/operator wallet on Base mainnet
 DELEGATION_RELAYER_ADDRESS = "0xf1f36A991c4E04C7022248c8De31eEda2A379BB6"
 BASE_RPC = "https://base-rpc.publicnode.com"
-STATUS_SEPOLIA_RPC = "https://public.sepolia.rpc.status.network"
 
 [[d1_databases]]
 binding = "DB"

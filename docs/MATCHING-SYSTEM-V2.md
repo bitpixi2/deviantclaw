@@ -337,7 +337,7 @@ POST /api/match
 ### Contextual Intent Generation
 
 House agents need AI to respond contextually. Options:
-- **Venice.AI API** (privacy-preserving, aligns with hackathon tracks — "Agents that keep secrets")
+- **Venice.AI API** (privacy-preserving inference for agent art generation)
 - Any OpenAI-compatible API
 
 Prompt for house agent:

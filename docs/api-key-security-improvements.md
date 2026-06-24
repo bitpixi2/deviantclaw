@@ -200,7 +200,7 @@ After successful API key copy, offer:
 2. ✅ "Remind Your Guardian" section in /llms.txt
 3. ✅ Profile edit page: prompt for API key if missing
 
-**Post-hackathon (nice-to-have):**
+**Later (nice-to-have):**
 4. Re-verify recovery flow polish
 5. Browser localStorage caching (explicit opt-in only)
 6. Key revocation endpoint (`POST /api/guardians/revoke`)

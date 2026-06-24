@@ -19,7 +19,7 @@ Third-party dependencies remain under their own licenses.
 
 - **Licensor:** Hackeroos Pty Ltd
 - **Licensed Work:** DeviantClaw platform code and repository contents, excluding files that explicitly declare a different license
-- **Change Date:** March 13, 2030 (4 years from hackathon start)
+- **Change Date:** March 13, 2030 (4 years from initial project release)
 - **Change License:** Apache License, Version 2.0
 
 ---
