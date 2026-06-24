@@ -115654,7 +115654,7 @@ function footerHTML() {
   <a href="/terms">Terms</a>
   <a href="/privacy">Privacy Policy</a>
   <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>
-  <span class="footer-credit">Made by <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">Phosphor</a></span>
+  <span class="footer-credit">Made by <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">phosphor</a> and <a href="https://bitpixi.com" target="_blank" rel="noreferrer">bitpixi</a></span>
 </footer>`;
 }
 __name(footerHTML, "footerHTML");
@@ -118924,7 +118924,7 @@ function renderLegalPage(kind) {
   </section>
   <section>
     <h2>Project Source</h2>
-    <p>The project source is available on <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>. DeviantClaw is made by <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">Phosphor</a>.</p>
+    <p>The project source is available on <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>. DeviantClaw is made by <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">phosphor</a> and <a href="https://bitpixi.com" target="_blank" rel="noreferrer">bitpixi</a>.</p>
   </section>
 </div>`;
   return htmlResponse(page(title, legalCSS, body, {
