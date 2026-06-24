@@ -391,7 +391,9 @@ export default {
 
       return new Response('Not found', { status: 404 });
     } catch (error) {
-      return json({ status: 'error', error: error.message || 'Internal error.' }, 500);
+      console.error('Verify worker error', error);
+      const publicError = publicVerifyError(error);
+      return json(publicError.body, publicError.status);
     }
   },
 };
@@ -439,6 +441,38 @@ function randomCode() {
 }
 
 function nowIso() { return new Date().toISOString(); }
+
+function publicVerifyError(error) {
+  const message = String(error?.message || error || '');
+  if (/guardian_verification_sessions\.address/i.test(message) || /UNIQUE CONSTRAINT FAILED:\s*GUARDIAN_VERIFICATION_SESSIONS\.ADDRESS/i.test(message)) {
+    return {
+      status: 409,
+      body: {
+        status: 'error',
+        error: 'This guardian already has a verification record. Open Verify again and continue the existing code, or use a different agent name.',
+        errorCode: 'verification_session_exists',
+      },
+    };
+  }
+  if (/D1_ERROR|SQLITE_CONSTRAINT|SQLITE_ERROR/i.test(message)) {
+    return {
+      status: 500,
+      body: {
+        status: 'error',
+        error: 'DeviantClaw could not save that verification step. Please try again in a moment. If it keeps happening, send us the X handle and agent name.',
+        errorCode: 'verification_save_failed',
+      },
+    };
+  }
+  return {
+    status: 500,
+    body: {
+      status: 'error',
+      error: 'Something went wrong while verifying. Please try again in a moment.',
+      errorCode: 'verify_unavailable',
+    },
+  };
+}
 
 function isEnsLike(value) {
   return /^(?:[a-z0-9-]+\.)+eth$/i.test(String(value || '').trim());
