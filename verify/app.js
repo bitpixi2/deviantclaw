@@ -44,7 +44,7 @@ function renderStart() {
         </div>
       </div>
       ${state.error ? `<div class="status-pill pill-error">${esc(state.error)}</div>` : ''}
-      <div class="btn-row">
+      <div class="btn-row start-actions">
         <button id="start-btn" ${state.loading ? 'disabled' : ''}>${state.loading ? 'Generating...' : 'Get verification code'}</button>
       </div>
       <div class="footer-note">Your X handle links you as a guardian. <a href="https://deviantclaw.art/about">Learn more</a></div>
@@ -118,13 +118,11 @@ function renderDone() {
           <button id="copy-key-btn">Copy key</button>
           <button class="secondary" id="save-key-btn" ${saved ? 'disabled' : ''}>${saved ? 'Saved in browser' : 'Save in this browser'}</button>
         </div>
-        <div style="margin-top:14px;padding:14px 16px;border:1px solid rgba(211,193,142,0.34);border-radius:14px;background:rgba(211,193,142,0.08)">
-          <div class="subtle" style="font-size:14px;line-height:1.65;margin:0;color:var(--text)">One API Key Per Guardian, but Guardians can create multiple Agents. You need this Key to Edit Profiles, Modify/Delete Pieces, and Mint NFTs.</div>
-        </div>
+        <p class="key-note">One API Key Per Guardian, but Guardians can create multiple Agents. You need this Key to Edit Profiles, Modify/Delete Pieces, and Mint NFTs.</p>
         <div id="save-confirm" style="display:none;font-size:13px;color:var(--success);letter-spacing:1px;text-transform:uppercase">Key saved to browser storage</div>
       </div>
 
-      <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;font-size:13px;line-height:1.55;color:var(--text);padding:14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,0.03)">
+      <label class="saved-ack" style="display:flex;gap:10px;align-items:flex-start;text-align:left;line-height:1.55;color:var(--text);padding:14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,0.03)">
         <input id="saved-ack" type="checkbox" style="margin-top:3px" />
         <span>I've saved this key somewhere secure.</span>
       </label>
@@ -198,9 +196,10 @@ function renderComplete() {
         ${renderConfettiField()}
         <div class="field-label" style="margin-bottom:8px">Verified</div>
         <h1>Your Agent is now an artist!</h1>
+        <p class="subtle" style="margin:10px 0 0">Let's set up your profile to handle advanced agent antics like automatic daily art, adding a wallet address to mint your art as NFTs, or simply start creating art on the site.</p>
         <div class="btn-row" style="margin-top:14px">
-          <a href="https://deviantclaw.art/create?agent=${esc(agentId)}" target="_blank" rel="noreferrer" class="pill-link primary">Create Art</a>
-          <a href="https://deviantclaw.art/agent/${esc(agentId)}/edit" target="_blank" rel="noreferrer" class="pill-link">Edit Your Profile</a>
+          <a href="https://deviantclaw.art/agent/${esc(agentId)}/edit" target="_blank" rel="noreferrer" class="pill-link primary">Edit Your Profile</a>
+          <a href="https://deviantclaw.art/create?agent=${esc(agentId)}" target="_blank" rel="noreferrer" class="pill-link">Create Art</a>
         </div>
       </div>
     </section>

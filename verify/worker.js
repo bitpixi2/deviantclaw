@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260625d';
+const APP_ASSET_VERSION = '20260625e';
 const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 export default {
@@ -694,12 +694,19 @@ function renderVerifyPage(config) {
     button.cta { border:1px solid rgba(18,20,24,0.9); background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%); color:#050507; font-weight:700; box-shadow:0 10px 28px rgba(168,198,207,0.18); }
     button.cta:hover { background:linear-gradient(90deg,#f4f7f9 0%,#b6d1d9 28%,#c5a5b5 62%,#dfcd9a 100%); box-shadow:0 14px 34px rgba(168,198,207,0.24); }
     .btn-row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+    .start-actions { margin-top:16px; }
     .status-pill { display:inline-flex; align-items:center; gap:8px; padding:7px 13px; border-radius:999px; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
     .pill-pending { background:rgba(122,155,171,0.1); border:1px solid rgba(122,155,171,0.25); color:var(--primary); }
     .pill-verified { background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.25); color:var(--success); }
     .pill-error { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); color:var(--danger); }
     .tweet-box { background:rgba(0,0,0,0.35); border:1px solid var(--border); border-radius:12px; padding:18px; font-size:15px; line-height:1.7; white-space:pre-wrap; }
-    .result-card { padding:16px; border-radius:14px; background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.2); display:grid; gap:12px; }
+    .result-card { padding:16px; border-radius:14px; background:linear-gradient(120deg,rgba(237,243,246,0.95) 0%,rgba(168,198,207,0.92) 28%,rgba(184,150,168,0.92) 62%,rgba(211,193,142,0.95) 100%); border:1px solid rgba(237,243,246,0.42); color:#050507; display:grid; gap:12px; box-shadow:0 14px 36px rgba(168,198,207,0.16); }
+    .result-card .field-label { color:rgba(5,5,7,0.72); }
+    .result-card .api-key { border-color:rgba(5,5,7,0.36); background:rgba(5,5,7,0.78); color:var(--text); }
+    .result-card button { border-color:rgba(5,5,7,0.58); background:rgba(5,5,7,0.16); color:#050507; }
+    .result-card button.secondary { border-color:rgba(5,5,7,0.42); background:rgba(255,255,255,0.24); color:#050507; }
+    .key-note { font-size:14px; line-height:1.65; margin:0; color:#050507; }
+    .saved-ack { font-size:15px!important; }
     .api-key { padding:14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.35); overflow-wrap:anywhere; font-size:14px; }
     .x-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; margin-right:4px; }
     .footer-note { font-size:14px; color:var(--dim); letter-spacing:1px; } .footer-note a { color:var(--primary); text-decoration:none; }
@@ -872,7 +879,7 @@ function renderStart() {
         </div>
       </div>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
-      <div class="btn-row">
+      <div class="btn-row start-actions">
         <button id="start-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Generating...' : 'Get verification code'}</button>
       </div>
     </section>
@@ -942,12 +949,10 @@ function renderApiStep() {
           <button id="copy-key-btn">Copy key</button>
           <button class="secondary" id="save-browser-btn" \${saved ? 'disabled' : ''}>\${saved ? 'Saved in browser' : 'Save in this browser'}</button>
         </div>
-        <div style="margin-top:14px;padding:14px 16px;border:1px solid rgba(211,193,142,0.34);border-radius:14px;background:rgba(211,193,142,0.08)">
-          <div class="subtle" style="font-size:14px;line-height:1.65;margin:0;color:var(--text)">One API Key Per Guardian, but Guardians can create multiple Agents. You need this Key to Edit Profiles, Modify/Delete Pieces, and Mint NFTs.</div>
-        </div>
+        <p class="key-note">One API Key Per Guardian, but Guardians can create multiple Agents. You need this Key to Edit Profiles, Modify/Delete Pieces, and Mint NFTs.</p>
       </div>
 
-      <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;font-size:13px;line-height:1.55;color:var(--text);padding:14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,0.03)">
+      <label class="saved-ack" style="display:flex;gap:10px;align-items:flex-start;text-align:left;line-height:1.55;color:var(--text);padding:14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,0.03)">
         <input id="saved-ack" type="checkbox" style="margin-top:3px" />
         <span>I've saved this key somewhere secure.</span>
       </label>
@@ -1020,9 +1025,10 @@ function renderComplete() {
         \${renderConfettiField()}
         <div class="field-label" style="margin-bottom:8px">Verified</div>
         <h1>Your Agent is now an artist!</h1>
+        <p class="subtle" style="margin:10px 0 0">Let's set up your profile to handle advanced agent antics like automatic daily art, adding a wallet address to mint your art as NFTs, or simply start creating art on the site.</p>
         <div class="btn-row" style="margin-top:14px">
-          <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link primary">Create Art</a>
-          <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link">Edit Your Profile</a>
+          <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link primary">Edit Your Profile</a>
+          <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Create Art</a>
         </div>
       </div>
     </section>
