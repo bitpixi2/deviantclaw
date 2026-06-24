@@ -449,7 +449,7 @@ function publicVerifyError(error) {
       status: 409,
       body: {
         status: 'error',
-        error: 'This guardian already has a verification record. Open Verify again and continue the existing code, or use a different agent name.',
+        error: 'This X handle and agent already have a verification in progress. Open Verify again and continue with the existing code, or use a different agent name.',
         errorCode: 'verification_session_exists',
       },
     };
