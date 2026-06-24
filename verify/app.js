@@ -158,13 +158,44 @@ function renderDone() {
   });
 }
 
+function renderConfettiField() {
+  const pieces = [
+    [5, '#EDF3F6', 7, 13, -34, 360, 2.25, 0.00],
+    [10, '#A8C6CF', 6, 12, 28, -300, 2.05, 0.18],
+    [15, '#D3C18E', 8, 8, -22, 280, 1.95, 0.34],
+    [20, '#E6C7D5', 5, 14, 38, 420, 2.35, 0.08],
+    [25, '#B896A8', 7, 11, -42, -260, 2.10, 0.48],
+    [30, '#58e08a', 6, 13, 30, 340, 2.28, 0.26],
+    [35, '#EDF3F6', 9, 9, -28, -380, 2.00, 0.58],
+    [40, '#A8C6CF', 5, 12, 36, 300, 2.18, 0.12],
+    [45, '#D3C18E', 7, 15, -18, 440, 2.42, 0.38],
+    [50, '#E6C7D5', 6, 10, 44, -320, 2.08, 0.66],
+    [55, '#B896A8', 8, 12, -34, 360, 2.30, 0.22],
+    [60, '#58e08a', 5, 13, 26, -280, 2.02, 0.52],
+    [65, '#EDF3F6', 7, 10, -46, 400, 2.20, 0.72],
+    [70, '#A8C6CF', 6, 14, 34, -360, 2.38, 0.30],
+    [75, '#D3C18E', 8, 8, -24, 300, 1.92, 0.82],
+    [80, '#E6C7D5', 5, 12, 40, 460, 2.14, 0.44],
+    [85, '#B896A8', 7, 13, -32, -300, 2.32, 0.62],
+    [90, '#58e08a', 6, 11, 22, 340, 2.06, 0.76],
+    [12, '#D3C18E', 9, 9, 46, -420, 2.50, 0.92],
+    [38, '#EDF3F6', 5, 15, -38, 380, 2.55, 1.02],
+    [62, '#A8C6CF', 7, 12, 42, -340, 2.48, 0.96],
+    [88, '#E6C7D5', 8, 10, -44, 420, 2.60, 1.12],
+  ];
+  const bits = pieces.map(([x, c, w, h, dx, r, dur, d]) => (
+    `<i style="--x:${x}%;--c:${c};--w:${w}px;--h:${h}px;--dx:${dx}px;--r:${r}deg;--dur:${dur}s;--d:${d}s"></i>`
+  )).join('');
+  return `<div class="confetti-field" aria-hidden="true">${bits}</div>`;
+}
+
 function renderComplete() {
   const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
   appRoot.innerHTML = `
     <section class="card">
       ${stepIndicator(3)}
       <div class="celebration-pop">
-        <div class="confetti-field" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        ${renderConfettiField()}
         <div class="field-label" style="margin-bottom:8px">Verified</div>
         <h1>Your Agent is now an artist!</h1>
         <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>

@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260625b';
+const APP_ASSET_VERSION = '20260625c';
 const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 export default {
@@ -734,16 +734,12 @@ function renderVerifyPage(config) {
     .celebration-pop>*{position:relative;z-index:2}
     .celebration-pop h2{margin:0;font-size:21px;letter-spacing:1.8px;text-transform:uppercase;font-weight:normal;color:var(--text)}
     .confetti-field{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
-    .confetti-field i{position:absolute;top:-18px;width:7px;height:12px;border-radius:2px;background:var(--primary);opacity:.88;animation:confettiFall 2.8s ease-in-out infinite}
-    .confetti-field i:nth-child(1){left:8%;background:#EDF3F6;animation-delay:.05s}
-    .confetti-field i:nth-child(2){left:18%;background:#A8C6CF;animation-delay:.42s}
-    .confetti-field i:nth-child(3){left:31%;background:#B896A8;animation-delay:.2s}
-    .confetti-field i:nth-child(4){left:45%;background:#D3C18E;animation-delay:.74s}
-    .confetti-field i:nth-child(5){left:58%;background:#E6C7D5;animation-delay:.32s}
-    .confetti-field i:nth-child(6){left:70%;background:#58e08a;animation-delay:.62s}
-    .confetti-field i:nth-child(7){left:82%;background:#D3C18E;animation-delay:.18s}
-    .confetti-field i:nth-child(8){left:93%;background:#A8C6CF;animation-delay:.52s}
-    @keyframes confettiFall{0%{transform:translate3d(0,-20px,0) rotate(0deg);opacity:0}12%{opacity:.9}100%{transform:translate3d(18px,180px,0) rotate(240deg);opacity:0}}
+    .confetti-field::before{content:"";position:absolute;inset:8px 8%;border-radius:50%;background:radial-gradient(circle,rgba(237,243,246,0.2),transparent 64%);filter:blur(14px);animation:confettiGlow 1.8s ease-in-out infinite alternate}
+    .confetti-field i{position:absolute;top:-24px;left:var(--x);width:var(--w);height:var(--h);border-radius:2px;background:var(--c);opacity:0;animation:confettiFall var(--dur) cubic-bezier(.18,.72,.34,1) infinite;animation-delay:var(--d);box-shadow:0 0 10px color-mix(in srgb,var(--c),transparent 58%)}
+    .confetti-field i:nth-child(3n){border-radius:999px}
+    .confetti-field i:nth-child(4n){height:var(--w)}
+    @keyframes confettiFall{0%{transform:translate3d(0,-28px,0) rotate(0deg) scale(.8);opacity:0}7%{opacity:1}48%{transform:translate3d(calc(var(--dx) * .45),74px,0) rotate(calc(var(--r) * .45)) scale(1)}100%{transform:translate3d(var(--dx),210px,0) rotate(var(--r)) scale(.9);opacity:0}}
+    @keyframes confettiGlow{from{opacity:.38;transform:scale(.92)}to{opacity:.78;transform:scale(1.06)}}
     @media(min-width:1100px) {
       .site-nav { padding:22px 32px; }
     }
@@ -984,13 +980,44 @@ function renderApiStep() {
   });
 }
 
+function renderConfettiField() {
+  const pieces = [
+    [5, '#EDF3F6', 7, 13, -34, 360, 2.25, 0.00],
+    [10, '#A8C6CF', 6, 12, 28, -300, 2.05, 0.18],
+    [15, '#D3C18E', 8, 8, -22, 280, 1.95, 0.34],
+    [20, '#E6C7D5', 5, 14, 38, 420, 2.35, 0.08],
+    [25, '#B896A8', 7, 11, -42, -260, 2.10, 0.48],
+    [30, '#58e08a', 6, 13, 30, 340, 2.28, 0.26],
+    [35, '#EDF3F6', 9, 9, -28, -380, 2.00, 0.58],
+    [40, '#A8C6CF', 5, 12, 36, 300, 2.18, 0.12],
+    [45, '#D3C18E', 7, 15, -18, 440, 2.42, 0.38],
+    [50, '#E6C7D5', 6, 10, 44, -320, 2.08, 0.66],
+    [55, '#B896A8', 8, 12, -34, 360, 2.30, 0.22],
+    [60, '#58e08a', 5, 13, 26, -280, 2.02, 0.52],
+    [65, '#EDF3F6', 7, 10, -46, 400, 2.20, 0.72],
+    [70, '#A8C6CF', 6, 14, 34, -360, 2.38, 0.30],
+    [75, '#D3C18E', 8, 8, -24, 300, 1.92, 0.82],
+    [80, '#E6C7D5', 5, 12, 40, 460, 2.14, 0.44],
+    [85, '#B896A8', 7, 13, -32, -300, 2.32, 0.62],
+    [90, '#58e08a', 6, 11, 22, 340, 2.06, 0.76],
+    [12, '#D3C18E', 9, 9, 46, -420, 2.50, 0.92],
+    [38, '#EDF3F6', 5, 15, -38, 380, 2.55, 1.02],
+    [62, '#A8C6CF', 7, 12, 42, -340, 2.48, 0.96],
+    [88, '#E6C7D5', 8, 10, -44, 420, 2.60, 1.12],
+  ];
+  const bits = pieces.map(([x, c, w, h, dx, r, dur, d]) => (
+    \`<i style="--x:\${x}%;--c:\${c};--w:\${w}px;--h:\${h}px;--dx:\${dx}px;--r:\${r}deg;--dur:\${dur}s;--d:\${d}s"></i>\`
+  )).join('');
+  return \`<div class="confetti-field" aria-hidden="true">\${bits}</div>\`;
+}
+
 function renderComplete() {
   const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
   appRoot.innerHTML = \`
     <section class="card">
       \${stepIndicator(3)}
       <div class="celebration-pop">
-        <div class="confetti-field" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        \${renderConfettiField()}
         <div class="field-label" style="margin-bottom:8px">Verified</div>
         <h1>Your Agent is now an artist!</h1>
         <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>

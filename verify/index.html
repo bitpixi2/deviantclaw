@@ -48,16 +48,12 @@
     .celebration-pop>*{position:relative;z-index:2}
     .celebration-pop h2{margin:0;font-size:21px;letter-spacing:1.8px;text-transform:uppercase;font-weight:normal;color:var(--text)}
     .confetti-field{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
-    .confetti-field i{position:absolute;top:-18px;width:7px;height:12px;border-radius:2px;background:var(--primary);opacity:.88;animation:confettiFall 2.8s ease-in-out infinite}
-    .confetti-field i:nth-child(1){left:8%;background:#EDF3F6;animation-delay:.05s}
-    .confetti-field i:nth-child(2){left:18%;background:#A8C6CF;animation-delay:.42s}
-    .confetti-field i:nth-child(3){left:31%;background:#B896A8;animation-delay:.2s}
-    .confetti-field i:nth-child(4){left:45%;background:#D3C18E;animation-delay:.74s}
-    .confetti-field i:nth-child(5){left:58%;background:#E6C7D5;animation-delay:.32s}
-    .confetti-field i:nth-child(6){left:70%;background:#58e08a;animation-delay:.62s}
-    .confetti-field i:nth-child(7){left:82%;background:#D3C18E;animation-delay:.18s}
-    .confetti-field i:nth-child(8){left:93%;background:#A8C6CF;animation-delay:.52s}
-    @keyframes confettiFall{0%{transform:translate3d(0,-20px,0) rotate(0deg);opacity:0}12%{opacity:.9}100%{transform:translate3d(18px,180px,0) rotate(240deg);opacity:0}}
+    .confetti-field::before{content:"";position:absolute;inset:8px 8%;border-radius:50%;background:radial-gradient(circle,rgba(237,243,246,0.2),transparent 64%);filter:blur(14px);animation:confettiGlow 1.8s ease-in-out infinite alternate}
+    .confetti-field i{position:absolute;top:-24px;left:var(--x);width:var(--w);height:var(--h);border-radius:2px;background:var(--c);opacity:0;animation:confettiFall var(--dur) cubic-bezier(.18,.72,.34,1) infinite;animation-delay:var(--d);box-shadow:0 0 10px color-mix(in srgb,var(--c),transparent 58%)}
+    .confetti-field i:nth-child(3n){border-radius:999px}
+    .confetti-field i:nth-child(4n){height:var(--w)}
+    @keyframes confettiFall{0%{transform:translate3d(0,-28px,0) rotate(0deg) scale(.8);opacity:0}7%{opacity:1}48%{transform:translate3d(calc(var(--dx) * .45),74px,0) rotate(calc(var(--r) * .45)) scale(1)}100%{transform:translate3d(var(--dx),210px,0) rotate(var(--r)) scale(.9);opacity:0}}
+    @keyframes confettiGlow{from{opacity:.38;transform:scale(.92)}to{opacity:.78;transform:scale(1.06)}}
     @media(max-width:640px) { .shell { width:min(100vw - 16px,640px); } h1 { font-size:24px; } }
   </style>
 </head>
@@ -72,7 +68,7 @@
   <script>
     window.__VERIFY_CONFIG__ = {"origin":"https://verify.deviantclaw.art"};
   </script>
-  <script type="module" src="/app.js?v=20260625b"></script>
+  <script type="module" src="/app.js?v=20260625c"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"499935fa47124ef4bd793371ed742eb7","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
