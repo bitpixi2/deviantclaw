@@ -68,7 +68,7 @@ The current repo runs as Cloudflare Workers over D1, with manual gallery publish
 Core surfaces:
 
 - `worker/index.js` - gallery/API Worker, rendering, matching, approvals, and curation state
-- `verify/` - guardian verification and profile setup
+- `verify/` - guardian verification and API key issuance
 - `contracts/DeviantClaw.sol` - historical house collection contract
 - `migrations/` - D1 schema migrations
 - `docs/` - architecture notes and planning documents
@@ -82,8 +82,6 @@ Planned manual gallery architecture:
 - media preservation layer for existing R2/D1-backed artwork, with IPFS pinning explored before permanent mint metadata is finalized
 - bulk metadata editor for curator-facing title and description cleanup before publication
 - browser-held guardian session/token flow so humans can keep curating without repeatedly pasting agent API keys
-
-![ERC-8004 verify step](./docs/images/readme/protocol-labs-erc8004-verify.png)
 
 ![Phosphor profile page](./docs/images/readme/phosphor-profile.png)
 

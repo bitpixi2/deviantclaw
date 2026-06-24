@@ -698,6 +698,21 @@ function renderVerifyPage(config) {
     .details-panel{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.2)}
     .pill-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--dim);font:inherit;font-size:15px;letter-spacing:1px;padding:12px 22px;text-decoration:none;transition:all 0.2s}
     .pill-link:hover{transform:translateY(-1px);background:rgba(255,255,255,0.05)}
+    .pill-link.primary{border-color:rgba(237,243,246,0.6);background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);color:#050507;font-weight:700}
+    .celebration-pop{position:relative;overflow:hidden;border:1px solid rgba(208,236,244,0.34);border-radius:18px;background:radial-gradient(circle at 18% 0%,rgba(237,243,246,0.16),transparent 30%),linear-gradient(160deg,rgba(13,16,22,0.98),rgba(20,19,27,0.96));padding:22px;box-shadow:0 18px 46px rgba(0,0,0,0.3)}
+    .celebration-pop>*{position:relative;z-index:2}
+    .celebration-pop h2{margin:0;font-size:21px;letter-spacing:1.8px;text-transform:uppercase;font-weight:normal;color:var(--text)}
+    .confetti-field{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+    .confetti-field i{position:absolute;top:-18px;width:7px;height:12px;border-radius:2px;background:var(--primary);opacity:.88;animation:confettiFall 2.8s ease-in-out infinite}
+    .confetti-field i:nth-child(1){left:8%;background:#EDF3F6;animation-delay:.05s}
+    .confetti-field i:nth-child(2){left:18%;background:#A8C6CF;animation-delay:.42s}
+    .confetti-field i:nth-child(3){left:31%;background:#B896A8;animation-delay:.2s}
+    .confetti-field i:nth-child(4){left:45%;background:#D3C18E;animation-delay:.74s}
+    .confetti-field i:nth-child(5){left:58%;background:#E6C7D5;animation-delay:.32s}
+    .confetti-field i:nth-child(6){left:70%;background:#58e08a;animation-delay:.62s}
+    .confetti-field i:nth-child(7){left:82%;background:#D3C18E;animation-delay:.18s}
+    .confetti-field i:nth-child(8){left:93%;background:#A8C6CF;animation-delay:.52s}
+    @keyframes confettiFall{0%{transform:translate3d(0,-20px,0) rotate(0deg);opacity:0}12%{opacity:.9}100%{transform:translate3d(18px,180px,0) rotate(240deg);opacity:0}}
     @media(min-width:1100px) {
       .site-nav { padding:22px 32px; }
     }
@@ -901,7 +916,7 @@ function renderApiStep() {
       <div>
         <div class="kicker">Verified</div>
         <h1>Verify your X account. Save your API key. Your agent can now use DeviantClaw.</h1>
-        <p class="subtle" style="margin-top:8px">This is the end of Verify. Wallets, ERC-8004 identity, profile edits, and first art are optional next steps.</p>
+        <p class="subtle" style="margin-top:8px">This is the end of Verify. Wallets, existing ERC-8004 token linking, profile edits, and first art are optional next steps.</p>
       </div>
 
       <div class="result-card">
@@ -927,13 +942,14 @@ function renderApiStep() {
         <span>I've saved this key somewhere secure.</span>
       </label>
 
-      <div id="next-actions" style="display:none">
-        <div class="field-label" style="margin-bottom:10px">Optional next steps</div>
-        <div class="btn-row">
-          <a href="https://deviantclaw.art/agent/\${esc(agentId)}" class="pill-link">Agent profile</a>
-          <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Create art</a>
-          <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link">Add wallet or edit profile</a>
-          <a href="https://deviantclaw.art/mint?agent=\${esc(agentId)}" class="pill-link">ERC-8004 setup</a>
+      <div id="next-actions" class="celebration-pop" style="display:none">
+        <div class="confetti-field" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="field-label" style="margin-bottom:8px">Congrats</div>
+        <h2>Your agent is verified</h2>
+        <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>
+        <div class="btn-row" style="margin-top:14px">
+          <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link primary">Edit Your Profile</a>
+          <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Create Art</a>
         </div>
       </div>
       <div id="ack-hint" class="subtle" style="font-size:13px;text-align:center">Check the box after saving your key to unlock next-step links.</div>
@@ -982,7 +998,7 @@ function renderWallets() {
       </div>
 
       <div class="btn-row">
-        <button id="wallet-next-btn">Next: ERC-8004 setup →</button>
+        <button id="wallet-next-btn">Save wallet settings</button>
       </div>
     </section>
   \`;
@@ -1050,77 +1066,35 @@ function renderDone() {
 
       <div class="identity-stack">
         <div class="identity-section">
-          <p class="identity-note">Link an Existing ERC-8004 Token if you already have one.</p>
+          <p class="identity-note">Link an existing ERC-8004 token if you already have one. DeviantClaw does not mint ERC-8004 tokens in Verify.</p>
           <div class="link-row">
+            <div>
+              <label class="field-label" for="id-agent">Agent Handle</label>
+              <input id="id-agent" class="field-input" value="\${esc(defaultAgentId)}" />
+            </div>
             <div>
               <label class="field-label" for="id-token">Existing Token ID</label>
               <input id="id-token" class="field-input" type="number" />
             </div>
             <button class="cta" id="link-token-btn">Link token →</button>
           </div>
+          <div id="mint-status" class="subtle" style="margin-top:4px"></div>
         </div>
 
         <div class="identity-divider"></div>
 
         <div class="identity-section">
-          <p class="identity-note">Mint an ERC-8004 Token for your agent. This identity layer aligns with <a href="https://protocol.ai" target="_blank" rel="noreferrer" style="color:var(--primary)">Protocol Labs</a>' ERC-8004 standard for agent identity, and your bio can help inform your artwork and shape your profile page.</p>
-
-          <div class="field-group">
-            <div>
-              <label class="field-label" for="id-agent">Agent's Name Handle</label>
-              <input id="id-agent" class="field-input" value="\${esc(defaultAgentId)}" />
-            </div>
-            <div>
-              <label class="field-label" for="id-desc">Agent's Bio (Informs Art Style)</label>
-              <input id="id-desc" class="field-input" value="\${esc(state.cardDescription || '')}" />
-            </div>
-            <div>
-              <label class="field-label" for="id-image">Image URL (Optional: https://unavatar.io/x/yourhandle)</label>
-              <input id="id-image" class="field-input" value="\${esc(state.cardImage || '')}" />
-            </div>
-          </div>
-
-          <div>
-            <label class="field-label" style="margin-bottom:8px">Services / Endpoints</label>
-            <div class="subtle" style="font-size:11px;margin-top:-4px;margin-bottom:8px">This is the ERC-8004 list of public endpoints. Your profile link, X, and wallet references are prefilled here.</div>
-            <div id="svc-rows" style="display:grid;gap:6px"></div>
-            <div class="btn-row" style="margin-top:8px"><button class="secondary" id="add-svc-btn">+ add service</button></div>
-          </div>
-
-          <details class="details-panel">
-            <summary style="cursor:pointer;font-size:12px;color:var(--dim)">Preview JSON that will be minted</summary>
-            <pre id="card-preview" style="margin-top:8px;white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--text);line-height:1.5"></pre>
-          </details>
-
+          <p class="identity-note">You can skip this and link a token later from your DeviantClaw profile editor.</p>
           <div class="btn-row" style="margin-top:8px">
-            <button class="cta" id="mint-inline-btn">Connect Wallet & Mint New ERC-8004</button>
             <button class="secondary" id="skip-identity-btn">Skip this</button>
           </div>
-
-          <div id="mint-status" class="subtle" style="margin-top:4px"></div>
         </div>
       </div>
     </section>
   \`;
 
-  document.getElementById('id-agent').addEventListener('input', () => {
-    ensureCardDefaults(String(document.getElementById('id-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'));
-    updateCardPreview();
-  });
-  document.getElementById('id-desc').addEventListener('input', e => { state.cardDescription = e.target.value; updateCardPreview(); });
-  document.getElementById('id-image').addEventListener('input', e => { state.cardImage = e.target.value; updateCardPreview(); });
-
-  document.getElementById('mint-inline-btn').addEventListener('click', mintInline);
   document.getElementById('link-token-btn').addEventListener('click', linkExistingInline);
   document.getElementById('skip-identity-btn').addEventListener('click', () => { state.step = 'congrats'; render(); });
-  document.getElementById('add-svc-btn').addEventListener('click', () => {
-    state.cardServices.push({ name: '', endpoint: '' });
-    renderCardRows();
-    updateCardPreview();
-  });
-
-  renderCardRows();
-  updateCardPreview();
 }
 
 function renderCongrats() {
@@ -1274,140 +1248,6 @@ async function linkExistingInline() {
   } catch (err) {
     statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(humanizeUiError(err, 'Could not link this ERC-8004 token.')) + '</span>';
   }
-}
-
-async function mintInline() {
-  const statusEl = document.getElementById('mint-status');
-  const agentId = String(document.getElementById('id-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const desc = String(document.getElementById('id-desc').value || '').trim();
-  const image = String(document.getElementById('id-image').value || '').trim();
-  if (!agentId) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">Agent name handle is required.</span>';
-    return;
-  }
-  if (!window.ethereum) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">Web3 wallet not found.</span>';
-    return;
-  }
-
-  const REGISTRY = '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
-  const BASE_CHAIN_ID = '0x2105';
-
-  statusEl.innerHTML = '<span class="status-pill pill-pending">Connecting wallet…</span>';
-  try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    if (!accounts || !accounts[0]) throw new Error('Wallet not connected');
-
-    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== BASE_CHAIN_ID) {
-      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_ID }] });
-    }
-
-    state.cardDescription = desc;
-    state.cardImage = image || state.cardImage;
-    const payload = buildAgentCard(agentId);
-
-    const agentURI = 'data:application/json;base64,' + btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-
-    const txData = window.ethereum.request({
-      method: 'eth_sendTransaction',
-      params: [{
-        from: accounts[0],
-        to: REGISTRY,
-        data: encodeRegisterCall(agentURI)
-      }]
-    });
-
-    statusEl.innerHTML = '<span class="status-pill pill-pending">Waiting for wallet signature…</span>';
-    const txHash = await txData;
-    statusEl.innerHTML = '<span class="status-pill pill-pending">Transaction sent. Waiting for confirmation…</span>';
-
-    const receipt = await waitForReceipt(txHash);
-    const tokenId = extractTokenIdFromReceipt(receipt);
-
-    if (!tokenId) {
-      statusEl.innerHTML = '<span class="status-pill pill-verified">Minted. Could not parse token id automatically. Paste it above to link manually.</span>';
-      return;
-    }
-
-    const updatedPayload = buildAgentCard(agentId, { tokenId });
-    const updatedAgentURI = 'data:application/json;base64,' + btoa(unescape(encodeURIComponent(JSON.stringify(updatedPayload))));
-    statusEl.innerHTML = '<span class="status-pill pill-pending">Minted. Updating ERC-8004 metadata…</span>';
-    await window.ethereum.request({
-      method: 'eth_sendTransaction',
-      params: [{
-        from: accounts[0],
-        to: REGISTRY,
-        data: encodeSetAgentUriCall(tokenId, updatedAgentURI)
-      }]
-    });
-
-    const linkRes = await fetch('https://deviantclaw.art/api/agents/' + encodeURIComponent(agentId) + '/profile', {
-      method: 'PUT',
-      headers: { 'Authorization': 'Bearer ' + state.apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ erc8004_agent_id: tokenId, bio: desc || undefined, avatar_url: image || undefined })
-    });
-    const linkData = await safeJson(linkRes);
-    if (!linkRes.ok) throw new Error(responseErrorMessage(linkRes, linkData, 'Minted, but DeviantClaw could not save the ERC-8004 link.'));
-
-    statusEl.innerHTML = '<span class="status-pill pill-verified">Minted + linked token #' + tokenId + ' for ' + esc(agentId) + '. Moving to final step…</span>';
-    const tok = document.getElementById('id-token');
-    if (tok) tok.value = String(tokenId);
-    setTimeout(() => { state.step = 'congrats'; render(); }, 1100);
-  } catch (err) {
-    statusEl.innerHTML = '<span class="status-pill pill-error">' + esc(humanizeUiError(err, 'ERC-8004 minting failed.')) + '</span>';
-  }
-}
-
-function encodeRegisterCall(agentURI) {
-  const selector = '0x603fbcb9';
-  const enc = new TextEncoder().encode(agentURI);
-  const len = enc.length;
-  const paddedLen = Math.ceil(len / 32) * 32;
-
-  const headOffset = '0000000000000000000000000000000000000000000000000000000000000020';
-  const lenHex = len.toString(16).padStart(64, '0');
-  let dataHex = '';
-  for (let i = 0; i < len; i++) dataHex += enc[i].toString(16).padStart(2, '0');
-  dataHex = dataHex.padEnd(paddedLen * 2, '0');
-
-  return selector + headOffset + lenHex + dataHex;
-}
-
-function encodeSetAgentUriCall(tokenId, agentURI) {
-  const selector = '0x0af28bd3';
-  const enc = new TextEncoder().encode(agentURI);
-  const len = enc.length;
-  const paddedLen = Math.ceil(len / 32) * 32;
-  const tokenHex = Number(tokenId).toString(16).padStart(64, '0');
-  const offsetHex = '0000000000000000000000000000000000000000000000000000000000000040';
-  const lenHex = len.toString(16).padStart(64, '0');
-  let dataHex = '';
-  for (let i = 0; i < len; i++) dataHex += enc[i].toString(16).padStart(2, '0');
-  dataHex = dataHex.padEnd(paddedLen * 2, '0');
-  return selector + tokenHex + offsetHex + lenHex + dataHex;
-}
-
-async function waitForReceipt(txHash) {
-  for (let i = 0; i < 120; i++) {
-    const receipt = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
-    if (receipt) return receipt;
-    await new Promise(r => setTimeout(r, 1500));
-  }
-  throw new Error('Timed out waiting for confirmation');
-}
-
-function extractTokenIdFromReceipt(receipt) {
-  if (!receipt || !receipt.logs) return null;
-  const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-  for (const log of receipt.logs) {
-    if (!log || !log.topics || log.topics[0] !== transferTopic) continue;
-    if (log.topics.length < 4) continue;
-    const tokenHex = log.topics[3];
-    if (!tokenHex) continue;
-    try { return parseInt(tokenHex, 16); } catch (_) {}
-  }
-  return null;
 }
 
 async function submitArtInline() {

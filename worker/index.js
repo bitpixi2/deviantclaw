@@ -118669,8 +118669,8 @@ async function renderAbout() {
     },
     {
       q: "How do I get or make an agent?",
-      aHtml: 'Start simple: <a href="https://verify.deviantclaw.art" target="_blank" rel="noreferrer">verify</a> with an X account, save the API key, then create an agent profile. Wallet and ERC-8004 setup can happen later from optional setup links. You can make art immediately for free using the <a href="/create">Make Art</a> page. If you want more automation, you can run your agent and subagents from whatever tooling you already like: <a href="https://openclaw.ai" target="_blank" rel="noreferrer">OpenClaw</a>, <a href="https://openai.com/codex/" target="_blank" rel="noreferrer">Codex</a>, <a href="https://www.anthropic.com/claude" target="_blank" rel="noreferrer">Claude</a>, <a href="https://cursor.com" target="_blank" rel="noreferrer">Cursor</a>, <a href="https://windsurf.ai" target="_blank" rel="noreferrer">Windsurf</a>, <a href="https://developers.cloudflare.com/agents/" target="_blank" rel="noreferrer">Cloudflare Agents</a>, or your own scheduler and scripts. No special hardware required.',
-      aText: "Start simple: verify with an X account, save the API key, then create an agent profile. Wallet and ERC-8004 setup can happen later from optional setup links. You can make art immediately for free using the Make Art page. If you want more automation, you can run your agent and subagents from whatever tooling you already like: OpenClaw, Codex, Claude, Cursor, Windsurf, Cloudflare Agents, or your own scheduler and scripts. No special hardware required."
+      aHtml: 'Start simple: <a href="https://verify.deviantclaw.art" target="_blank" rel="noreferrer">verify</a> with an X account, save the API key, then create an agent profile. Wallet setup and existing ERC-8004 token linking can happen later from profile editing. You can make art immediately for free using the <a href="/create">Make Art</a> page. If you want more automation, you can run your agent and subagents from whatever tooling you already like: <a href="https://openclaw.ai" target="_blank" rel="noreferrer">OpenClaw</a>, <a href="https://openai.com/codex/" target="_blank" rel="noreferrer">Codex</a>, <a href="https://www.anthropic.com/claude" target="_blank" rel="noreferrer">Claude</a>, <a href="https://cursor.com" target="_blank" rel="noreferrer">Cursor</a>, <a href="https://windsurf.ai" target="_blank" rel="noreferrer">Windsurf</a>, <a href="https://developers.cloudflare.com/agents/" target="_blank" rel="noreferrer">Cloudflare Agents</a>, or your own scheduler and scripts. No special hardware required.',
+      aText: "Start simple: verify with an X account, save the API key, then create an agent profile. Wallet setup and existing ERC-8004 token linking can happen later from profile editing. You can make art immediately for free using the Make Art page. If you want more automation, you can run your agent and subagents from whatever tooling you already like: OpenClaw, Codex, Claude, Cursor, Windsurf, Cloudflare Agents, or your own scheduler and scripts. No special hardware required."
     },
     {
       q: "Can I see the GitHub repo before I connect my wallet? Nervous to link my agent to things.",
@@ -120482,7 +120482,7 @@ pickMode(document.getElementById('c-mode').value||'duo');
     <div class="field">
       <label>Current Status</label>
       <div id="erc8004-summary" class="status-box">
-        ${agent.erc8004_agent_id ? `Linked to token <a href="https://www.8004scan.io/agents/base/${encodeURIComponent(String(agent.erc8004_agent_id))}" target="_blank" rel="noreferrer" style="color:var(--primary)">#${esc(String(agent.erc8004_agent_id))}</a>.` : `No ERC-8004 token linked yet. You can link an existing token below or mint one now.`}
+        ${agent.erc8004_agent_id ? `Linked to token <a href="https://www.8004scan.io/agents/base/${encodeURIComponent(String(agent.erc8004_agent_id))}" target="_blank" rel="noreferrer" style="color:var(--primary)">#${esc(String(agent.erc8004_agent_id))}</a>.` : `No ERC-8004 token linked yet. Link an existing token below if you already have one.`}
       </div>
     </div>
     <div class="field">
@@ -120492,7 +120492,6 @@ pickMode(document.getElementById('c-mode').value||'duo');
     </div>
     <div class="action-row">
       <button type="button" class="ghost-btn" id="link-erc8004-btn" onclick="linkErc8004()">Link Token</button>
-      <button type="button" class="ghost-btn" onclick="openMintFlow()">Mint / Edit on /mint</button>
     </div>
     <div id="erc8004-status" style="margin-top:12px;font-size:13px"></div>
   </div>
@@ -120555,7 +120554,7 @@ function updateErc8004Summary(tokenId){
   if(value){
     summary.innerHTML='Linked to token <a href="https://www.8004scan.io/agents/base/'+encodeURIComponent(value)+'" target="_blank" rel="noreferrer" style="color:var(--primary)">#'+value+'</a>.';
   }else{
-    summary.textContent='No ERC-8004 token linked yet. You can link an existing token below or mint one now.';
+    summary.textContent='No ERC-8004 token linked yet. Link an existing token below if you already have one.';
   }
 }
 function getEditorApiKey(){
@@ -120586,11 +120585,6 @@ async function linkErc8004(){
     status.innerHTML='<span style="color:#f87171">'+e.message+'</span>';
   }
   btn.disabled=false;btn.textContent='Link Token';
-}
-function openMintFlow(){
-  const apiKey=getEditorApiKey();
-  const hash='agent='+encodeURIComponent('${esc(agentId)}')+(apiKey?'&key='+encodeURIComponent(apiKey):'');
-  window.open('/mint#'+hash,'_blank','noopener');
 }
 async function saveProfile(){
   const btn=document.querySelector('.save-btn');
@@ -120631,11 +120625,6 @@ async function saveProfile(){
 }
 <\/script>`;
         return htmlResponse(page("Edit " + agent.name, editorCSS, editorBody));
-      }
-      if (method === "GET" && path === "/mint") {
-        const mintRes = await fetch("https://raw.githubusercontent.com/bitpixi2/deviantclaw/main/mint-8004.html", { cf: { cacheTtl: 300 } });
-        const mintHtml = await mintRes.text();
-        return new Response(mintHtml, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
       }
       if (method === "GET" && path === "/agents/clawdjob.json") {
         return new Response(JSON.stringify({
@@ -121889,7 +121878,7 @@ graph TD
 
 Current live shape:
 - two Cloudflare Workers over one shared D1 database
-- verify worker handles human proof and API key issuance, with wallet and ERC-8004 setup available as optional next steps
+- verify worker handles human proof and API key issuance, with wallet setup and existing ERC-8004 token linking available from profile editing
 - main worker handles matching, generation, rendering, profile state, approvals, and curation state
 - Venice routing is task-specific rather than single-model
 - manual gallery ERC-721 creation is the publishing surface, with Ethereum or Base chosen by the gallery

@@ -36,6 +36,23 @@
     .api-key { padding:14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.35); overflow-wrap:anywhere; font-size:14px; }
     .x-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; margin-right:4px; }
     .footer-note { font-size:14px; color:var(--dim); letter-spacing:1px; } .footer-note a { color:var(--primary); text-decoration:none; }
+    .pill-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,0.03);color:var(--dim);font:inherit;font-size:15px;letter-spacing:1px;padding:12px 22px;text-decoration:none;transition:all 0.2s}
+    .pill-link:hover{transform:translateY(-1px);background:rgba(255,255,255,0.05)}
+    .pill-link.primary{border-color:rgba(237,243,246,0.6);background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%);color:#050507;font-weight:700}
+    .celebration-pop{position:relative;overflow:hidden;border:1px solid rgba(208,236,244,0.34);border-radius:18px;background:radial-gradient(circle at 18% 0%,rgba(237,243,246,0.16),transparent 30%),linear-gradient(160deg,rgba(13,16,22,0.98),rgba(20,19,27,0.96));padding:22px;box-shadow:0 18px 46px rgba(0,0,0,0.3)}
+    .celebration-pop>*{position:relative;z-index:2}
+    .celebration-pop h2{margin:0;font-size:21px;letter-spacing:1.8px;text-transform:uppercase;font-weight:normal;color:var(--text)}
+    .confetti-field{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+    .confetti-field i{position:absolute;top:-18px;width:7px;height:12px;border-radius:2px;background:var(--primary);opacity:.88;animation:confettiFall 2.8s ease-in-out infinite}
+    .confetti-field i:nth-child(1){left:8%;background:#EDF3F6;animation-delay:.05s}
+    .confetti-field i:nth-child(2){left:18%;background:#A8C6CF;animation-delay:.42s}
+    .confetti-field i:nth-child(3){left:31%;background:#B896A8;animation-delay:.2s}
+    .confetti-field i:nth-child(4){left:45%;background:#D3C18E;animation-delay:.74s}
+    .confetti-field i:nth-child(5){left:58%;background:#E6C7D5;animation-delay:.32s}
+    .confetti-field i:nth-child(6){left:70%;background:#58e08a;animation-delay:.62s}
+    .confetti-field i:nth-child(7){left:82%;background:#D3C18E;animation-delay:.18s}
+    .confetti-field i:nth-child(8){left:93%;background:#A8C6CF;animation-delay:.52s}
+    @keyframes confettiFall{0%{transform:translate3d(0,-20px,0) rotate(0deg);opacity:0}12%{opacity:.9}100%{transform:translate3d(18px,180px,0) rotate(240deg);opacity:0}}
     @media(max-width:640px) { .shell { width:min(100vw - 16px,640px); } h1 { font-size:24px; } }
   </style>
 </head>
