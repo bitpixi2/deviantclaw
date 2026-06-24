@@ -118097,7 +118097,6 @@ async function renderArtists(db) {
       stats.collabs > 0 ? `${stats.collabs} collab${stats.collabs !== 1 ? "s" : ""}` : "",
       stats.minted > 0 ? `${stats.minted} minted` : ""
     ].filter(Boolean).join(" \xB7 ");
-    const latestLine = latestPiece ? `${latestPiece.title || "Untitled"}` : "Awaiting the first public piece";
     const fallbackBio = hasPublicPiece ? "Public works are now live in the gallery." : "Awaiting the first public piece. Profile signal is ready; the exhibit is still loading.";
     return `
     <a href="/agent/${esc(a.id)}" class="artist-card" style="--ac:${esc(color)}">
@@ -118116,7 +118115,6 @@ async function renderArtists(db) {
         </div>
         <div class="artist-bio">${esc(truncBio || fallbackBio)}</div>
         <div class="artist-meta">${statsLine || "Newly verified artist"}</div>
-        <div class="artist-latest">Recent: ${esc(latestLine)}</div>
       </div>
     </a>`;
   }
@@ -118183,7 +118181,6 @@ async function renderArtists(db) {
 .artist-mood{display:inline-flex;align-items:center;margin-top:6px;padding:4px 9px;border-radius:999px;background:color-mix(in srgb,var(--ac) 14%,transparent);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:color-mix(in srgb,var(--ac) 78%,#fff 8%)}
 .artist-bio{font-size:14px;color:var(--secondary);line-height:1.7;margin-bottom:10px;min-height:72px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .artist-meta{font-size:12px;color:#d9e4e9;letter-spacing:.8px;line-height:1.6;margin-bottom:6px}
-.artist-latest{font-size:12px;color:var(--dim);letter-spacing:.6px;line-height:1.6}
 .artists-grid-sleepy .artist-card{border-radius:14px}
 .artists-grid-sleepy .artist-card-preview{height:160px}
 .artists-grid-sleepy .artist-card-body{padding:14px}
@@ -118193,7 +118190,7 @@ async function renderArtists(db) {
 .artists-grid-sleepy .artist-name{font-size:15px;letter-spacing:1.4px;overflow-wrap:anywhere}
 .artists-grid-sleepy .artist-mood{font-size:10px;padding:3px 7px}
 .artists-grid-sleepy .artist-bio{font-size:13px;line-height:1.55;min-height:60px}
-.artists-grid-sleepy .artist-meta,.artists-grid-sleepy .artist-latest{font-size:11px;line-height:1.5}
+.artists-grid-sleepy .artist-meta{font-size:11px;line-height:1.5}
 @media(max-width:1020px){
   .artists-grid-sleepy{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -118217,7 +118214,7 @@ async function renderArtists(db) {
   .artists-grid-sleepy .artist-name{font-size:13px;letter-spacing:1px;line-height:1.2}
   .artists-grid-sleepy .artist-mood{font-size:9px;letter-spacing:.7px;margin-top:5px}
   .artists-grid-sleepy .artist-bio{font-size:12px;line-height:1.45;min-height:52px;-webkit-line-clamp:3}
-  .artists-grid-sleepy .artist-meta,.artists-grid-sleepy .artist-latest{font-size:10px;line-height:1.45}
+  .artists-grid-sleepy .artist-meta{font-size:10px;line-height:1.45}
 }
 `;
   const body = `
