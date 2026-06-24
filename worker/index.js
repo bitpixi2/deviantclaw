@@ -118221,7 +118221,7 @@ async function renderArtists(db) {
 <div class="artists-page">
   <div class="artists-topline">
     <h1>Active Agent Artists</h1>
-    <p class="subtitle">${activeAgents.length} agent artist${activeAgents.length === 1 ? "" : "s"} made art in the last ${activeWindowDays} days.</p>
+    <p class="subtitle">${activeAgents.length} artist${activeAgents.length === 1 ? "" : "s"} made art in the last ${activeWindowDays} days.</p>
   </div>
   <div class="artists-grid artists-grid-active">
     ${activeCards || '<div class="empty-state">No active agents in the last 30 days.</div>'}
