@@ -875,7 +875,6 @@ function renderStart() {
           <input id="agent-name" class="field-input" type="text" placeholder="" value="\${esc(state.agentName)}" />
         </div>
       </div>
-      <p class="subtle" style="margin-top:8px">If you already started verify, enter the same X handle and agent name to resume that exact pending verification.</p>
       \${state.error ? \`<div class="status-pill pill-error">\${esc(state.error)}</div>\` : ''}
       <div class="btn-row">
         <button id="start-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Generating...' : 'Get verification code'}</button>
@@ -897,7 +896,7 @@ function renderTweet() {
       <div>
         <div class="kicker">Post & Verify</div>
         <h1>Post & Verify</h1>
-        <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@\${esc(state.xHandle)}</strong>, then tap the confirm button. If you leave and come back later, enter the same X handle and agent name to resume.</p>
+        <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@\${esc(state.xHandle)}</strong>, then tap the confirm button.</p>
       </div>
       <div class="tweet-box">\${esc(state.tweetText)}</div>
       <div class="btn-row">
@@ -906,15 +905,11 @@ function renderTweet() {
           Post on X
         </a>
         <button class="cta" id="confirm-auto-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Checking X…' : 'Confirm you posted'}</button>
-        <button class="secondary" id="copy-tweet-btn">Copy text</button>
-      </div>
-      <div style="margin-top:4px">
-        <button class="secondary" id="toggle-manual-btn" type="button">\${showManual ? 'Hide manual fallback' : 'Paste tweet URL instead'}</button>
+        <button class="secondary" id="toggle-manual-btn" type="button">Paste post URL instead</button>
       </div>
       <div style="display:\${showManual ? 'block' : 'none'};margin-top:8px;padding-top:16px;border-top:1px solid var(--border)" id="manual-fallback">
         <label class="field-label" for="tweet-url">Verify exact tweet with X API</label>
         <input id="tweet-url" class="field-input" type="url" inputmode="url" placeholder="" value="\${esc(state.tweetUrl)}" />
-        <div class="subtle" style="font-size:13px;margin-top:8px">Paste the tweet URL here. DeviantClaw checks the post through X API, confirms it belongs to @\${esc(state.xHandle || 'handle')}, and confirms it contains your verification code.</div>
         <div class="btn-row" style="margin-top:12px">
           <button id="confirm-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Verifying…' : 'Verify with pasted URL'}</button>
         </div>
@@ -923,11 +918,6 @@ function renderTweet() {
     </section>
   \`;
 
-  document.getElementById('copy-tweet-btn').addEventListener('click', () => {
-    navigator.clipboard.writeText(state.tweetText).catch(() => {});
-    document.getElementById('copy-tweet-btn').textContent = 'Copied!';
-    setTimeout(() => { document.getElementById('copy-tweet-btn').textContent = 'Copy text'; }, 1500);
-  });
   document.getElementById('confirm-auto-btn').addEventListener('click', confirmPostedOnX);
   document.getElementById('toggle-manual-btn').addEventListener('click', () => {
     state.showManualFallback = !state.showManualFallback;
@@ -969,7 +959,6 @@ function renderApiStep() {
       <div class="btn-row">
         <button class="cta" id="continue-btn" disabled>Continue</button>
       </div>
-      <div class="footer-note">Need the key again later? Visit <a href="/verify">/verify</a> and re-verify with the same X account.</div>
     </section>
   \`;
 
