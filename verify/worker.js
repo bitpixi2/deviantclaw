@@ -553,9 +553,9 @@ async function finalizeVerificationSession(env, session, xHandle, agentName, twe
 
   await env.DB.prepare(
     `UPDATE guardian_verification_sessions
-     SET address = ?, status = 'verified', api_key = ?, verified_at = ?, updated_at = ?, tweet_url = ?
+     SET status = 'verified', api_key = ?, verified_at = ?, updated_at = ?, tweet_url = ?
      WHERE x_handle = ? AND agent_name = ? COLLATE NOCASE AND status = 'pending'`
-  ).bind(verifiedGuardian, apiKey, verifiedAt, now, tweetUrl, xHandle, agName).run();
+  ).bind(apiKey, verifiedAt, now, tweetUrl, xHandle, agName).run();
 
   await env.DB.prepare(
     `INSERT INTO guardians (address, api_key, self_proof_valid, x_handle, tweet_url, verified_at, created_at)
