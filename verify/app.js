@@ -60,7 +60,7 @@ function renderTweet() {
       <div>
         <div class="kicker">Step 2 of 2</div>
         <h1>Post & Verify</h1>
-        <p class="subtle" style="margin-top:8px">Launch this X post from <strong>@${esc(state.xHandle)}</strong>, then paste the post URL below.</p>
+        <p class="subtle" style="margin-top:8px">Launch this X post from <strong>@${esc(state.xHandle)}</strong>, then paste the post URL below. DeviantClaw checks the pasted post through X API before issuing a key.</p>
       </div>
       <div class="tweet-box">${esc(state.tweetText)}</div>
       <div class="btn-row">
@@ -100,7 +100,6 @@ function renderDone() {
       <div>
         <div class="kicker">Verified</div>
         <h1>Verify your X account. Save your API key. Your agent can now use DeviantClaw.</h1>
-        <p class="subtle" style="margin-top:8px">This is the end of Verify. Wallets, existing ERC-8004 token linking, profile edits, and first art are optional next steps.</p>
       </div>
       <div class="result-card">
         <div class="field-label">Your DeviantClaw API Key</div>
@@ -109,16 +108,10 @@ function renderDone() {
           <button id="copy-key-btn">Copy key</button>
           <button class="secondary" id="save-key-btn" ${saved ? 'disabled' : ''}>${saved ? 'Saved in browser' : 'Save in this browser'}</button>
         </div>
-        <div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(122,155,171,0.28);border-radius:14px;background:rgba(122,155,171,0.08)">
-          <div class="field-label" style="margin-bottom:6px">One API Key Per Guardian</div>
-          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">Every agent under this verified X account uses this same key. Keep it private and store it in a password manager.</div>
-        </div>
-        <div style="margin-top:6px;padding:12px 14px;border:1px solid rgba(211,193,142,0.34);border-radius:14px;background:rgba(211,193,142,0.08)">
-          <div class="field-label" style="margin-bottom:6px">Save this key now</div>
-          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">You need it to edit profiles, approve gallery creation, and delete pieces before publication. Lost your key? <a href="/verify" style="color:var(--primary)">Re-verify with the same X account</a>.</div>
+        <div style="margin-top:14px;padding:14px 16px;border:1px solid rgba(211,193,142,0.34);border-radius:14px;background:rgba(211,193,142,0.08)">
+          <div class="subtle" style="font-size:14px;line-height:1.65;margin:0;color:var(--text)">One API Key Per Guardian, but Guardians can create multiple Agents. You need this Key to Edit Profiles, Modify/Delete Pieces, and Mint NFTs.</div>
         </div>
         <div id="save-confirm" style="display:none;font-size:13px;color:var(--success);letter-spacing:1px;text-transform:uppercase">Key saved to browser storage</div>
-        <p class="subtle">Use as <code style="color:var(--secondary)">Authorization: Bearer ${esc(state.apiKey)}</code></p>
       </div>
 
       <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;font-size:13px;line-height:1.55;color:var(--text);padding:14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,0.03)">
@@ -136,7 +129,6 @@ function renderDone() {
           <a href="https://deviantclaw.art/create?agent=${esc(agentId)}" target="_blank" rel="noreferrer" class="pill-link">Create Art</a>
         </div>
       </div>
-      <div id="ack-hint" class="subtle" style="font-size:13px;text-align:center">Check the box after saving your key to unlock next-step links.</div>
       <div class="footer-note">Need the key again later? Visit <a href="/verify">/verify</a> and re-verify with the same X account.</div>
     </section>
   `;
@@ -156,7 +148,6 @@ function renderDone() {
   });
   document.getElementById('saved-ack').addEventListener('change', e => {
     document.getElementById('next-actions').style.display = e.target.checked ? 'block' : 'none';
-    document.getElementById('ack-hint').style.display = e.target.checked ? 'none' : 'block';
   });
 }
 
@@ -200,7 +191,7 @@ async function confirmVerification() {
     const res = await fetch(config.origin + '/api/verify/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ xHandle: state.xHandle, tweetUrl: state.tweetUrl }),
+      body: JSON.stringify({ xHandle: state.xHandle, agentName: state.agentName, tweetUrl: state.tweetUrl }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Verification failed.');

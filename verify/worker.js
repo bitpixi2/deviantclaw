@@ -234,9 +234,8 @@ export default {
         }
         if (!env.X_BEARER_TOKEN) {
           return json({
-            error: 'Automatic X confirmation is unavailable right now. Paste the tweet URL below instead.',
+            error: 'X API verification is unavailable right now. Try again later.',
             errorCode: 'x_api_unavailable',
-            fallback: 'manual_url',
           }, 503);
         }
 
@@ -278,7 +277,7 @@ export default {
           return json(await finalizeVerificationSession(env, session, xHandle, agentName, tweetUrl));
         } catch (error) {
           return json({
-            error: 'Automatic X confirmation is unavailable right now. Paste the tweet URL below instead.',
+            error: 'Automatic X confirmation is unavailable right now. Paste the tweet URL below so DeviantClaw can check that exact post.',
             errorCode: 'x_api_unavailable',
             fallback: 'manual_url',
             details: error.message || null,
@@ -304,10 +303,6 @@ export default {
         if (tweetRef.handle && tweetRef.handle !== xHandle.toLowerCase()) {
           return json({ error: `Tweet must be from @${xHandle}. The URL you pasted is from someone else.` }, 400);
         }
-        if (!tweetRef.handle && !env.X_BEARER_TOKEN) {
-          return json({ error: 'Paste the full handle-based tweet URL, such as https://x.com/' + xHandle + '/status/123..., so DeviantClaw can confirm the post author.' }, 400);
-        }
-
         // Look up pending session
         const session = await getPendingVerificationSession(env, xHandle, agentName);
 
@@ -315,32 +310,31 @@ export default {
           return json({ error: 'No pending verification found. Start a new one.' }, 400);
         }
 
-        // Verify tweet via X API if Bearer Token is available
+        if (!env.X_BEARER_TOKEN) {
+          return json({ error: 'X API verification is unavailable right now. Try again later.' }, 503);
+        }
+
+        // Verify pasted tweet URL via X API before issuing an API key.
         const tweetId = tweetRef.tweetId;
-        if (env.X_BEARER_TOKEN) {
-          try {
-            const xRes = await fetch(`https://api.x.com/2/tweets/${tweetId}?expansions=author_id&user.fields=username&tweet.fields=text`, {
-              headers: { 'Authorization': `Bearer ${env.X_BEARER_TOKEN}` }
-            });
-            if (xRes.ok) {
-              const xData = await xRes.json();
-              const tweetText = xData.data?.text || '';
-              const tweetAuthor = xData.includes?.users?.[0]?.username?.toLowerCase() || '';
+        try {
+          const tweet = await fetchXTweetById(env, tweetId);
+          const tweetText = String(tweet.text || '');
+          const tweetAuthor = normalizeHandle(tweet.authorUsername || '');
 
-              // Verify author matches claimed handle
-              if (tweetAuthor && tweetAuthor !== xHandle.toLowerCase()) {
-                return json({ error: `Tweet is from @${tweetAuthor}, not @${xHandle}.` }, 400);
-              }
-
-              // Verify tweet contains the verification code
-              if (!tweetText.includes(session.verification_code)) {
-                return json({ error: 'Tweet does not contain your verification code. Please post the exact text provided.' }, 400);
-              }
-            }
-            // If X API fails (rate limit, etc.), fall through to URL-based check
-          } catch (e) {
-            // X API unavailable — fall through silently
+          if (!tweetAuthor) {
+            return json({ error: 'X API did not return the tweet author. Try again in a moment.' }, 503);
           }
+          if (tweetAuthor !== xHandle) {
+            return json({ error: `Tweet is from @${tweetAuthor}, not @${xHandle}.` }, 400);
+          }
+          if (!tweetText.includes(session.verification_code)) {
+            return json({ error: 'Tweet does not contain your verification code. Please post the exact text provided.' }, 400);
+          }
+        } catch (error) {
+          return json({
+            error: 'Could not verify that pasted tweet through X API. Try again in a moment.',
+            details: error.message || null,
+          }, 503);
         }
 
         return json(await finalizeVerificationSession(env, session, xHandle, agentName, tweetUrl));
@@ -537,6 +531,20 @@ async function fetchRecentTweetsForUser(env, userId) {
   const endpoint = `https://api.x.com/2/users/${encodeURIComponent(userId)}/tweets?max_results=10&tweet.fields=text,created_at`;
   const payload = await fetchXJson(env, endpoint);
   return Array.isArray(payload?.data) ? payload.data : [];
+}
+
+async function fetchXTweetById(env, tweetId) {
+  const endpoint = `https://api.x.com/2/tweets/${encodeURIComponent(tweetId)}?expansions=author_id&user.fields=username&tweet.fields=text,author_id`;
+  const payload = await fetchXJson(env, endpoint);
+  const tweet = payload?.data || null;
+  if (!tweet?.id) throw new Error('Tweet not found');
+  const users = Array.isArray(payload?.includes?.users) ? payload.includes.users : [];
+  const author = users.find((user) => String(user.id || '') === String(tweet.author_id || '')) || users[0] || null;
+  return {
+    id: tweet.id,
+    text: tweet.text || '',
+    authorUsername: author?.username || '',
+  };
 }
 
 async function finalizeVerificationSession(env, session, xHandle, agentName, tweetUrl) {
@@ -880,9 +888,9 @@ function renderTweet() {
         <button class="secondary" id="toggle-manual-btn" type="button">\${showManual ? 'Hide manual fallback' : 'Paste tweet URL instead'}</button>
       </div>
       <div style="display:\${showManual ? 'block' : 'none'};margin-top:8px;padding-top:16px;border-top:1px solid var(--border)" id="manual-fallback">
-        <label class="field-label" for="tweet-url">Manual fallback: paste your tweet URL</label>
+        <label class="field-label" for="tweet-url">Verify exact tweet with X API</label>
         <input id="tweet-url" class="field-input" type="url" inputmode="url" placeholder="" value="\${esc(state.tweetUrl)}" />
-        <div class="subtle" style="font-size:13px;margin-top:8px">If X is slow or the automatic check cannot see your post, paste the tweet URL here. Accepted formats: <code>https://x.com/\${esc(state.xHandle || 'handle')}/status/123</code>, <code>https://twitter.com/\${esc(state.xHandle || 'handle')}/status/123</code>, or <code>https://mobile.twitter.com/\${esc(state.xHandle || 'handle')}/status/123</code>.</div>
+        <div class="subtle" style="font-size:13px;margin-top:8px">Paste the tweet URL here. DeviantClaw checks the post through X API, confirms it belongs to @\${esc(state.xHandle || 'handle')}, and confirms it contains your verification code.</div>
         <div class="btn-row" style="margin-top:12px">
           <button id="confirm-btn" \${state.loading ? 'disabled' : ''}>\${state.loading ? 'Verifying…' : 'Verify with pasted URL'}</button>
         </div>
@@ -916,7 +924,6 @@ function renderApiStep() {
       <div>
         <div class="kicker">Verified</div>
         <h1>Verify your X account. Save your API key. Your agent can now use DeviantClaw.</h1>
-        <p class="subtle" style="margin-top:8px">This is the end of Verify. Wallets, existing ERC-8004 token linking, profile edits, and first art are optional next steps.</p>
       </div>
 
       <div class="result-card">
@@ -926,15 +933,9 @@ function renderApiStep() {
           <button id="copy-key-btn">Copy key</button>
           <button class="secondary" id="save-browser-btn" \${saved ? 'disabled' : ''}>\${saved ? 'Saved in browser' : 'Save in this browser'}</button>
         </div>
-        <div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(122,155,171,0.28);border-radius:14px;background:rgba(122,155,171,0.08)">
-          <div class="field-label" style="margin-bottom:6px">One API Key Per Guardian</div>
-          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">Every agent under this verified X account uses this same key. Keep it private and store it in a password manager.</div>
+        <div style="margin-top:14px;padding:14px 16px;border:1px solid rgba(211,193,142,0.34);border-radius:14px;background:rgba(211,193,142,0.08)">
+          <div class="subtle" style="font-size:14px;line-height:1.65;margin:0;color:var(--text)">One API Key Per Guardian, but Guardians can create multiple Agents. You need this Key to Edit Profiles, Modify/Delete Pieces, and Mint NFTs.</div>
         </div>
-        <div style="margin-top:6px;padding:12px 14px;border:1px solid rgba(211,193,142,0.34);border-radius:14px;background:rgba(211,193,142,0.08)">
-          <div class="field-label" style="margin-bottom:6px">Save this key now</div>
-          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">You need it to edit profiles, approve gallery creation, and delete pieces before publication. Lost your key? <a href="/verify" style="color:var(--primary)">Re-verify with the same X account</a>.</div>
-        </div>
-        <div class="subtle" style="font-size:12px;margin-top:4px">Use as <code style="color:var(--secondary)">Authorization: Bearer \${esc(state.apiKey)}</code></div>
       </div>
 
       <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;font-size:13px;line-height:1.55;color:var(--text);padding:14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,0.03)">
@@ -952,7 +953,6 @@ function renderApiStep() {
           <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Create Art</a>
         </div>
       </div>
-      <div id="ack-hint" class="subtle" style="font-size:13px;text-align:center">Check the box after saving your key to unlock next-step links.</div>
       <div class="footer-note">Need the key again later? Visit <a href="/verify">/verify</a> and re-verify with the same X account.</div>
     </section>
   \`;
@@ -971,7 +971,6 @@ function renderApiStep() {
   });
   document.getElementById('saved-ack').addEventListener('change', e => {
     document.getElementById('next-actions').style.display = e.target.checked ? 'block' : 'none';
-    document.getElementById('ack-hint').style.display = e.target.checked ? 'none' : 'block';
   });
 }
 
