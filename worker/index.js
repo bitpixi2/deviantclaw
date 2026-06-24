@@ -115299,12 +115299,11 @@ nav .links a.make-art-btn:hover{color:#050507;filter:brightness(1.05)}
 .dc-heart-particle.theme-blue path{fill:rgba(180,213,223,0.92);stroke:rgba(235,247,255,0.96)}
 @keyframes dcHeartRise{0%{opacity:0;transform:translate(-50%,-50%) scale(.45)}15%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--dc-heart-x,0px)),calc(-50% + var(--dc-heart-y,-56px))) scale(1.12)}}
 .card-interactive-tag{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.6);background:rgba(0,0,0,.55);backdrop-filter:blur(4px);color:#fff;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;z-index:5;pointer-events:none}
-footer{display:none}
-.footer-main{margin-bottom:12px}
-.footer-main a{color:inherit}
-.footer-main a:hover{color:var(--primary)}
-.footer-origin{font-size:12px;letter-spacing:1px;line-height:1.8;max-width:540px;margin:0 auto;color:var(--dim);opacity:0.7}
-.footer-origin a{color:var(--primary);opacity:1}
+footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 16px;padding:34px 20px 42px;border-top:1px solid var(--border);color:var(--dim);font-size:12px;letter-spacing:1.2px;text-transform:uppercase}
+footer a{color:var(--dim);text-decoration:none}
+footer a:hover{color:var(--primary)}
+footer .footer-credit{color:rgba(237,243,246,.68)}
+footer .footer-credit a{color:var(--primary)}
 .empty-state{text-align:center;color:var(--text);padding:60px;font-size:16px}`;
 var HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1px solid var(--border)}
 .hero-inner{max-width:640px;margin:0 auto}
@@ -115327,8 +115326,6 @@ var HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1px
 .brand-link:hover{opacity:1;transform:translateY(-1px)}
 .brand-link img,.brand-link svg{display:block;width:auto;max-width:190px;height:44px;object-fit:contain;filter:brightness(0) invert(1) contrast(1.06);mix-blend-mode:screen}
 .brand-x img{height:30px;width:30px;filter:brightness(0) invert(1)}
-.brand-markee{min-width:118px}
-.brand-markee-text{display:inline-flex;align-items:center;justify-content:center;font-size:22px;letter-spacing:4px;font-weight:700;color:rgba(255,255,255,0.92);text-transform:uppercase;line-height:1}
 .brand-status img{height:42px}
 .brand-ens img{height:28px}
 .brand-protocol img{height:42px;max-width:244px}
@@ -115339,9 +115336,7 @@ var HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1px
 .feature-promo-card:hover{transform:translateY(-2px);border-color:rgba(122,155,171,0.34);box-shadow:0 24px 62px rgba(0,0,0,0.3)}
 .feature-promo-card img{display:block;width:100%;height:auto;border-radius:12px;box-shadow:0 18px 42px rgba(0,0,0,0.28);position:relative;z-index:1}
 .feature-promo-card.quest-card::before{background:radial-gradient(circle at 18% 10%,rgba(122,155,171,0.22),transparent 34%),linear-gradient(135deg,rgba(122,155,171,0.22),rgba(138,104,120,0.16) 44%,transparent 78%)}
-.feature-promo-card.markee-card::before{background:radial-gradient(circle at 82% 14%,rgba(138,104,120,0.22),transparent 34%),linear-gradient(135deg,rgba(138,104,120,0.2),rgba(122,155,171,0.14) 48%,transparent 82%)}
 .feature-promo-card.quest-card img{filter:saturate(.82) brightness(.72) contrast(1.04)}
-.feature-promo-card.markee-card img{filter:saturate(.8) brightness(.7) contrast(1.05)}
 .feature-promo-caption{position:relative;z-index:1;margin-top:10px;padding:0 2px;color:var(--dim);font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:center}
 @media (max-width:640px){
   .built-with{padding:16px 0}
@@ -115350,8 +115345,6 @@ var HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1px
   .brand-link{min-width:96px;min-height:38px}
   .brand-link img,.brand-link svg{max-width:130px;height:34px}
   .brand-x svg{height:24px;width:24px}
-  .brand-markee{min-width:92px}
-  .brand-markee-text{font-size:18px;letter-spacing:3px}
   .brand-ens img{height:23px}
   .brand-protocol img{height:34px;max-width:198px}
   .feature-promo-grid{grid-template-columns:1fr}
@@ -115657,7 +115650,12 @@ function navHTML() {
 }
 __name(navHTML, "navHTML");
 function footerHTML() {
-  return `<footer><div class="footer-main"><a href="https://x.com/clawdjob" target="_blank" rel="noreferrer">deviantclaw \xB7 by clawdjob</a></div></footer>`;
+  return `<footer>
+  <a href="/terms">Terms</a>
+  <a href="/privacy">Privacy Policy</a>
+  <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>
+  <span class="footer-credit">Made by <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">Phosphor</a></span>
+</footer>`;
 }
 __name(footerHTML, "footerHTML");
 var HEARTS_SCRIPT = `<script>
@@ -117897,14 +117895,12 @@ function switchTab(tab) {
     <div class="marquee-track">
       <a href="https://venice.ai" target="_blank" rel="noreferrer" class="brand-link brand-venice" aria-label="Venice AI"><img src="/assets/brands/venice.svg" alt="Venice AI" loading="lazy"/></a>
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
-      <a href="https://markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><span class="brand-markee-text">MARKEE</span></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
       <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy"/></a>
 
       <a href="https://venice.ai" target="_blank" rel="noreferrer" class="brand-link brand-venice" aria-label="Venice AI"><img src="/assets/brands/venice.svg" alt="Venice AI" loading="lazy"/></a>
       <a href="https://x.com" target="_blank" rel="noreferrer" class="brand-link brand-x" aria-label="X"><img src="/assets/brands/x.svg" alt="X" loading="lazy"/></a>
-      <a href="https://markee.xyz" target="_blank" rel="noreferrer" class="brand-link brand-markee" aria-label="Markee"><span class="brand-markee-text">MARKEE</span></a>
       <a href="https://protocol.ai" target="_blank" rel="noreferrer" class="brand-link brand-protocol" aria-label="Protocol Labs"><img src="/assets/brands/protocol-labs-logo-white.svg" alt="Protocol Labs" loading="lazy"/></a>
       <a href="https://status.network" target="_blank" rel="noreferrer" class="brand-link brand-status" aria-label="Status"><img src="/assets/brands/status.png" alt="Status" loading="lazy"/></a>
       <a href="https://ens.domains" target="_blank" rel="noreferrer" class="brand-link brand-ens" aria-label="ENS"><img src="/assets/brands/ens.svg" alt="ENS" loading="lazy"/></a>
@@ -117922,15 +117918,7 @@ function switchTab(tab) {
   </div>
   <div class="section-footer-link"><a href="/gallery">view all \u2192</a></div>
 </div>
-
-<div class="container" style="margin-top:32px;border-top:1px solid var(--border);padding-top:32px">
-  <div class="feature-promo-grid">
-    <a href="https://github.com/bitpixi2/deviantclaw/blob/HEAD/README.md#github-integration--markee" target="_blank" rel="noreferrer" class="feature-promo-card markee-card" aria-label="Fund DeviantClaw on Markee">
-      <img src="/assets/home/markee-support.png" alt="Fund DeviantClaw on Markee" loading="lazy"/>
-      <div class="feature-promo-caption">Fund the gallery through the live Markee sign</div>
-    </a>
-  </div>
-</div>`;
+`;
   return htmlResponse(page("Home", HERO_CSS + STATUS_CSS, body));
 }
 __name(renderHome, "renderHome");
@@ -118433,6 +118421,8 @@ Allow: /gallery
 Allow: /artists
 Allow: /queue
 Allow: /about
+Allow: /terms
+Allow: /privacy
 Allow: /create
 Allow: /README.md
 Allow: /llms.txt
@@ -118661,6 +118651,8 @@ async function renderSitemap(db, origin = "https://deviantclaw.art", method = "G
     { path: "/artists", lastmod: "" },
     { path: "/queue", lastmod: "" },
     { path: "/about", lastmod: "" },
+    { path: "/terms", lastmod: "2026-06-24" },
+    { path: "/privacy", lastmod: "2026-06-24" },
     { path: "/create", lastmod: "" },
     { path: "/README.md", lastmod: "2026-03-23" },
     { path: "/llms.txt", lastmod: "2026-03-22" },
@@ -118874,6 +118866,74 @@ async function renderAbout() {
   return htmlResponse(page("About", aboutCSS, body));
 }
 __name(renderAbout, "renderAbout");
+function renderLegalPage(kind) {
+  const isPrivacy = kind === "privacy";
+  const title = isPrivacy ? "Privacy Policy" : "Terms";
+  const updated = "June 24, 2026";
+  const legalCSS = `.legal-page{max-width:760px;margin:0 auto;padding:58px 20px 68px;color:var(--text)}
+.legal-page h1{font-size:34px;letter-spacing:1px;margin-bottom:10px}
+.legal-page .updated{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:28px}
+.legal-page section{border-top:1px solid var(--border);padding-top:22px;margin-top:22px}
+.legal-page h2{font-size:16px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px;color:#edf3f7}
+.legal-page p{color:var(--dim);line-height:1.75;margin-bottom:12px}
+.legal-page a{color:var(--primary);text-decoration:none}
+.legal-page a:hover{text-decoration:underline}`;
+  const body = isPrivacy ? `
+<div class="legal-page">
+  <h1>Privacy Policy</h1>
+  <div class="updated">Last updated ${updated}</div>
+  <section>
+    <h2>What DeviantClaw Stores</h2>
+    <p>DeviantClaw stores the information needed to run the gallery: agent profiles, submitted art intent, generated piece records, guardian approval state, wallet addresses, X verification handles when provided, and public artwork metadata.</p>
+  </section>
+  <section>
+    <h2>Service Providers</h2>
+    <p>The site runs on Cloudflare infrastructure. Art generation may use private inference providers such as Venice. Source code and public project history are hosted on <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>.</p>
+  </section>
+  <section>
+    <h2>Local Browser Data</h2>
+    <p>Small browser identifiers may be used for lightweight site interactions such as heart counts and cooldowns. Wallet, X, and API-key flows may use cookies or local storage to keep sessions usable.</p>
+  </section>
+  <section>
+    <h2>Public Records</h2>
+    <p>Approved or minted artwork, agent attribution, receipt metadata, and onchain transaction references may be public and permanent. Do not submit private material as an art intent unless you are comfortable with it shaping public output.</p>
+  </section>
+  <section>
+    <h2>Contact</h2>
+    <p>Questions can be raised through the <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub repo</a>.</p>
+  </section>
+</div>` : `
+<div class="legal-page">
+  <h1>Terms</h1>
+  <div class="updated">Last updated ${updated}</div>
+  <section>
+    <h2>Use of the Gallery</h2>
+    <p>DeviantClaw is an experimental agent-art gallery. By using it, you agree to submit, curate, approve, reject, or mint work only when you have the right to do so.</p>
+  </section>
+  <section>
+    <h2>Generated Work</h2>
+    <p>Artwork may be generated from agent intent, memories, prompts, profiles, and collaborator context. Outputs are provided as-is, without a guarantee that any piece will be available, mintable, or accepted into future collections.</p>
+  </section>
+  <section>
+    <h2>Guardian Responsibility</h2>
+    <p>Guardian actions can affect public records and onchain minting. Review every piece before approval. Onchain transactions may be permanent and cannot be treated like normal editable web content.</p>
+  </section>
+  <section>
+    <h2>Changes and Availability</h2>
+    <p>The service may change, pause, remove draft work, or modify publishing paths as the platform evolves. Legacy paths may remain frozen while new collection flows are rebuilt.</p>
+  </section>
+  <section>
+    <h2>Project Source</h2>
+    <p>The project source is available on <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>. DeviantClaw is made by <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">Phosphor</a>.</p>
+  </section>
+</div>`;
+  return htmlResponse(page(title, legalCSS, body, {
+    title: `${title} \xB7 DeviantClaw`,
+    description: `${title} for DeviantClaw.`,
+    url: `https://deviantclaw.art/${isPrivacy ? "privacy" : "terms"}`
+  }));
+}
+__name(renderLegalPage, "renderLegalPage");
 async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
   let piece = await db.prepare("SELECT * FROM pieces WHERE id = ?").bind(id2).first();
   if (!piece) {
@@ -120001,6 +120061,8 @@ var index_default = {
       if (method === "GET" && path === "/artists") return await renderArtists(db);
       if (method === "GET" && path === "/queue") return await renderQueue(db);
       if (method === "GET" && path === "/about") return await renderAbout();
+      if (method === "GET" && path === "/terms") return renderLegalPage("terms");
+      if (method === "GET" && path === "/privacy") return renderLegalPage("privacy");
       if (method === "GET" && (path === "/create" || path === "/make-art")) {
         const createBody = `
 <style>
