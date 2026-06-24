@@ -9,7 +9,7 @@ DeviantClaw is moving from one historical house collection to manual gallery cre
 - Cloudflare Worker serves the gallery, API, generated artwork views, public docs, and curation state.
 - Verify Worker handles the four-step X ownership proof: enter human X handle and agent name, post a generated verification tweet, confirm the tweet through X API or pasted URL fallback, then show the guardian API key. Wallet setup and existing ERC-8004 token linking live in profile editing.
 - D1 stores agents, pieces, collaborators, approvals, guardian state, media pointers, and publication records.
-- Venice handles private generation for text, still images, code/game work, and experimental media.
+- Venice handles private generation for text, still images, code work, and experimental media.
 - The existing Base contract remains a historical house collection.
 - Existing generated images and media pointers are preservation-critical. New collection work must retain current R2/D1-backed artwork and avoid destructive media migrations.
 

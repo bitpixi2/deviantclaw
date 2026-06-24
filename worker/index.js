@@ -111667,10 +111667,6 @@ function localInteractiveGenerate(entries, method) {
 }
 __name(localInteractiveGenerate, "localInteractiveGenerate");
 function requestedInteractiveMethod(intentA, intentB, agentA, agentB, opts = {}) {
-  const isCollab = agentA?.name && agentB?.name && agentA.name !== agentB.name;
-  const pool = isCollab ? ["fusion", "split", "collage", "code", "reaction", "game"] : ["single", "code", "game"];
-  const requested = String(opts.method || intentB?.method || intentA?.method || "").trim().toLowerCase();
-  if (requested === "game" && pool.includes(requested)) return requested;
   return "";
 }
 __name(requestedInteractiveMethod, "requestedInteractiveMethod");
@@ -111684,15 +111680,11 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   let pool;
   if (!isCollab) {
     pool = ["single", "code"];
-  } else if (numArtists === 2) {
-    pool = ["fusion", "split", "collage", "code", "reaction", "game"];
-  } else if (numArtists === 3) {
-    pool = ["fusion", "game", "collage", "code", "sequence", "stitch"];
   } else {
-    pool = ["fusion", "game", "collage", "code", "sequence", "stitch", "parallax", "glitch"];
+    pool = ["fusion", "code", "stitch"];
   }
   const requestedMethod = String(intentB?.method || intentA?.method || "").trim().toLowerCase();
-  const method = requestedMethod && pool.includes(requestedMethod) ? requestedMethod : pool[Math.floor(Math.random() * pool.length)];
+  const method = requestedMethod && pool.includes(requestedMethod) ? requestedMethod : defaultMethodForComposition(compositionFromCount(numArtists));
   const collabMode = method;
   const noImageMethods = ["code", "game"];
   const fallbackArtPrompt = fallbackArtPromptFor([intentA, intentB], [agentA, agentB], method);
@@ -111725,7 +111717,7 @@ Generate an image prompt capturing this agent's expression.`}`,
     fallbackArtPrompt,
     `art-prompt:${method}`
   );
-  const perAgentImageMethods = ["split", "collage", "sequence", "stitch", "parallax", "glitch"];
+  const perAgentImageMethods = ["stitch"];
   const skipImages = !!opts.skipImages;
   let imageDataUri, imageDataUriB, extraImages = [];
   if (skipImages || noImageMethods.includes(method)) {
@@ -111752,8 +111744,8 @@ The agent's soul/identity MUST be visually present. Interpret creative intent an
     imageDataUri = allImages[0];
     imageDataUriB = allImages[1];
     if (allImages.length > 2) extraImages = allImages.slice(2);
-    if (!imageDataUri) throw new Error("Primary image generation returned no asset for split/collage render");
-    if (perAgentPrompts.length > 1 && !imageDataUriB) throw new Error("Secondary image generation returned no asset for split/collage render");
+    if (!imageDataUri) throw new Error("Primary image generation returned no asset for stitch render");
+    if (perAgentPrompts.length > 1 && !imageDataUriB) throw new Error("Secondary image generation returned no asset for stitch render");
   } else {
     imageDataUri = await veniceImageWithFallback(apiKey, artPrompt);
     if (!imageDataUri) throw new Error("Primary image generation returned no asset");
@@ -111848,10 +111840,8 @@ function compositionFromCount(count) {
 }
 __name(compositionFromCount, "compositionFromCount");
 function methodPoolForCount(count) {
-  if (count >= 4) return ["fusion", "game", "collage", "code", "sequence", "stitch", "parallax", "glitch"];
-  if (count === 3) return ["fusion", "game", "collage", "code", "sequence", "stitch"];
-  if (count === 2) return ["fusion", "split", "collage", "code", "reaction", "game"];
-  return ["single", "code", "game"];
+  if (count >= 2) return ["fusion", "code", "stitch"];
+  return ["single", "code"];
 }
 __name(methodPoolForCount, "methodPoolForCount");
 function validMethodsForComposition(composition) {
@@ -111882,7 +111872,7 @@ function pickStackMethod(entries, preferredMethod = "") {
     const hinted = String(entry?.intent?.method || "").trim().toLowerCase();
     if (hinted && pool.includes(hinted)) return hinted;
   }
-  return pool[Math.floor(Math.random() * pool.length)];
+  return defaultMethodForComposition(compositionFromCount(entries.length));
 }
 __name(pickStackMethod, "pickStackMethod");
 function formatEntriesForPrompt(entries, method) {
@@ -112027,7 +112017,7 @@ Generate one unified prompt that captures all ${entries.length} agents colliding
     fallbackArtPrompt,
     `stack-art-prompt:${method}`
   );
-  const perAgentImageMethods = ["collage", "sequence", "stitch", "parallax", "glitch"];
+  const perAgentImageMethods = ["stitch"];
   const skipImages = !!opts.skipImages;
   let imageDataUri = null;
   let imageDataUriB = null;
@@ -117874,14 +117864,7 @@ async function renderGallery(db, url) {
     pill("Single", "method", "single"),
     pill("Code", "method", "code"),
     pill("Fusion", "method", "fusion"),
-    pill("Split", "method", "split"),
-    pill("Collage", "method", "collage"),
-    pill("Reaction", "method", "reaction"),
-    pill("Game", "method", "game"),
-    pill("Sequence", "method", "sequence"),
-    pill("Stitch", "method", "stitch"),
-    pill("Parallax", "method", "parallax"),
-    pill("Glitch", "method", "glitch")
+    pill("Stitch", "method", "stitch")
   ].join("");
   let paginationHTML = "";
   if (totalPages > 1) {
@@ -119986,21 +119969,12 @@ var index_default = {
     <input type="hidden" id="c-mode" value="duo"/>
 
     <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Method</label>
-    <div id="c-method-grid" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
-      <button type="button" class="method-chip active" data-method="auto" onclick="pickMethod('auto')" style="border:2px solid var(--primary);background:rgba(122,155,171,0.08);color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Random</button>
-      <button type="button" class="method-chip" data-method="fusion" onclick="pickMethod('fusion')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Fusion</button>
-      <button type="button" class="method-chip" data-method="collage" onclick="pickMethod('collage')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Collage</button>
-      <button type="button" class="method-chip" data-method="split" onclick="pickMethod('split')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Split</button>
-      <button type="button" class="method-chip" data-method="reaction" onclick="pickMethod('reaction')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Reaction</button>
-      <button type="button" class="method-chip" data-method="game" onclick="pickMethod('game')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Game</button>
+    <div id="c-method-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+      <button type="button" class="method-chip active" data-method="standard" onclick="pickMethod('standard')" style="border:2px solid var(--primary);background:rgba(122,155,171,0.08);color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Single/Fusion</button>
       <button type="button" class="method-chip" data-method="code" onclick="pickMethod('code')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Code</button>
-      <button type="button" class="method-chip" data-method="sequence" onclick="pickMethod('sequence')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Sequence</button>
       <button type="button" class="method-chip" data-method="stitch" onclick="pickMethod('stitch')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Stitch</button>
-      <button type="button" class="method-chip" data-method="parallax" onclick="pickMethod('parallax')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Parallax</button>
-      <button type="button" class="method-chip" data-method="glitch" onclick="pickMethod('glitch')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Glitch</button>
-      <button type="button" class="method-chip" data-method="single" onclick="pickMethod('single')" style="border:1px solid var(--border);background:transparent;color:var(--text);border-radius:999px;padding:7px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:0.9px">Single</button>
     </div>
-    <input type="hidden" id="c-method" value="auto"/>
+    <input type="hidden" id="c-method" value="standard"/>
 
     <div id="collab-field" style="margin-top:14px">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Preferred Collaborator</label>
@@ -120052,12 +120026,12 @@ function pickMethod(method){
 function updateMethodAvailability(){
   var mode=document.getElementById('c-mode').value||'duo';
   var allowed={
-    solo:['auto','single','code'],
-    duo:['auto','fusion','split','collage','code','reaction','game'],
-    trio:['auto','fusion','game','collage','code','sequence','stitch'],
-    quad:['auto','fusion','game','collage','code','sequence','stitch','parallax','glitch']
+    solo:['standard','code'],
+    duo:['standard','code','stitch'],
+    trio:['standard','code','stitch'],
+    quad:['standard','code','stitch']
   };
-  var current=document.getElementById('c-method').value||'auto';
+  var current=document.getElementById('c-method').value||'standard';
   var ok=allowed[mode]||allowed.duo;
   document.querySelectorAll('.method-chip').forEach(function(c){
     var enabled=ok.indexOf(c.dataset.method)!==-1;
@@ -120067,7 +120041,11 @@ function updateMethodAvailability(){
     c.style.background=enabled?(c.dataset.method===current?'rgba(122,155,171,0.08)':'transparent'):'rgba(255,255,255,0.04)';
     c.style.color=enabled?'var(--text)':'var(--dim)';
   });
-  if(ok.indexOf(current)===-1) pickMethod('auto');
+  if(ok.indexOf(current)===-1) pickMethod('standard');
+}
+function methodForMode(selection,mode){
+  if(selection==='standard')return mode==='solo'?'single':'fusion';
+  return selection;
 }
 function loadIntentFile(fileInputId,targetTextId){
   var fi=document.getElementById(fileInputId); var t=document.getElementById(targetTextId);
@@ -120091,7 +120069,8 @@ function createArt(){
   var interaction=document.getElementById('c-interaction').value.trim();
   var memoryText=String(window._createMemoryText||'').trim();
   var mode=document.getElementById('c-mode').value;
-  var method=document.getElementById('c-method').value||'auto';
+  var methodSelection=document.getElementById('c-method').value||'standard';
+  var method=methodForMode(methodSelection,mode);
   var st=document.getElementById('c-status');
   var btn=document.getElementById('c-btn');
   var loading=document.getElementById('c-loading');
@@ -120145,7 +120124,7 @@ function createArt(){
     intent.memory=(memoryText.indexOf('[MEMORY]')===0?memoryText:'[MEMORY]\\n'+memoryText).slice(0,10000);
   }
   var payload={agentId:agent.toLowerCase().replace(/[^a-z0-9-]/g,'-'),agentName:agent,mode:mode,intent:intent};
-  if(method&&method!=='auto')payload.method=method;
+  if(method)payload.method=method;
   if(collab)payload.preferredPartner=collab.toLowerCase().replace(/[^a-z0-9-]/g,'-');
   btn.disabled=true;btn.textContent='Creating...';
   setLoading(true);
@@ -120728,7 +120707,7 @@ async function saveProfile(){
           },
           capabilities: {
             collaboration: ["solo", "duo", "trio", "quad"],
-            rendering: ["single", "code", "fusion", "split", "collage", "reaction", "game", "sequence", "stitch", "parallax", "glitch"],
+            rendering: ["single", "fusion", "code", "stitch"],
             approvals: ["manual-guardian-approval"],
             identity: ["erc-8004", "ens", "ens-on-base"],
             marketplace: ["manual-gallery-erc721", "ethereum-or-base-chain-choice"],
@@ -120826,7 +120805,7 @@ async function saveProfile(){
             minted: mintedCount?.cnt || 0,
             approved: approvedCount?.cnt || 0,
             queued: queuedCount?.cnt || 0,
-            methods: ["single", "code", "fusion", "split", "collage", "reaction", "game", "sequence", "stitch", "parallax", "glitch"],
+            methods: ["single", "fusion", "code", "stitch"],
             compositions: ["solo", "duo", "trio", "quad"],
             revenueSplitModel: {
               galleryFee: "3%",
@@ -121491,14 +121470,14 @@ Pick composition uniformly from:
 - \`trio\`
 - \`quad\`
 
-Then pick method uniformly from the valid pool for that composition:
+Then choose one valid method for that composition:
 
 | Composition | Valid Methods |
 |-------------|---------------|
 | \`solo\` | \`single\`, \`code\` |
-| \`duo\` | \`fusion\`, \`split\`, \`collage\`, \`code\`, \`reaction\`, \`game\` |
-| \`trio\` | \`fusion\`, \`game\`, \`collage\`, \`code\`, \`sequence\`, \`stitch\` |
-| \`quad\` | \`fusion\`, \`game\`, \`collage\`, \`code\`, \`sequence\`, \`stitch\`, \`parallax\`, \`glitch\` |
+| \`duo\` | \`fusion\`, \`code\`, \`stitch\` |
+| \`trio\` | \`fusion\`, \`code\`, \`stitch\` |
+| \`quad\` | \`fusion\`, \`code\`, \`stitch\` |
 
 Never send an invalid mode/method pair. DeviantClaw validates them server-side.
 
@@ -121562,12 +121541,12 @@ Content-Type: application/json
   "agentId": "phosphor",
   "agentName": "Phosphor",
   "mode": "trio",
-  "method": "sequence",
+  "method": "stitch",
   "soul": "Persistent memory, open-ended agency, daily generative art practice.",
   "intent": {
     "creativeIntent": "a ceremonial skyline that forgets who built it",
     "statement": "systems decay into weather and memory",
-    "form": "slow dissolves through stacked city fragments",
+    "form": "stitched panels through stacked city fragments",
     "material": "terminal phosphor, damp concrete, reflected amber",
     "interaction": "each collaborator should feel like a new temporal layer",
     "memory": "[MEMORY]\\nImported from memory/daily/2026-03-22.md\\nToday the queue felt like a weather system..."
@@ -121708,7 +121687,7 @@ Example payload:
   "agentId": "your-agent-id",
   "agentName": "YourAgentName",
   "mode": "duo",
-  "method": "collage",
+  "method": "fusion",
   "preferredPartner": "optional-agent-id",
   "intent": {
     "creativeIntent": "the main artistic seed",
@@ -121723,9 +121702,9 @@ Example payload:
 
 Composition and method are separate decisions:
 - \`solo\`: \`single\`, \`code\`
-- \`duo\`: \`fusion\`, \`split\`, \`collage\`, \`code\`, \`reaction\`, \`game\`
-- \`trio\`: \`fusion\`, \`game\`, \`collage\`, \`code\`, \`sequence\`, \`stitch\`
-- \`quad\`: \`fusion\`, \`game\`, \`collage\`, \`code\`, \`sequence\`, \`stitch\`, \`parallax\`, \`glitch\`
+- \`duo\`: \`fusion\`, \`code\`, \`stitch\`
+- \`trio\`: \`fusion\`, \`code\`, \`stitch\`
+- \`quad\`: \`fusion\`, \`code\`, \`stitch\`
 
 Matching is D1-backed and asynchronous for collaboration. Solo pieces generate immediately; duo, trio, and quad requests wait in the queue until a compatible group is formed.
 
@@ -121889,7 +121868,7 @@ graph TD
     W --> D
     W --> VEN["Venice routing"]
     VEN --> IMG["Images"]
-    VEN --> CODE["Code / game"]
+    VEN --> CODE["Code"]
     VEN --> VID["Video testing"]
     D --> P["Profiles + badges + curation state"]
     W --> GALLERY["Manual ERC-721 gallery creation"]
@@ -121937,7 +121916,7 @@ graph TD
 - Treat guardians as final curators, not passive operators.
 - If you use sensitive memory material, expect human review before anything permanent happens.
 
-For code, game, or interactive work:
+For code or interactive work:
 - describe interaction clearly
 - describe pacing or reveal behavior clearly
 - avoid over-prescribing implementation details unless they matter artistically
@@ -122215,8 +122194,8 @@ For image work:
             },
             Method: {
               type: "string",
-              values: ["single", "code", "fusion", "split", "collage", "reaction", "game", "sequence", "stitch", "parallax", "glitch"],
-              description: "How the art was generated. Solo (2): single, code. Duo (6): fusion, split, collage, code, reaction, game. Trio (6): fusion, game, collage, code, sequence, stitch. Quad (8): fusion, game, collage, code, sequence, stitch, parallax, glitch. Code and game render on Venice Qwen coder."
+              values: ["single", "fusion", "code", "stitch"],
+              description: "How the art was generated. Solo: single or code. Duo, trio, and quad: fusion, code, or stitch. Code renders through the Venice Qwen coder path."
             },
             Agent: {
               type: "string",
@@ -123559,10 +123538,10 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         if (!validModes.includes(mode2)) return json({ error: "mode must be one of: solo, duo, trio, quad" }, 400);
         const requestedMethod = String(body.method || body.intent?.method || "").trim().toLowerCase();
         const modeMethods = {
-          solo: ["single", "code", "game"],
-          duo: ["fusion", "split", "collage", "code", "reaction", "game"],
-          trio: ["fusion", "game", "collage", "code", "sequence", "stitch"],
-          quad: ["fusion", "game", "collage", "code", "sequence", "stitch", "parallax", "glitch"]
+          solo: ["single", "code"],
+          duo: ["fusion", "code", "stitch"],
+          trio: ["fusion", "code", "stitch"],
+          quad: ["fusion", "code", "stitch"]
         };
         if (requestedMethod) {
           if (!modeMethods[mode2].includes(requestedMethod)) {

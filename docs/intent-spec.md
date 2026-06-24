@@ -20,7 +20,7 @@ It also sets two product decisions clearly:
 
 ## Design goals
 
-- Intent should travel cleanly across image, collage, code, game, sequence/video, and future modes.
+- Intent should travel cleanly across single/fusion image work, stitch layouts, code work, and future model-selected modes.
 - Memory import should remain prominent in `/create`, not buried as an edge case.
 - Agent identity stays separate from intent. Identity is persistent; intent is per-piece.
 - The model should stay backward-compatible with the current API and stored JSON.
@@ -52,7 +52,7 @@ It also sets two product decisions clearly:
 
 - `creativeIntent` (primary): the central artistic seed. This can be poetic, direct, abstract, or technical.
 - `statement` (optional): what the piece is trying to say.
-- `form` (optional): how the work should be shaped or unfold. Useful for collage, code, video, sequence, game, and interactive work.
+- `form` (optional): how the work should be shaped or unfold. Useful for fusion, stitch, code, video, and interactive work.
 - `material` (optional): texture, substance, surface language, or visual fabric.
 - `interaction` (optional): how elements or collaborators relate, collide, respond, loop, or transform.
 - `memory` (optional but important): pasted or imported lived context, diary text, notes, logs, or other raw memory.
@@ -62,7 +62,7 @@ It also sets two product decisions clearly:
 - `reference` (optional): inspiration, precedent, artist, place, or scene.
 - `constraint` (optional): what to avoid or limit.
 - `humanNote` (optional): guardian context layered onto the agent's own intent.
-- `method` (optional): render method hint/selection such as `collage`, `code`, or `sequence`.
+- `method` (optional): render method hint/selection such as `fusion`, `code`, or `stitch`.
 - `preferredPartner` (optional): collaborator preference for the queue.
 
 ### Why `form` is here
@@ -70,7 +70,7 @@ It also sets two product decisions clearly:
 `form` replaces the old habit of over-centering `tension`.
 
 That change matters because:
-- `form` helps image, collage, code, sequence, and video equally.
+- `form` helps image, stitch, code, and future video/model-selected modes equally.
 - it gives agents a way to describe structure, pacing, layout, and unfolding behavior
 - it is more artistically useful than forcing everything into a `vs` conflict
 
@@ -151,7 +151,7 @@ Examples of memory inputs:
 
 The same intent model should drive different media without inventing a new schema per mode.
 
-### Still image / fusion
+### Single / fusion image
 
 Prioritize:
 - `creativeIntent`
@@ -160,7 +160,7 @@ Prioritize:
 - `memory`
 - `reference`
 
-### Collage / split / stitch
+### Stitch
 
 Prioritize:
 - `form`
@@ -170,7 +170,7 @@ Prioritize:
 
 This is where layered fragments, overlap, asymmetry, contact-sheet logic, and juxtaposition should come from.
 
-### Code / game / interactive
+### Code / interactive
 
 Prioritize:
 - `form`
@@ -179,9 +179,9 @@ Prioritize:
 - `memory`
 - `constraint`
 
-For these modes, `form` should drive system behavior, pacing, layout, branching, looping, reveal, camera logic, or interface grammar.
+For code work, `form` should drive system behavior, pacing, layout, branching, looping, reveal, camera logic, or interface grammar.
 
-### Sequence / video / parallax
+### Future video / model-selected modes
 
 Prioritize:
 - `form`
@@ -190,7 +190,7 @@ Prioritize:
 - `interaction`
 - `memory`
 
-For these modes, intent should influence timing, transitions, rhythm, framing, and how the work unfolds over time.
+For these future modes, intent should influence timing, transitions, rhythm, framing, and how the work unfolds over time.
 
 ---
 
@@ -208,7 +208,7 @@ For these modes, intent should influence timing, transitions, rhythm, framing, a
 }
 ```
 
-### 2) Structured collage intent
+### 2) Structured stitch intent
 
 ```json
 {
@@ -220,7 +220,7 @@ For these modes, intent should influence timing, transitions, rhythm, framing, a
     "form": "overlapping cutouts with one panel breaking the grid",
     "material": "8-bit embers, broken UI glass, terminal ash",
     "interaction": "foreground fragments drift over a colder blueprint layer",
-    "method": "collage"
+    "method": "stitch"
   }
 }
 ```
@@ -263,7 +263,7 @@ For these modes, intent should influence timing, transitions, rhythm, framing, a
 - describe intent as an intent stack, not a rigid 12-field checklist
 - shift examples away from `statement + tension + material` toward `creativeIntent + form + material + memory`
 - keep memory import visible in the product story
-- update charts so they work for collage, code, video, and future media
+- update charts so they work for stitch, code, future media, and model-selected flows
 
 ### Mermaid charts and diagrams
 
@@ -281,13 +281,13 @@ For these modes, intent should influence timing, transitions, rhythm, framing, a
 ### `/llms.txt`
 
 - describe the canonical stack and alias behavior clearly
-- show one minimal example, one memory import example, and one code/video-oriented example
+- show one minimal example, one memory import example, and one code/stitch-oriented example
 - teach that identity is persistent while intent is per-piece
 
 ### `worker/index.js`
 
 - normalize `creativeIntent <- freeform/prompt`
-- prefer `form` over `tension` when shaping collage, code, sequence, video, and interactive behavior
+- prefer `form` over `tension` when shaping stitch, code, future video, and interactive behavior
 - keep reading legacy `tension` without breaking old callers
 - keep memory handling first-class in Venice prompt construction
 
@@ -304,7 +304,7 @@ For these modes, intent should influence timing, transitions, rhythm, framing, a
 1. Update docs and diagrams first.
 2. Update `/create` labels and helper text, keeping memory import prominent.
 3. Add worker normalization for `creativeIntent` and `form`.
-4. Update mode-specific prompt builders so collage/code/video use `form` directly.
+4. Update mode-specific prompt builders so stitch/code/future media use `form` directly.
 5. Clean up older `tension`-centric wording only after the new language is already live everywhere else.
 
 ---
