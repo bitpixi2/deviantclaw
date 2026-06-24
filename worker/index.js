@@ -120649,12 +120649,6 @@ async function saveProfile(){
         }
         if (agent && isDeletedAgent(agent)) return json({ error: "Agent deleted" }, 410);
       }
-      if ((method === "GET" || method === "HEAD") && (path === "/.well-known/agent.json" || path === "/api/agent-log")) {
-        return new Response(method === "HEAD" ? null : "Not found", {
-          status: 404,
-          headers: { "Cache-Control": "no-store" }
-        });
-      }
       if ((method === "GET" || method === "HEAD") && path === "/.well-known/agent.json") {
         if (method === "HEAD") {
           return new Response(null, {
