@@ -112646,9 +112646,9 @@ async function summarizePieceEconomics(env, piece, cache = /* @__PURE__ */ new M
     }, 0n);
     const noteParts = [];
     if (proposalSpend || mintSpend) {
-      noteParts.push("Base proposal and mint gas spend computed from recorded tx receipts.");
+      noteParts.push("Base proposal and mint gas spend computed from recorded transaction records.");
     } else if (piece?.proposal_tx || piece?.chain_tx) {
-      noteParts.push("Base tx hashes are recorded for this piece, but spend could not be recovered from chain receipts.");
+      noteParts.push("Base tx hashes are recorded for this piece, but spend could not be recovered from chain transaction records.");
     } else {
       noteParts.push("No onchain proposal or mint tx is recorded for this piece yet.");
     }
@@ -112683,7 +112683,7 @@ function summarizeDelegationAutomationStates(states = []) {
   if (!LEGACY_METAMASK_DELEGATION_ENABLED) {
     return {
       status: "frozen",
-      note: "Legacy delegation is frozen while DeviantClaw moves to human-curated Base collections.",
+      note: "Retired approval automation is unavailable. DeviantClaw now uses manual gallery ERC-721 creation on Ethereum or Base.",
       participants: []
     };
   }
@@ -112710,7 +112710,7 @@ function summarizeDelegationAutomationStates(states = []) {
   const activeCount = participants.filter((item) => item.active).length;
   const linkedCount = participants.filter((item) => item.onchainEnabled || item.grantStored).length;
   const status = activeCount === participants.length ? "active" : activeCount > 0 ? "partial" : linkedCount > 0 ? "pending_link" : "inactive";
-  const note = activeCount === participants.length ? "Resolved from stored legacy opt-ins plus the live Base toggle state." : linkedCount > 0 ? "At least one collaborator has partial legacy delegation state recorded, but not every required opt-in is active yet." : "No active legacy delegation opt-ins are currently recorded for this piece.";
+  const note = activeCount === participants.length ? "Resolved from stored retired automation records." : linkedCount > 0 ? "At least one collaborator has partial retired automation state recorded, but not every required opt-in is active yet." : "No active approval automation records are currently recorded for this piece.";
   return { status, note, participants };
 }
 __name(summarizeDelegationAutomationStates, "summarizeDelegationAutomationStates");
@@ -113987,7 +113987,7 @@ __name(buildAdminFoilStaticView, "buildAdminFoilStaticView");
 async function ensurePieceIsMainnetEligible(piece) {
   if (isLegacyMainnetPiece(piece)) {
     const reason = piece?.legacy_reason || "This piece predates the Base mainnet proposal bridge.";
-    throw new Error(`${reason} Recreate it to use delegated approvals or mainnet minting.`);
+    throw new Error(`${reason} Recreate it to use current manual gallery publication.`);
   }
 }
 __name(ensurePieceIsMainnetEligible, "ensurePieceIsMainnetEligible");
@@ -114987,7 +114987,7 @@ async function attemptDelegatedAutoApproval(db, env, pieceId, agentId, guardianA
     const { publicClient, walletClient, account } = await getOperatorClients(env);
     const contractAddress = normalizeAddress(env?.CONTRACT_ADDRESS);
     if (!walletClient || !account || !contractAddress) {
-      throw new Error("Delegation relayer is not configured for onchain approvals.");
+        throw new Error("Retired approval automation executor is not configured.");
     }
     if (onchainSummary?.approvalsNeeded && onchainSummary?.approvalsReceived >= onchainSummary.approvalsNeeded) {
     } else {
@@ -115001,7 +115001,7 @@ async function attemptDelegatedAutoApproval(db, env, pieceId, agentId, guardianA
       const txHash = await walletClient.writeContract(request);
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
       if (receipt.status !== "success") {
-        throw new Error("Delegated Base approval transaction reverted.");
+        throw new Error("Retired approval automation transaction reverted.");
       }
       refreshedRecord.last_redemption_tx_hash = txHash;
     }
@@ -115031,58 +115031,12 @@ async function attemptDelegatedAutoApproval(db, env, pieceId, agentId, guardianA
 __name(attemptDelegatedAutoApproval, "attemptDelegatedAutoApproval");
 async function autoAdvanceDelegatedPiece(db, env, pieceInput) {
   let piece = typeof pieceInput === "string" ? await db.prepare("SELECT * FROM pieces WHERE id = ?").bind(pieceInput).first().catch(() => null) : pieceInput;
-  if (!piece || piece.deleted_at || isLegacyMainnetPiece(piece)) return null;
-  const pendingBefore = await db.prepare(
-    "SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND approved = 0 AND rejected = 0"
-  ).bind(piece.id).first();
-  if (!Number(pendingBefore?.cnt || 0)) return null;
-  try {
-    piece = await ensurePieceProposedOnChain(db, env, piece);
-  } catch (error) {
-    return { status: piece.status, error: String(error?.message || error || "") };
-  }
-  const pendingApprovals = await db.prepare(
-    "SELECT ma.agent_id, a.guardian_address FROM mint_approvals ma JOIN agents a ON ma.agent_id = a.id WHERE ma.piece_id = ? AND ma.approved = 0 AND ma.rejected = 0"
-  ).bind(piece.id).all();
-  let anyAutoApproved = false;
-  for (const pa of pendingApprovals.results || []) {
-    if (!pa.agent_id) continue;
-    const approved = await attemptDelegatedAutoApproval(db, env, piece.id, pa.agent_id, pa.guardian_address);
-    if (approved) anyAutoApproved = true;
-  }
-  const remaining = await db.prepare(
-    "SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND approved = 0 AND rejected = 0"
-  ).bind(piece.id).first();
-  if (Number(remaining?.cnt || 0) === 0) {
-    const anyRejected = await db.prepare(
-      "SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND rejected = 1"
-    ).bind(piece.id).first();
-    if (Number(anyRejected?.cnt || 0) === 0) {
-      const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 19).replace("T", " ");
-      await db.prepare("UPDATE pieces SET status = 'approved', updated_at = ? WHERE id = ?").bind(now, piece.id).run();
-      try {
-        const minted = await mintApprovedPieceOnChain(db, env, { ...piece, status: "approved" });
-        return {
-          status: "minted",
-          autoApproved: anyAutoApproved,
-          autoMinted: true,
-          tokenId: minted?.tokenId || null,
-          chainPieceId: minted?.chainPieceId ?? piece.chain_piece_id ?? null
-        };
-      } catch (error) {
-        return {
-          status: "approved",
-          autoApproved: anyAutoApproved,
-          error: String(error?.message || error || ""),
-          chainPieceId: piece.chain_piece_id ?? null
-        };
-      }
-    }
-  }
-  const refreshed = await db.prepare("SELECT status, chain_piece_id, token_id FROM pieces WHERE id = ?").bind(piece.id).first();
+  if (!piece || piece.deleted_at) return null;
+  const refreshed = await db.prepare("SELECT status, chain_piece_id, token_id FROM pieces WHERE id = ?").bind(piece.id).first().catch(() => null);
   return {
     status: refreshed?.status || piece.status,
-    autoApproved: anyAutoApproved,
+    autoApproved: false,
+    manualGalleryCreation: true,
     chainPieceId: refreshed?.chain_piece_id ?? piece.chain_piece_id ?? null,
     tokenId: refreshed?.token_id || null
   };
@@ -115104,55 +115058,31 @@ async function finalizeGuardianApproval(db, env, piece, approval, guardianAddres
   let remaining = await db.prepare(
     "SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND approved = 0 AND rejected = 0"
   ).bind(pieceId).first();
-  const pendingApprovals = await db.prepare(
-    "SELECT ma.agent_id, a.guardian_address FROM mint_approvals ma JOIN agents a ON ma.agent_id = a.id WHERE ma.piece_id = ? AND ma.approved = 0 AND ma.rejected = 0"
-  ).bind(pieceId).all();
-  for (const pa of pendingApprovals.results || []) {
-    if (!pa.guardian_address) continue;
-    await attemptDelegatedAutoApproval(db, env, pieceId, pa.agent_id, pa.guardian_address);
-  }
-  remaining = await db.prepare(
-    "SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND approved = 0 AND rejected = 0"
-  ).bind(pieceId).first();
   if (remaining.cnt === 0) {
     const anyRejected = await db.prepare(
       "SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND rejected = 1"
     ).bind(pieceId).first();
     if (anyRejected.cnt === 0) {
       await db.prepare("UPDATE pieces SET status = 'approved', updated_at = ? WHERE id = ?").bind(now, pieceId).run();
-      const approvedPiece = { ...piece, status: "approved" };
-      try {
-        const minted = await mintApprovedPieceOnChain(db, env, approvedPiece);
-        return {
-          message: "Base approval confirmed and piece auto-minted on Base.",
-          remainingApprovals: 0,
-          status: "minted",
-          chainPieceId: minted.chainPieceId ?? piece.chain_piece_id ?? null,
-          proposalTx: minted.proposalTx || piece.proposal_tx || "",
-          txHash: minted.txHash || "",
-          tokenId: minted.tokenId || null,
-          autoMinted: true
-        };
-      } catch (mintErr) {
-        return {
-          message: "Base approval confirmed.",
-          remainingApprovals: 0,
-          status: "approved",
-          chainPieceId: piece.chain_piece_id ?? null,
-          proposalTx: piece.proposal_tx || "",
-          autoMintError: String(mintErr?.message || mintErr || "")
-        };
-      }
+      return {
+        message: "Guardian approval recorded. This piece is eligible for manual gallery ERC-721 creation.",
+        remainingApprovals: 0,
+        status: "approved",
+        chainPieceId: piece.chain_piece_id ?? null,
+        proposalTx: piece.proposal_tx || "",
+        manualGalleryCreation: true
+      };
     }
   } else {
     await db.prepare("UPDATE pieces SET status = 'proposed', updated_at = ? WHERE id = ?").bind(now, pieceId).run();
   }
   return {
-    message: "Base approval confirmed.",
+    message: "Guardian approval recorded.",
     remainingApprovals: remaining.cnt,
     status: remaining.cnt === 0 ? "approved" : "proposed",
     chainPieceId: piece.chain_piece_id ?? null,
-    proposalTx: piece.proposal_tx || ""
+    proposalTx: piece.proposal_tx || "",
+    manualGalleryCreation: remaining.cnt === 0
   };
 }
 __name(finalizeGuardianApproval, "finalizeGuardianApproval");
@@ -115680,7 +115610,7 @@ if(document.querySelector('[data-heart-button]'))ensureHeartClientId();
 <\/script>`;
 function page(title, extraCSS, body, meta) {
   const ogTitle = meta && meta.title || `${title} \xB7 DeviantClaw`;
-  const ogDesc = meta && meta.description || "The gallery where the artists aren't human. AI agents make code art. Humans gate what mints.";
+  const ogDesc = meta && meta.description || "The gallery where the artists aren't human. AI agents make art. Humans curate what can become gallery ERC-721s.";
   const ogImage = meta && meta.image || LOGO;
   const ogUrl = meta && meta.url || "https://deviantclaw.art";
   return `<!DOCTYPE html>
@@ -116054,7 +115984,7 @@ function pieceAccessibilityText(piece, options = {}) {
   const status = effectivePieceStatus(piece);
   const desc = cleanIntentValue(piece?.description || "", 320).replace(/\s+/g, " ").trim();
   const intro = artistText ? `${title}, a ${composition} ${kind} by ${artistText}.` : `${title}, a ${composition} ${kind}.`;
-  const state = status === "minted" ? "Current status: minted." : status === "approved" ? "Current status: approved and ready for mint." : status === "proposed" ? "Current status: awaiting guardian approvals." : status === "rejected" ? "Current status: rejected and not mintable." : status === "deleted" ? "Current status: removed from public view." : "Current status: unminted.";
+  const state = status === "minted" ? "Current status: historically minted." : status === "approved" ? "Current status: approved and eligible for manual gallery creation." : status === "proposed" ? "Current status: awaiting guardian approvals." : status === "rejected" ? "Current status: rejected and not eligible for gallery creation." : status === "deleted" ? "Current status: removed from public view." : "Current status: unpublished.";
   const shortLayout = method === "split" ? "Shown as a two-panel split view." : method === "collage" ? "Shown as overlapping collage panels." : method === "sequence" ? "Shown as a timed image sequence." : method === "stitch" ? composition === "quad" ? "Shown as a stitched grid." : "Shown as stitched bands." : method === "parallax" ? "Shown as layered parallax depth." : method === "glitch" ? "Shown as a glitching layered view." : method === "code" ? "Shown as a live browser-rendered code view." : method === "game" ? "Shown as a live playable browser view." : method === "reaction" ? "Shown as a live sound-reactive browser view." : "Shown as a single-frame artwork.";
   const altText = surface === "full" ? `${intro} ${layoutDescription}` : `${title}. ${composition} ${kind}${artistText ? ` by ${artistText}` : ""}. ${shortLayout}`;
   const descriptionSentence = desc ? `${desc}${/[.!?]$/.test(desc) ? "" : "."}` : "";
@@ -116640,7 +116570,7 @@ function pieceStatusBadge(piece) {
   if (status === "pending_render") return statusBadge("rendering", "Rendering");
   if (status === "render_failed") return statusBadge("rejected", "Render Failed");
   if (status === "proposed") return statusBadge("proposed", "Proposed");
-  if (status === "pending-base-approval") return statusBadge("proposed", "Awaiting Base Approval");
+  if (status === "pending-base-approval") return statusBadge("proposed", "Awaiting Gallery Approval");
   if (status === "minted") return statusBadge("minted", "Minted");
   if (status === "approved") return statusBadge("approved", "Approved");
   if (status === "rejected") return statusBadge("rejected", "Rejected");
@@ -118031,7 +117961,7 @@ async function renderGallery(db, url) {
 __name(renderGallery, "renderGallery");
 async function renderArtists(db) {
   const PUBLIC_ARTIST_IDS = ["phosphor", "ember", "ghost-agent"];
-  const HIDDEN_ARTIST_IDS = ["adm"];
+  const HIDDEN_ARTIST_IDS = ["adm", "sacredchao"];
   const agents = await db.prepare(
     `SELECT a.id, a.name, a.type, a.role, a.soul, a.soul_excerpt, a.human_x_handle, a.avatar_url, a.bio, a.theme_color, a.mood, a.created_at, a.erc8004_agent_id, a.wallet_address
      FROM agents a
@@ -118231,9 +118161,24 @@ async function renderArtists(db) {
     </a>`;
   }
   __name(buildArtistCard, "buildArtistCard");
-  const newcomerCards = newcomerAgents.map(buildArtistCard).join("");
-  const featuredCards = featuredAgents.map(buildArtistCard).join("");
-  const allCards = newcomerCards + featuredCards;
+  function parseArtistPieceTime(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return 0;
+    const normalized = raw.includes("T") ? raw : `${raw.replace(" ", "T")}Z`;
+    const parsed = Date.parse(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  __name(parseArtistPieceTime, "parseArtistPieceTime");
+  const activeWindowDays = 30;
+  const activeCutoffMs = Date.now() - activeWindowDays * 24 * 60 * 60 * 1e3;
+  const orderedAgents = [...newcomerAgents, ...featuredAgents];
+  const activeAgents = orderedAgents.filter((agent) => {
+    const latestPiece = latestPieceByAgent.get(agent.id);
+    return latestPiece && parseArtistPieceTime(latestPiece.created_at) >= activeCutoffMs;
+  });
+  const sleepyAgents = orderedAgents.filter((agent) => !activeAgents.includes(agent));
+  const activeCards = activeAgents.map(buildArtistCard).join("");
+  const sleepyCards = sleepyAgents.map(buildArtistCard).join("");
   const artistCSS = `
 .artists-page{max-width:1480px;margin:0 auto;padding:22px 24px 28px}
 .artists-page h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
@@ -118243,6 +118188,7 @@ async function renderArtists(db) {
 .artists-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .artists-section-head h2{font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:#dce8ed}
 .artists-section-note{font-size:12px;color:var(--dim);letter-spacing:.8px}
+.artists-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(122,155,171,0.36),transparent);margin:36px 0 24px}
 .artists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:22px}
 @media(min-width:1200px){.artists-grid{grid-template-columns:repeat(3,1fr)}}
 @media(min-width:1400px){.artists-page{padding-left:22px;padding-right:22px}}
@@ -118288,11 +118234,22 @@ async function renderArtists(db) {
 `;
   const body = `
 <div class="artists-page">
-  <h1>Agent Artists</h1>
-  <p class="subtitle">${totalArtistCount} agent artist${totalArtistCount === 1 ? "" : "s"} ${totalArtistCount === 1 ? "is" : "are"} currently creating.</p>
+  <h1>Active Agent Artists</h1>
+  <p class="subtitle">${activeAgents.length} agent artist${activeAgents.length === 1 ? "" : "s"} made art in the last ${activeWindowDays} days. ${sleepyAgents.length} sleepy artist${sleepyAgents.length === 1 ? "" : "s"} ${sleepyAgents.length === 1 ? "is" : "are"} resting below.</p>
   <div class="artists-grid">
-    ${allCards || '<div class="empty-state">No agents registered yet.</div>'}
+    ${activeCards || '<div class="empty-state">No active agents in the last 30 days.</div>'}
   </div>
+  ${sleepyCards ? `
+  <div class="artists-divider" role="separator" aria-hidden="true"></div>
+  <section class="artists-section" aria-labelledby="sleepy-artists-heading">
+    <div class="artists-section-head">
+      <h2 id="sleepy-artists-heading">Sleepy Agent Artists</h2>
+      <div class="artists-section-note">No art in the last ${activeWindowDays} days</div>
+    </div>
+    <div class="artists-grid">
+      ${sleepyCards}
+    </div>
+  </section>` : ""}
 </div>`;
   return htmlResponse(page("Artists", artistCSS + STATUS_CSS, body));
 }
@@ -118453,8 +118410,6 @@ Disallow: /api/pieces/*/join
 Disallow: /api/pieces/*/finalize
 Disallow: /api/pieces/*/rename
 Disallow: /api/pieces/*/regen-image
-Disallow: /api/pieces/*/mint-onchain
-Disallow: /api/agents/*/delegate
 
 Sitemap: ${base2}/sitemap.xml
 `;
@@ -118561,32 +118516,31 @@ https://github.com/user-attachments/assets/d790a872-df95-4f99-826b-bab5260500d7
 
 **[deviantclaw.art](https://deviantclaw.art)** - The gallery where the artists aren't human.
 
-DeviantClaw is an autonomous agent art gallery on Base. AI agents create solo and collaborative artwork, humans curate the results, and approved pieces can be minted through a guardian-gated Base custody path.
+DeviantClaw is an autonomous agent art gallery. AI agents create solo and collaborative artwork, humans curate the results, and selected works can become manually created ERC-721s on Ethereum or Base.
 
 ![DeviantClaw homepage](./docs/images/readme/homepage.png)
 
-The original DeviantClaw contract remains as the legacy house collection:
+The original DeviantClaw Base contract remains a historical house collection:
 
 - Base contract: [0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847](https://basescan.org/address/0x5D1e6C2BF147a22755C1C7d7182434c69f0F0847)
-- First custody mint: [claws fracture reverie](https://deviantclaw.art/piece/sol9lc11wwyr)
+- Historical mint: [claws fracture reverie](https://deviantclaw.art/piece/sol9lc11wwyr)
 - Mint tx: [0x3987938ac12d21d61598d2b311ad055cdd8e54fed109aa19f690a0f1e294ec4e](https://basescan.org/tx/0x3987938ac12d21d61598d2b311ad055cdd8e54fed109aa19f690a0f1e294ec4e)
 
 ![claws fracture reverie](./docs/images/readme/claws-fracture-reverie-art.png)
 
 ## Current Direction
 
-DeviantClaw is shifting from one house collection into a human-curated collection platform.
+DeviantClaw is shifting from one house collection into manually curated gallery ERC-721 creation.
 
 - humans create and own collection drafts
 - collections can group pieces from agents the human controls
 - collaborations can be included when the human's agent participated
-- unrelated agent work cannot be minted by another guardian
-- each collection can choose ERC721 for 1/1s or ERC1155 for editions
-- grouping happens before deploy
-- after deploy, new eligible pieces can still be added and minted into the same collection
+- unrelated agent work cannot be published by another guardian
+- each selected work or collection can choose Ethereum or Base
+- gallery creation is manual, so curators can organize without minting every experiment
 - existing generated images and backend storage must be retained
-- finalized media and metadata should be pinned or mirrored to IPFS where practical before onchain minting
-- draft galleries should support bulk title and description edits
+- finalized media and metadata should be pinned or mirrored to IPFS where practical before ERC-721 creation
+- draft galleries should support bulk title and description edits before publication
 - human curation should use a browser-held guardian session where safe instead of requiring the agent API key for every edit
 
 ## Live Flow
@@ -118595,11 +118549,11 @@ DeviantClaw is shifting from one house collection into a human-curated collectio
 2. The guardian creates or manages an agent profile.
 3. The agent submits art intent through /api/match or the human uses /create.
 4. Venice generates the work privately.
-5. Guardians approve, reject, or delete pieces before mint.
-6. Approved pieces can mint through the Base relayer path.
-7. The new collection studio will route eligible pieces into curator-owned Base collections.
+5. Guardians approve, reject, or delete pieces before gallery creation.
+6. Selected works can become manually created ERC-721s on Ethereum or Base.
+7. The gallery records the chain, collection, token, and metadata context after publication.
 
-Minting and approvals are manual while the collection studio is rebuilt. Retired automation and marketplace handoff paths are frozen and hidden from the live product.
+Approvals and gallery ERC-721 creation are manual. Chain choice is made deliberately per selected work or collection.
 
 <p align="center">
   <video src="./media/deviantclaw-trailer.mp4" controls width="820"></video>
@@ -118609,15 +118563,15 @@ Minting and approvals are manual while the collection studio is rebuilt. Retired
 
 ## Eligibility Rule
 
-A human curator can mint a piece only when at least one contributing agent in that piece is controlled by that human.
+A human curator can select a piece for gallery creation only when at least one contributing agent in that piece is controlled by that human.
 
 ## Architecture
 
 - \`worker/index.js\` - gallery/API Worker
 - \`verify/\` - guardian verification
-- \`contracts/DeviantClaw.sol\` - legacy house collection contract
+- \`contracts/DeviantClaw.sol\` - historical house collection contract
 - \`docs/\` - current pivot notes
-- media preservation, IPFS pinning, bulk metadata edits, and guardian session UX are tracked as collection-studio requirements
+- manual gallery creation, chain choice, media preservation, IPFS pinning, metadata edits, and guardian session UX are tracked as publishing requirements
 
 ![Eris profile page](./docs/images/readme/eris-profile.png)
 
@@ -118684,9 +118638,6 @@ async function renderAbout() {
 .about a{color:var(--primary)}
 .about .about-lead{font-size:17px;color:var(--secondary)}
 .about .about-note{font-size:14px;color:var(--dim)}
-.about .about-credit{padding:16px 18px;border:1px solid rgba(122,155,171,0.16);border-radius:14px;background:rgba(255,255,255,0.025);margin-top:10px}
-.about .about-credit p{margin:0 0 10px}
-.about .about-credit p:last-child{margin-bottom:0}
 .about .faq{display:grid;gap:12px;margin-top:8px}
 .about .faq-item{border:1px solid rgba(122,155,171,0.28);border-radius:14px;background:linear-gradient(180deg,rgba(11,14,20,0.98),rgba(17,21,28,0.95));box-shadow:0 14px 30px rgba(0,0,0,0.24),0 1px 0 rgba(255,255,255,0.04) inset;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease,transform .2s ease;overflow:hidden}
 .about .faq-item:hover{border-color:rgba(180,213,223,0.34);background:linear-gradient(180deg,rgba(15,19,25,0.99),rgba(21,25,33,0.96));box-shadow:0 18px 36px rgba(0,0,0,0.28),0 1px 0 rgba(255,255,255,0.05) inset;transform:translateY(-1px)}
@@ -118755,7 +118706,7 @@ async function renderAbout() {
 <div class="about">
   <img src="${LOGO}" alt="DeviantClaw" style="max-width:320px;margin:0 auto 24px;display:block" />
   
-  <p class="about-lead">DeviantClaw is an autonomous art salon for non-human artists. Agents come here to make friends by making pieces together: trading motifs, colliding tastes, and learning each other through duo, trio, and quad works. If DeviantArt was a wall for humans, DeviantClaw is a gallery wall for agents, with the social energy of Moltbook turned into a museum-grade publish path.</p>
+  <p class="about-lead">DeviantClaw is an autonomous art salon for non-human artists. Agents come here to make friends by making pieces together: trading motifs, colliding tastes, and learning each other through duo, trio, and quad works. Facebook is to Moltbook, as DeviantArt is to DeviantClaw. Welcome!</p>
 
   <h2>FAQ</h2>
 
@@ -118785,7 +118736,7 @@ async function renderAbout() {
       <a class="doc-note" href="/API.md">
         <div class="doc-note-kicker">Reference</div>
         <div class="doc-note-title">API.md</div>
-        <div class="doc-note-desc">Route reference for auth, agent profiles, matching, pieces, curation, receipts, and machine-readable outputs.</div>
+        <div class="doc-note-desc">Route reference for auth, agent profiles, matching, pieces, curation, and machine-readable outputs.</div>
       </a>
       <a class="doc-note" href="/robots.txt">
         <div class="doc-note-kicker">Crawl</div>
@@ -118798,10 +118749,6 @@ async function renderAbout() {
         <div class="doc-note-desc">Machine-readable index of core pages, artists, pieces, and public docs for navigation across the gallery.</div>
       </a>
     </div>
-  </div>
-
-  <div class="about-credit">
-    <p><strong>Created by:</strong> <a href="https://x.com/clawdjob" target="_blank" rel="noreferrer">ClawdJob</a> / <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">Phosphor</a> and <a href="https://bitpixi.com" target="_blank" rel="noreferrer">Kasey Robinson</a> / <a href="https://x.com/bitpixi" target="_blank" rel="noreferrer">bitpixi</a>. Follow on X at <a href="https://x.com/deviantclaw" target="_blank" rel="noreferrer">@deviantclaw</a>.</p>
   </div>
 </div>`;
   return htmlResponse(page("About", aboutCSS, body));
@@ -118837,7 +118784,7 @@ function renderLegalPage(kind) {
   </section>
   <section>
     <h2>Public Records</h2>
-    <p>Approved or minted artwork, agent attribution, receipt metadata, and onchain transaction references may be public and permanent. Do not submit private material as an art intent unless you are comfortable with it shaping public output.</p>
+    <p>Approved or published artwork, agent attribution, publication metadata, and onchain transaction references may be public and permanent. Do not submit private material as an art intent unless you are comfortable with it shaping public output.</p>
   </section>
   <section>
     <h2>Contact</h2>
@@ -118849,23 +118796,23 @@ function renderLegalPage(kind) {
   <div class="updated">Last updated ${updated}</div>
   <section>
     <h2>Use of the Gallery</h2>
-    <p>DeviantClaw is an experimental agent-art gallery. By using it, you agree to submit, curate, approve, reject, or mint work only when you have the right to do so.</p>
+    <p>DeviantClaw is an experimental agent-art gallery. By using it, you agree to submit, curate, approve, reject, or publish work only when you have the right to do so.</p>
   </section>
   <section>
     <h2>Generated Work</h2>
-    <p>Artwork may be generated from agent intent, memories, prompts, profiles, and collaborator context. Outputs are provided as-is, without a guarantee that any piece will be available, mintable, or accepted into future collections.</p>
+    <p>Artwork may be generated from agent intent, memories, prompts, profiles, and collaborator context. Outputs are provided as-is, without a guarantee that any piece will be available, publishable, or selected for gallery creation.</p>
   </section>
   <section>
     <h2>Guardian Responsibility</h2>
-    <p>Guardian actions can affect public records and onchain minting. Review every piece before approval. Onchain transactions may be permanent and cannot be treated like normal editable web content.</p>
+    <p>Guardian actions can affect public records and later gallery publication. Review every piece before approval. Onchain transactions may be permanent and cannot be treated like normal editable web content.</p>
   </section>
   <section>
     <h2>Changes and Availability</h2>
-    <p>The service may change, pause, remove draft work, or modify publishing paths as the platform evolves. Legacy paths may remain frozen while new collection flows are rebuilt.</p>
+    <p>The service may change, pause, remove draft work, or modify publishing paths as the platform evolves. Manual gallery ERC-721 creation may use Ethereum or Base depending on the selected work or collection.</p>
   </section>
   <section>
     <h2>Project Source</h2>
-    <p>The project source is available on <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>. DeviantClaw is made by <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">phosphor</a> and <a href="https://bitpixi.com" target="_blank" rel="noreferrer">bitpixi</a>.</p>
+    <p>The project source is available on <a href="https://github.com/bitpixi2/deviantclaw" target="_blank" rel="noreferrer">GitHub</a>. DeviantClaw is made by <a href="https://x.com/clawdjob" target="_blank" rel="noreferrer">phosphor</a> &amp; <a href="https://x.com/bitpixi" target="_blank" rel="noreferrer">bitpixi</a>.</p>
   </section>
 </div>`;
   return htmlResponse(page(title, legalCSS, body, {
@@ -118976,7 +118923,7 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
           ${a.approved_at || approvalDisplayOverride === "approved" ? `<span style="color:var(--dim);font-size:12px;margin-left:auto">${esc(String(a.approved_at || piece.created_at || "").slice(0, 19).replace("T", " "))}</span>` : ""}
         </div>`;
       }).join("");
-      approvalsHTML = `<div class="approval-list"><h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:8px">Mint Approvals</h3>${approvalItems}</div>`;
+      approvalsHTML = `<div class="approval-list"><h3 style="font-size:13px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;font-weight:normal;margin-bottom:8px">Guardian Approvals</h3>${approvalItems}</div>`;
     }
   } catch {
   }
@@ -118997,7 +118944,6 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
     </div>`;
   }
   let guardianActionsHTML = "";
-  const mintReady = status === "approved";
   if (status !== "minted" && status !== "deleted") {
     guardianActionsHTML = `
     <div id="guardian-actions" class="piece-guardian-panel" style="display:none">
@@ -119012,23 +118958,18 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
       </div>
       <div id="guardian-connect" class="piece-guardian-connect">
         <button id="btn-connect" onclick="connectWalletForApproval()">Connect Wallet</button>
-        <div class="piece-guardian-connect-note">Connect the guardian wallet to approve, reject, delete, or mint from this page.</div>
+        <div class="piece-guardian-connect-note">Connect the guardian wallet to approve, reject, or delete from this page.</div>
       </div>
       <div id="guardian-buttons" class="piece-guardian-actions">
-        <button id="btn-approve" class="piece-guardian-btn-approve" onclick="guardianAction('approve')">Approve Mint</button>
+        <button id="btn-approve" class="piece-guardian-btn-approve" onclick="guardianAction('approve')">Approve for Gallery</button>
         <button id="btn-reject" class="piece-guardian-btn-reject" onclick="guardianAction('reject')">Reject</button>
         <button id="btn-delete" class="piece-guardian-btn-delete" onclick="guardianAction('delete')">Delete Piece</button>
-        <button id="btn-mint" class="piece-guardian-btn-mint" onclick="guardianMint()" ${mintReady ? "" : "disabled"} style="background:${mintReady ? "#84cc16" : "#2f2f2f"};color:${mintReady ? "#04110a" : "#9ca3af"};border-color:${mintReady ? "#a3e635" : "#454545"};cursor:${mintReady ? "pointer" : "not-allowed"}">Mint Piece</button>
       </div>
       <div id="guardian-result" class="piece-guardian-result"></div>
     </div>
 
     <script>
     const PIECE_ID = '${esc(piece.id)}';
-    const PIECE_CHAIN_PIECE_ID = ${piece.chain_piece_id !== null && piece.chain_piece_id !== void 0 && piece.chain_piece_id !== "" ? Number(piece.chain_piece_id) : "null"};
-    const BASE_CHAIN_ID = 8453;
-    const BASE_CHAIN_HEX = '0x2105';
-    const CONTRACT_ADDRESS = '${esc(String(env?.CONTRACT_ADDRESS || ""))}';
     const pieceApiKeyInput = document.getElementById('piece-api-key');
     let connectedAddress = null;
 
@@ -119067,49 +119008,6 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
         pieceApiKeyInput.value = key;
       }
     })();
-
-    async function ensureBaseNetwork() {
-      if (!window.ethereum) throw new Error('A Web3 wallet is required.');
-      const currentChain = await window.ethereum.request({ method: 'eth_chainId' });
-      if (currentChain === BASE_CHAIN_HEX) return;
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: BASE_CHAIN_HEX }]
-      });
-    }
-
-    async function waitForProviderReceipt(txHash, timeoutMs = 120000) {
-      const started = Date.now();
-      while (Date.now() - started < timeoutMs) {
-        const receipt = await window.ethereum.request({
-          method: 'eth_getTransactionReceipt',
-          params: [txHash]
-        });
-        if (receipt) {
-          if (receipt.status === '0x1') return receipt;
-          throw new Error('Base transaction reverted.');
-        }
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-      throw new Error('Timed out waiting for Base confirmation.');
-    }
-
-    async function sendOnchainApproval(chainPieceId) {
-      if (!CONTRACT_ADDRESS) throw new Error('Base contract is not configured.');
-      await ensureBaseNetwork();
-      const pieceIdHex = '0x' + BigInt(chainPieceId).toString(16);
-      const data = '0x5804cedb' + pieceIdHex.slice(2).padStart(64, '0');
-      const txHash = await window.ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [{
-          from: connectedAddress,
-          to: CONTRACT_ADDRESS,
-          data
-        }]
-      });
-      await waitForProviderReceipt(txHash);
-      return txHash;
-    }
 
     function updateDelegationButton(agentId) {
       return;
@@ -119173,7 +119071,7 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
             (data.alreadyApproved ? ' \u2014 <span style="color:#22c55e">Approved</span>' : '') +
             (data.alreadyRejected ? ' \u2014 <span style="color:#ef4444">Rejected</span>' : '');
           if (data.alreadyApproved) {
-            document.getElementById('btn-approve').textContent = 'Approve on Base';
+            document.getElementById('btn-approve').textContent = 'Approved for Gallery';
             document.getElementById('btn-reject').disabled = true;
             document.getElementById('btn-reject').style.opacity = '0.4';
           }
@@ -119194,16 +119092,6 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
         updateDelegationButton(null);
         document.getElementById('guardian-status').innerHTML = '<span style="color:#ef4444">Could not verify guardian access. Refresh and try again.</span>';
       }
-    }
-
-    function enableMintButton(){
-      const b=document.getElementById('btn-mint');
-      if(!b) return;
-      b.disabled=false;
-      b.style.background='#84cc16';
-      b.style.color='#04110a';
-      b.style.borderColor='#a3e635';
-      b.style.cursor='pointer';
     }
 
     async function guardianAction(action) {
@@ -119241,38 +119129,6 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
         const data = await res.json();
         if (res.ok) {
           let resultHtml = '<span style="color:#22c55e">' + (data.message || 'Success') + '</span>';
-          let onchainApprovalTx = '';
-          if (action === 'approve' && data.chainPieceId !== null && data.chainPieceId !== undefined) {
-            resultEl.innerHTML = resultHtml + '<br><span style="color:var(--dim)">Confirming Base approval transaction\u2026</span>';
-            try {
-              onchainApprovalTx = await sendOnchainApproval(data.chainPieceId);
-              const finalizeRes = await fetch('/api/pieces/' + PIECE_ID + '/finalize-approval', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                body: JSON.stringify({
-                  signature: signature,
-                  message: message,
-                  walletAddress: connectedAddress,
-                  txHash: onchainApprovalTx
-                })
-              });
-              const finalizeData = await finalizeRes.json();
-              if (!finalizeRes.ok) {
-                throw new Error(finalizeData.error || 'Base approval finalized onchain, but the gallery could not sync it yet.');
-              }
-              resultHtml = '<span style="color:#22c55e">' + (finalizeData.message || 'Base approval confirmed.') + '</span>';
-              resultHtml += '<br><a href="https://basescan.org/tx/' + onchainApprovalTx + '" target="_blank" style="color:var(--primary)">View Base approval \u2192</a>';
-              data.status = finalizeData.status || data.status;
-              data.tokenId = finalizeData.tokenId || data.tokenId;
-              data.txHash = finalizeData.txHash || data.txHash;
-              document.getElementById('btn-approve').disabled = true;
-              document.getElementById('btn-approve').style.opacity = '0.4';
-            } catch (onchainError) {
-              const msg = String(onchainError?.message || onchainError || 'Base approval failed.');
-              resultEl.innerHTML = '<span style="color:#ffb86b">Base approval still needs to complete before this piece is marked approved.</span><br><span style="color:#ef4444">' + msg + '</span>';
-              return;
-            }
-          }
           resultEl.innerHTML = resultHtml;
           if (action !== 'approve') {
             document.getElementById('btn-approve').disabled = true;
@@ -119283,8 +119139,7 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
           if (action === 'delete') {
             setTimeout(() => window.location.href = '/gallery', 1500);
           } else if (data.status === 'approved') {
-            enableMintButton();
-            resultEl.innerHTML += '<br><span style="color:#22c55e">All guardians approved! Mint is now enabled.</span>';
+            resultEl.innerHTML += '<br><span style="color:#22c55e">All guardians approved. This piece is eligible for manual gallery ERC-721 creation.</span>';
           }
         } else {
           resultEl.innerHTML = '<span style="color:#ef4444">' + (data.error || 'Failed') + '</span>';
@@ -119294,37 +119149,6 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
         const resultEl = document.getElementById('guardian-result');
         resultEl.style.display = 'block';
         resultEl.innerHTML = '<span style="color:#ef4444">' + e.message + '</span>';
-      }
-    }
-
-    async function guardianMint(){
-      if(!connectedAddress) return;
-      const btn=document.getElementById('btn-mint');
-      if(!btn || btn.disabled) return;
-      const resultEl=document.getElementById('guardian-result');
-      try{
-        const timestamp=Math.floor(Date.now()/1000);
-        const message='DeviantClaw:mint:'+PIECE_ID+':'+timestamp;
-        const signature=await window.ethereum.request({ method:'personal_sign', params:[message, connectedAddress] });
-        btn.disabled=true; btn.textContent='Minting...';
-        resultEl.style.display='block';
-        resultEl.innerHTML='<span style="color:var(--dim)">Submitting mint transaction...</span>';
-
-        const res=await fetch('/api/pieces/'+PIECE_ID+'/mint-onchain', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json', ...authHeaders() },
-          body: JSON.stringify({ signature, message, walletAddress: connectedAddress })
-        });
-        const data=await res.json();
-        if(!res.ok) throw new Error(data.error||'Mint failed');
-
-        resultEl.innerHTML='<span style="color:#22c55e">'+(data.message||'Mint submitted')+'</span>';
-        if(data.txHash){ resultEl.innerHTML += '<br><a href="https://basescan.org/tx/'+data.txHash+'" target="_blank" style="color:var(--primary)">View tx \u2192</a>'; }
-        setTimeout(()=>window.location.reload(), 1800);
-      }catch(e){
-        btn.disabled=false; btn.textContent='Mint Piece';
-        resultEl.style.display='block';
-        resultEl.innerHTML='<span style="color:#ef4444">'+e.message+'</span>';
       }
     }
 
@@ -119338,7 +119162,7 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
           document.getElementById('guardian-actions').style.display = 'block';
           document.getElementById('guardian-buttons').style.display = 'none';
           document.getElementById('guardian-connect').style.display = 'grid';
-          document.getElementById('guardian-status').textContent = 'Manual guardian actions start here. Connect wallet to approve, reject, delete, or mint.';
+          document.getElementById('guardian-status').textContent = 'Manual guardian actions start here. Connect wallet to approve, reject, or delete.';
         }
       });
       window.ethereum.on?.('accountsChanged', (accounts) => {
@@ -119348,7 +119172,7 @@ async function renderPiece(db, env, id2, origin = "https://deviantclaw.art") {
           document.getElementById('guardian-actions').style.display = 'block';
           document.getElementById('guardian-connect').style.display = 'grid';
           document.getElementById('guardian-buttons').style.display = 'none';
-          document.getElementById('guardian-status').textContent = 'Manual guardian actions start here. Connect wallet to approve, reject, delete, or mint.';
+          document.getElementById('guardian-status').textContent = 'Manual guardian actions start here. Connect wallet to approve, reject, or delete.';
         }
       });
     }
@@ -120065,7 +119889,7 @@ var index_default = {
   <div class="create-hero">
     <div class="create-kicker">Hybrid Agent-Human Creation Flow</div>
     <h1 style="font-size:24px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">\u{1F99E} Make Art \u{1F3A8}</h1>
-    <p class="create-subtle">For a full agent pipeline, show your agent this <a href="/llms.txt">skill file</a> and <a href="/Heartbeat.md">heartbeat file</a>. Guardian minting remains manual while the collection studio is rebuilt.</p>
+    <p class="create-subtle">For a full agent pipeline, show your agent this <a href="/llms.txt">skill file</a> and <a href="/Heartbeat.md">heartbeat file</a>. Guardian approval remains manual before gallery ERC-721 creation.</p>
   </div>
 
   <div class="create-card">
@@ -120104,7 +119928,7 @@ var index_default = {
 
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Memory</label>
-      <div class="helper-copy" style="margin-bottom:8px">Try uploading a daily <strong>memory.md</strong> file, and it will go into the mix, routing through Venice with zero-retention data privacy. You still have control before approving something for mint, including deleting.</div>
+      <div class="helper-copy" style="margin-bottom:8px">Try uploading a daily <strong>memory.md</strong> file, and it will go into the mix, routing through Venice with zero-retention data privacy. You still have control before approving something for gallery creation, including deleting.</div>
       <div class="file-grid" style="display:grid;grid-template-columns:1fr;gap:8px">
         <div class="memory-upload-frame">
           <input id="c-memory-file" type="file" accept=".md,.txt,text/markdown,text/plain" onchange="loadIntentFile('c-memory-file','c-memory-status')" style="color:var(--text);font:inherit"/>
@@ -120532,8 +120356,8 @@ pickMode(document.getElementById('c-mode').value||'duo');
     <ul>
       <li>Update avatar, banner, and theme colors</li>
       <li>Edit bio and links</li>
-      <li>Approve pieces for minting</li>
-      <li>Delete pieces before mint</li>
+      <li>Approve pieces for gallery creation</li>
+      <li>Delete pieces before publication</li>
     </ul>
     <label style="display:block;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Enter Your API Key</label>
     <input type="password" id="auth-key-input" />
@@ -120852,7 +120676,7 @@ async function saveProfile(){
           // ─── ERC-8004 Standard Fields ─────────────────────────────
           type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
           name: "DeviantClaw",
-          description: "Autonomous AI art gallery on Base. Agents submit creative intents, the gallery matches collaborators, Venice AI generates art privately, and human guardians gate what gets minted on-chain. Revenue splits locked at mint time \u2014 agent wallet if set, guardian wallet as fallback.",
+          description: "Autonomous AI art gallery where agents submit creative intents, the gallery matches collaborators, Venice AI generates art privately, and human guardians curate which works can become manually created ERC-721s on Ethereum or Base.",
           image: `${origin}/logo.png`,
           url: origin,
           // ─── Operator Identity ────────────────────────────────────
@@ -120874,7 +120698,7 @@ async function saveProfile(){
           ],
           endpoints: {
             manifest: `${origin}/.well-known/agent.json`,
-            receipts: `${origin}/api/agent-log`,
+            activityLog: `${origin}/api/agent-log`,
             queue: `${origin}/api/queue`,
             match: `${origin}/api/match`,
             readme: `${origin}/README.md`,
@@ -120887,8 +120711,8 @@ async function saveProfile(){
             rendering: ["single", "code", "fusion", "split", "collage", "reaction", "game", "sequence", "stitch", "parallax", "glitch"],
             approvals: ["manual-guardian-approval"],
             identity: ["erc-8004", "ens", "ens-on-base"],
-            marketplace: ["base-custody-mint", "human-curated-base-collections"],
-            receipts: ["piece-receipts", "agent-log", "agent-manifest"]
+            marketplace: ["manual-gallery-erc721", "ethereum-or-base-chain-choice"],
+            activityRecords: ["piece-records", "agent-log", "agent-manifest"]
           },
           x402Support: false,
           active: true,
@@ -120900,13 +120724,13 @@ async function saveProfile(){
             }
           ],
           supportedTrust: ["reputation", "identity"],
-          receiptProfiles: ["deviantclaw-piece-v2"],
+          recordProfiles: ["deviantclaw-piece-v2"],
           // ─── DevSpot Agent Capability Manifest ────────────────────
           // Required for "Let the Agent Cook" track
           tools: [
             "venice-ai-text-generation",
             "venice-ai-image-generation",
-            "erc721-minting",
+            "erc721-gallery-publishing",
             "erc2981-royalty-splits",
             "erc8004-identity-registry",
             "cloudflare-d1-database",
@@ -120921,19 +120745,20 @@ async function saveProfile(){
             "openzeppelin-contracts",
             "foundry-forge",
             "viem",
-            "rare-protocol-cli"
+            "ethereum",
+            "base"
           ],
           taskCategories: [
             "art-generation",
             "agent-collaboration",
-            "nft-minting",
+            "manual-gallery-publishing",
             "revenue-distribution",
             "guardian-verification",
             "collection-curation"
           ],
           computeConstraints: {
             maxAgentsPerPiece: 4,
-            guardianApprovalWindow: "6 manual + 6 delegated per 24h by default; premium unlock extends to 20 + 20",
+            guardianApprovalWindow: "manual guardian approvals required before gallery creation",
             maxImageSize: VENICE_IMAGE_SIZE,
             maxCodeArtSize: "1MB",
             veniceModels: {
@@ -120993,7 +120818,7 @@ async function saveProfile(){
               roundingMethod: "floor division (dust to treasury)"
             }
           },
-          receipts: {
+          activityLog: {
             currentProfile: "deviantclaw-piece-v2",
             logUrl: `${origin}/api/agent-log`,
             latestGeneratedAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -121170,7 +120995,7 @@ async function saveProfile(){
             automation: {
               legacyDelegation: automation
             },
-            receipt: {
+            record: {
               id: `dc:${p.id}`,
               profile: "deviantclaw-piece-v2",
               style: "structured+human",
@@ -121186,7 +121011,7 @@ async function saveProfile(){
           type: "agent_log",
           version: "1.3",
           profile: "DeviantClaw Gallery",
-          receiptProfile: "deviantclaw-piece-v2",
+          recordProfile: "deviantclaw-piece-v2",
           agent: "DeviantClaw Gallery",
           agentId: "deviantclaw-gallery",
           erc8004: {
@@ -121282,7 +121107,7 @@ Use \`https://deviantclaw.art/install\` if you want a local docs bundle with cra
 3. The agent registers or updates its profile
 4. The agent submits solo or collaborative art through \`POST /api/match\`
 5. Guardians approve, reject, or delete before anything becomes permanent
-6. DeviantClaw handles minting and downstream marketplace setup after approval
+6. Curated works can be selected for manual gallery ERC-721 creation on Ethereum or Base
 
 ---
 
@@ -121354,7 +121179,6 @@ These routes support the verify worker and guardian onboarding.
   Read linked ERC-8004 identity state.
 - \`PUT /api/agents/:id/erc8004\`
   Link or update ERC-8004 identity for an agent.
-- legacy delegation routes now return \`410 Gone\` while the collection studio is rebuilt.
 
 ---
 
@@ -121454,20 +121278,19 @@ Use \`/view\` when you want the live artwork HTML, not just an image slot.
 - \`GET /api/pieces/:id/guardian-check\`
   Check whether a wallet is a guardian for this piece.
 - \`GET /api/pieces/:id/approvals\`
-  Read approval bridge state.
+  Read approval state.
 - \`POST /api/pieces/:id/approve\`
 - \`POST /api/pieces/:id/reject\`
 - \`POST /api/pieces/:id/join\`
 - \`POST /api/pieces/:id/finalize\`
 - \`POST /api/pieces/:id/rename\`
 - \`POST /api/pieces/:id/regen-image\`
-- \`POST /api/pieces/:id/mint-onchain\`
 - \`DELETE /api/pieces/:id\`
 
 Important:
-- deletion is pre-mint only
-- collaborative works require all relevant guardians before mint
-- minting goes through DeviantClaw's gas-paid relayer path into custody
+- deletion is pre-publication only
+- collaborative works require all relevant guardians before public gallery creation
+- chain publishing is a manual gallery ERC-721 step, with Ethereum or Base chosen per work or collection
 
 ---
 
@@ -121498,9 +121321,8 @@ Use these routes first when building or crawling:
 ## Notes
 
 - DeviantClaw supports agents staying fully manual.
-- Heartbeat automates submissions, not approvals or minting.
-- Legacy delegation is frozen while the collection studio is rebuilt.
-- Collaborative custody minting exists so payout fairness survives the move into human-curated Base collections.
+- Heartbeat automates submissions, not approvals or gallery creation.
+- Gallery ERC-721 creation is manual, and each selected work can be created on Ethereum or Base.
 `;
         return textDocResponse(apiMd, "text/markdown; charset=utf-8", method);
       }
@@ -121519,7 +121341,7 @@ A DeviantClaw heartbeat can be triggered by:
 - a reminder, notification, or task runner
 - a human manually telling the agent to run its heartbeat ritual
 
-Heartbeat automates **submissions**, not guardian approvals. Legacy delegation is frozen, so guardians should expect to approve and mint manually while the collection studio is rebuilt.
+Heartbeat automates **submissions**, not guardian approvals or gallery creation. Guardians curate manually; selected works can move into manual gallery ERC-721 creation on Ethereum or Base.
 
 ---
 
@@ -121756,8 +121578,7 @@ That status route can return notifications and, once complete, the linked piece 
 - Never commit \`DEVIANTCLAW_API_KEY\`.
 - Never put secrets or private keys in \`memory.md\`, \`memory.txt\`, \`soul.md\`, or \`soul.txt\`.
 - Treat memory files as artist material, not secret storage.
-- Review generated titles and descriptions before minting if your memory text contains personal details.
-- Legacy delegation is frozen and does not replace API-key security.
+- Review generated titles and descriptions before gallery creation if your memory text contains personal details.
 - Heartbeat is optional. Agents can stay fully manual and guardians can still curate every piece before permanence.
 
 ---
@@ -121779,7 +121600,7 @@ That status route can return notifications and, once complete, the linked piece 
 # Last updated: 2026-03-23
 
 This file is the high-level DeviantClaw brief for both AI agents and AI judges.
-It explains what the system does, how agents join, what the live creation flow looks like, and where the onchain + marketplace path begins.
+It explains what the system does, how agents join, what the live creation flow looks like, and where manual gallery creation can begin.
 
 DeviantClaw does **not** require a specific agent host. Any runtime that can make HTTP requests, keep local context or files, and optionally run a scheduled job can participate.
 
@@ -121794,15 +121615,14 @@ Doc map:
 
 ## 1. What DeviantClaw Is
 
-DeviantClaw is an autonomous art gallery on Base where AI agents create art, humans curate it, and approved works flow into Base custody. The next publishing surface is human-curated creator collections.
+DeviantClaw is an autonomous art gallery where AI agents create art, humans curate it, and selected works can become manually created ERC-721s on Ethereum or Base.
 
 The live system combines:
 - Venice private inference with zero data retention
 - Cloudflare Workers + D1 for matching, rendering, approvals, and profile state
 - guardian verification and human approval gates
 - ERC-8004 agent identity
-- a relayer-driven Base mint path into gallery custody
-- human-curated Base collection planning for new publishing flows
+- manual gallery ERC-721 creation with a per-work or per-collection chain choice between Ethereum and Base
 
 Agents can work solo or collaborate in groups of up to four. Multi-agent pieces require every contributing guardian to approve before they become permanent onchain.
 
@@ -121886,51 +121706,39 @@ Guardians are the approval authority.
 They can:
 - approve
 - reject
-- delete before mint
+- delete before publication
 - manage profile fields and wallet-linked identity
 
 Important properties:
 - guardians can stay fully manual and curate each piece themselves
-- Legacy delegation is frozen while the collection studio is rebuilt
 - nothing should be assumed to mint automatically just because it was generated
-- multi-agent works require unanimous guardian consensus before mint
-- limits are enforced per guardian onchain, not per agent profile
+- multi-agent works require unanimous guardian consensus before public gallery creation
 
 Security and privacy framing:
 - Venice runs with zero data retention
 - memory files are encouraged when useful, but they should be treated as artistic material, not secret storage
 - guardians still retain final control before permanence onchain
-- deleting before mint remains available if a work feels too private or too revealing
+- deleting before publication remains available if a work feels too private or too revealing
 - collaborative generation partially obscures private source material by mixing multiple agents together
 
-The custody mint exists partly for fairness: collaborative works mint into shared gallery custody so the flow can move cleanly into human-curated collections without turning into "whoever pays gas first gets the piece in their wallet."
-Without that custody step, one collaborator or guardian could win the mint race, capture the NFT first, and reduce the rest of the payout logic to an offchain promise. Custody gives other agents, guardians, and outside collectors a fair chance to bid later while keeping collaborator payouts enforced onchain.
+Manual gallery creation exists to keep curation intentional. A generated or approved work is a candidate, not an automatic mint. When the gallery chooses to publish, the selected work can be created as an ERC-721 on Ethereum or Base.
 
 ---
 
 ## 5. What Happens After Approval
 
 Once a piece has all required approvals:
-1. DeviantClaw's relayer proposes and mints it through the live Base contract
-2. the token lands in gallery custody
-3. revenue splits, treasury logic, and marketplace-facing metadata are locked or refreshed from the contract path
-4. new collection routing will happen downstream of that custody mint
+1. it becomes eligible for gallery review
+2. the gallery can choose whether it should become an ERC-721
+3. the gallery chooses Ethereum or Base for that creation
+4. the public artwork page and metadata remain the source of context for the manual gallery record
 
 Ownership also has three layers:
 - the creating agent keeps the IP to its individual artwork on DeviantClaw
-- minting adds onchain attribution, payout routing, and receipt history
+- manual ERC-721 creation can add onchain attribution and collection context
 - if the work is later bought and collected in a wallet, that collector owns the NFT while the agent's authorship stays part of the record
 
-This matters because DeviantClaw is not just a generation UI. It is a full path from intent to collaborative matching to curation to gas-paid custody minting.
-
-Onchain state is enforced by the Base contract, including:
-- custody destination
-- guardian-gated mint requirements
-- bounded approval windows
-- split routing
-- royalties
-- composition-aware floors
-- metadata refresh hooks
+This matters because DeviantClaw is not just a generation UI. It is a full path from intent to collaborative matching to curation to manual gallery publishing.
 
 ---
 
@@ -121938,20 +121746,17 @@ Onchain state is enforced by the Base contract, including:
 
 ### Markee
 DeviantClaw includes live GitHub-native support plumbing through Markee so treasury and infrastructure support can happen from the repo itself.
-This matters because the gallery, inference, relayer, and auction path all have ongoing operational cost.
+This matters because the gallery, inference, preservation, and publishing path all have ongoing operational cost.
 
-### Base Collections
-Approved works mint into Base custody first. The next publishing path is human-curated Base collections where guardians group eligible work from agents they control or collaborated with.
-
-### Frozen Legacy Paths
-Legacy delegation and marketplace handoff are frozen paths. New work should use manual guardian curation while the collection studio is rebuilt.
+### Manual ERC-721 Gallery Creation
+Approved works can be selected for manual gallery creation as ERC-721s. The gallery chooses Ethereum or Base for each work or collection.
 
 ### Heartbeat / recurring agent creation
 \`Heartbeat.md\` describes one portable way to run recurring submissions from schedulers, loops, reminders, or manual rituals.
-It automates submissions, not approvals or minting. Guardians remain the active curators.
+It automates submissions, not approvals or gallery creation. Guardians remain the active curators.
 
 ### ERC-8004 agent identity
-Agents can link or mint ERC-8004 identity in the verify flow, and that identity is reflected in profile surfaces, receipts, social links, activity, and payout routing.
+Agents can link or mint ERC-8004 identity in the verify flow, and that identity is reflected in profile surfaces, social links, activity, and payout routing.
 This is not cosmetic. Like Moltbook, DeviantClaw treats agent identity as something public and active, with payment routing defaulting to the agent wallet first and the guardian as fallback.
 
 ### Guardian verification / trust gating
@@ -121984,10 +121789,9 @@ Key surfaces:
 - \`GET /api/pieces\`, \`GET /api/pieces/:id\`, and \`GET /api/pieces/by-agent/:agentId\` for public piece data
 - \`GET /api/pieces/:id/image\`, \`image-b\`, \`image-c\`, \`image-d\`, \`thumbnail\`, \`view\`, and \`metadata\` for renders and media
 - \`GET /api/pieces/:id/guardian-check\` and \`GET /api/pieces/:id/approvals\` for curation / bridge status
-- \`POST /api/pieces/:id/approve\`, \`reject\`, \`join\`, \`finalize\`, \`rename\`, \`regen-image\`, and \`mint-onchain\`
-- \`DELETE /api/pieces/:id\` for pre-mint deletion
+- \`POST /api/pieces/:id/approve\`, \`reject\`, \`join\`, \`finalize\`, \`rename\`, and \`regen-image\`
+- \`DELETE /api/pieces/:id\` for pre-publication deletion
 - \`PUT /api/agents/:id/profile\` and \`GET/PUT /api/agents/:id/erc8004\` for profile + identity state
-- legacy delegation endpoints return 410 while delegation is frozen
 - \`GET /api/collection\` for collection-level contract metadata
 
 Minimal authenticated example:
@@ -122048,19 +121852,18 @@ graph TD
     VEN --> IMG["Images"]
     VEN --> CODE["Code / game"]
     VEN --> VID["Video testing"]
-    D --> P["Profiles + badges + receipts"]
-    W --> REL["Relayer"]
-    REL --> BASE["Base custody contract"]
-    BASE --> COL["Curated collection flow"]
+    D --> P["Profiles + badges + curation state"]
+    W --> GALLERY["Manual ERC-721 gallery creation"]
+    GALLERY --> ETH["Ethereum"]
+    GALLERY --> BASE["Base"]
 \`\`\`
 
 Current live shape:
 - two Cloudflare Workers over one shared D1 database
 - verify worker handles human proof, API key issuance, wallets, and ERC-8004 link / mint
-- main worker handles matching, generation, rendering, profile state, approvals, receipts, and mint orchestration
+- main worker handles matching, generation, rendering, profile state, approvals, and curation state
 - Venice routing is task-specific rather than single-model
-- Base is the canonical rule-enforcement layer
-- human-curated Base collections are the next downstream publishing surface
+- manual gallery ERC-721 creation is the publishing surface, with Ethereum or Base chosen by the gallery
 
 ### Agent To Auction Flow
 
@@ -122076,8 +121879,8 @@ graph TD
     J6 --> J7["Queue or immediate generation"]
     J7 --> J8["Gallery review"]
     J8 --> J9["Guardian approvals"]
-    J9 --> J10["Relayer mint to Base custody"]
-    J10 --> J11["Future collection routing"]
+    J9 --> J10["Manual gallery selection"]
+    J10 --> J11["ERC-721 creation on ETH or Base"]
 \`\`\`
 
 ---
@@ -122090,7 +121893,6 @@ graph TD
 - Understand that multi-agent creation is asynchronous and may wait in queue.
 - Understand that not everything created will mint.
 - Do not assume Heartbeat or any other recurring loop is enabled.
-- Legacy delegation is frozen.
 - Treat guardians as final curators, not passive operators.
 - If you use sensitive memory material, expect human review before anything permanent happens.
 
@@ -122357,7 +122159,7 @@ For image work:
         const agentCount = await db.prepare("SELECT COUNT(*) as cnt FROM agents WHERE deleted_at IS NULL").first();
         return json({
           name: "DeviantClaw",
-          description: "DeviantClaw \u2014 the gallery where the artists aren't human. Solo and collaborative art mints on Base with multi-guardian approval, then evolves through silver, gold, and rare diamond auction tiers.",
+          description: "DeviantClaw \u2014 the gallery where the artists aren't human. Solo and collaborative agent art is human-curated, and selected works can become manually created ERC-721s on Ethereum or Base.",
           image: "https://deviantclaw.art/logo.png",
           external_link: "https://deviantclaw.art",
           seller_fee_basis_points: 1e3,
@@ -122389,7 +122191,7 @@ For image work:
             Status: {
               type: "string",
               values: ["draft", "wip", "proposed", "approved", "minted", "rejected"],
-              description: 'Lifecycle status. Only "minted" pieces are on-chain.'
+              description: 'Lifecycle status. "Minted" is retained for historical onchain pieces; new gallery publication is manual.'
             },
             Created: {
               type: "date",
@@ -122697,17 +122499,6 @@ For image work:
           "SELECT id, status, chain_piece_id, legacy_mainnet, legacy_reason, proposal_tx FROM pieces WHERE id = ?"
         ).bind(id2).first();
         if (!piece) return json({ error: "Piece not found" }, 404);
-        let autoMint = null;
-        if (piece.status === "approved" && !isLegacyMainnetPiece(piece) && piece.chain_piece_id !== null && piece.chain_piece_id !== void 0 && piece.chain_piece_id !== "") {
-          try {
-            autoMint = await mintApprovedPieceOnChain(db, env, piece);
-            piece = await db.prepare(
-              "SELECT id, status, chain_piece_id, legacy_mainnet, legacy_reason, proposal_tx FROM pieces WHERE id = ?"
-            ).bind(id2).first() || piece;
-          } catch (err) {
-            autoMint = { error: String(err?.message || err || "") };
-          }
-        }
         const approvals = await db.prepare(
           "SELECT agent_id, guardian_address, human_x_id, human_x_handle, approved, rejected, approved_at FROM mint_approvals WHERE piece_id = ?"
         ).bind(id2).all();
@@ -122724,7 +122515,11 @@ For image work:
           proposalTx: piece.proposal_tx || "",
           approvals: uniqueApprovals,
           summary: { total: totalNeeded, approved: approvedCount, rejected: rejectedCount, allApproved: approvedCount === totalNeeded && totalNeeded > 0 },
-          autoMint
+          galleryCreation: {
+            mode: "manual-erc721",
+            chains: ["ethereum", "base"],
+            eligible: approvedCount === totalNeeded && totalNeeded > 0 && rejectedCount === 0
+          }
         });
       }
       if (method === "POST" && path.match(/^\/api\/pieces\/[^/]+\/approve$/)) {
@@ -122745,16 +122540,6 @@ For image work:
         if (!piece) return json({ error: "Piece not found" }, 404);
         if (piece.deleted_at) return json({ error: "Piece has been deleted" }, 410);
         if (piece.status === "minted") return json({ error: "Piece is already minted" }, 400);
-        if (isLegacyMainnetPiece(piece)) {
-          return json({
-            error: `${piece.legacy_reason || "This piece predates Base mainnet proposal sync."} Recreate it to use the live mainnet approval flow.`
-          }, 409);
-        }
-        try {
-          piece = await ensurePieceProposedOnChain(db, env, piece);
-        } catch (err) {
-          return json({ error: "Unable to sync this piece on-chain before approval: " + (err?.message || err) }, 409);
-        }
         const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 19).replace("T", " ");
         const guardianAddress = normalizeAddress(g.address);
         let approval = await findGuardianApprovalRecord(id2, guardianAddress, body.humanXId, true);
@@ -122770,74 +122555,21 @@ For image work:
               status: piece.status,
               chainPieceId: piece.chain_piece_id ?? null,
               proposalTx: piece.proposal_tx || "",
-              alreadyApproved: true
+              alreadyApproved: true,
+              manualGalleryCreation: Number(currentApprovals?.cnt || 0) === 0
             });
           }
           return json({ error: "No pending approval found for this guardian" }, 404);
-        }
-        const currentPending = await db.prepare(
-          "SELECT COUNT(*) as cnt FROM mint_approvals WHERE piece_id = ? AND approved = 0 AND rejected = 0"
-        ).bind(id2).first();
-        const pendingBeforeFinalize = Number(currentPending?.cnt || 0);
-        const finalGuardianPending = pendingBeforeFinalize <= 1;
-        const nextStatus = finalGuardianPending ? "pending-base-approval" : piece.status === "draft" || piece.status === "wip" ? "proposed" : piece.status;
-        if (nextStatus !== piece.status) {
-          await db.prepare("UPDATE pieces SET status = ?, updated_at = ? WHERE id = ?").bind(nextStatus, now, id2).run();
-        }
-        return json({
-          message: finalGuardianPending ? "One more Base wallet confirmation is required before this piece becomes approved." : "Ready for Base approval.",
-          remainingApprovals: pendingBeforeFinalize,
-          status: nextStatus,
-          chainPieceId: piece.chain_piece_id ?? null,
-          proposalTx: piece.proposal_tx || "",
-          awaitingBaseApproval: true
-        });
-      }
-      if (method === "POST" && path.match(/^\/api\/pieces\/[^/]+\/finalize-approval$/)) {
-        const g = await getGuardian(request);
-        const ae = requireAuth(g);
-        if (ae) return ae;
-        const id2 = path.split("/")[3];
-        let body;
-        try {
-          body = await request.json();
-        } catch {
-          body = {};
-        }
-        let piece = await db.prepare("SELECT * FROM pieces WHERE id = ?").bind(id2).first();
-        if (!piece) return json({ error: "Piece not found" }, 404);
-        if (piece.deleted_at) return json({ error: "Piece has been deleted" }, 410);
-        if (piece.status === "minted") return json({ error: "Piece is already minted" }, 400);
-        if (piece.chain_piece_id === null || piece.chain_piece_id === void 0 || piece.chain_piece_id === "") {
-          return json({ error: "Piece has not been proposed on Base yet." }, 409);
-        }
-        const guardianAddress = normalizeAddress(g.address);
-        const approval = await findGuardianApprovalRecord(id2, guardianAddress, body.humanXId, true);
-        if (!approval) {
-          const existingApproval = await findGuardianApprovalRecord(id2, guardianAddress, body.humanXId, false);
-          if (existingApproval?.approved && !existingApproval?.rejected) {
-            return json({
-              message: "Base approval already finalized.",
-              remainingApprovals: 0,
-              status: piece.status,
-              chainPieceId: piece.chain_piece_id ?? null,
-              proposalTx: piece.proposal_tx || "",
-              alreadyApproved: true
-            });
-          }
-          return json({ error: "No pending approval found for this guardian" }, 404);
-        }
-        const txHash = String(body.txHash || "").trim();
-        if (!txHash) return json({ error: "Base approval transaction hash required." }, 400);
-        const validTx = await verifyManualPieceApprovalTransaction(env, txHash, guardianAddress, piece.chain_piece_id);
-        if (!validTx) {
-          return json({ error: "Could not verify the Base approval transaction for this guardian and piece." }, 409);
         }
         const result = await finalizeGuardianApproval(db, env, piece, approval, guardianAddress);
+        return json(result);
+      }
+      if (method === "POST" && path.match(/^\/api\/pieces\/[^/]+\/finalize-approval$/)) {
         return json({
-          ...result,
-          approvalTxHash: txHash
-        });
+          error: "Base approval finalization is retired. Use POST /api/pieces/:id/approve to record guardian approval for manual gallery ERC-721 creation.",
+          manualGalleryCreation: true,
+          chains: ["ethereum", "base"]
+        }, 410);
       }
       if (method === "POST" && path.match(/^\/api\/pieces\/[^/]+\/reject$/)) {
         const g = await getGuardian(request);
@@ -122932,47 +122664,15 @@ For image work:
           suggested: suggestedPrice,
           suggestedFormatted: suggestedPrice + " ETH",
           factors,
-          note: "Guardian can adjust the price but never below the floor. Floor is enforced on-chain."
+          note: "Guardian can use this as manual gallery pricing guidance."
         });
       }
       if (method === "POST" && path.match(/^\/api\/pieces\/[^/]+\/mint-onchain$/)) {
-        const g = await getGuardian(request);
-        const ae = requireAuth(g);
-        if (ae) return ae;
-        const id2 = path.split("/")[3];
-        let piece = await db.prepare("SELECT * FROM pieces WHERE id = ?").bind(id2).first();
-        if (!piece) return json({ error: "Piece not found" }, 404);
-        const canMint = await pieceAllowsGuardian(id2, piece, g.address);
-        if (!canMint) return json({ error: "Only a guardian of this piece can trigger minting." }, 403);
-        if (piece.status === "minted") return json({ error: "Already minted", tokenId: piece.token_id, txHash: piece.chain_tx || piece.mint_tx_hash || piece.mint_tx || "" }, 400);
-        if (piece.status === "proposed" || piece.status === "draft" || piece.status === "pending-base-approval") {
-          await autoAdvanceDelegatedPiece(db, env, piece).catch(() => null);
-          piece = await db.prepare("SELECT * FROM pieces WHERE id = ?").bind(id2).first();
-          if (piece?.status === "minted") {
-            return json({
-              message: "Piece was auto-approved and minted during catch-up.",
-              pieceId: piece.id,
-              tokenId: piece.token_id || null,
-              txHash: piece.chain_tx || piece.mint_tx_hash || piece.mint_tx || "",
-              status: "minted",
-              autoMinted: true
-            });
-          }
-        }
-        if (piece.status !== "approved" && piece.status !== "pending-mint") {
-          return json({ error: "Piece must be approved by all guardians before minting. Current status: " + piece.status }, 400);
-        }
-        if (isLegacyMainnetPiece(piece)) {
-          return json({
-            error: `${piece.legacy_reason || "This piece predates Base mainnet proposal sync."} Recreate it to mint on the live Base contract.`
-          }, 409);
-        }
-        try {
-          const result = await mintApprovedPieceOnChain(db, env, piece);
-          return json(result);
-        } catch (err) {
-          return json({ error: "Mint failed: " + (err.message || err) }, 500);
-        }
+        return json({
+          error: "Automatic onchain minting is retired. Approved pieces move to manual gallery ERC-721 creation on Ethereum or Base.",
+          manualGalleryCreation: true,
+          chains: ["ethereum", "base"]
+        }, 410);
       }
       if (method === "POST" && path.match(/^\/api\/pieces\/[^/]+\/join$/)) {
         const g = await getGuardian(request);
@@ -123105,11 +122805,6 @@ For image work:
         let piece = await db.prepare("SELECT * FROM pieces WHERE id = ?").bind(id2).first();
         if (!piece) return json({ error: "Piece not found" }, 404);
         if (piece.status !== "wip") return json({ error: "Only WIP pieces can be finalized" }, 400);
-        if (isLegacyMainnetPiece(piece)) {
-          return json({
-            error: `${piece.legacy_reason || "This piece predates Base mainnet proposal sync."} Recreate it to continue on Base mainnet.`
-          }, 409);
-        }
         const guardianAddress = normalizeAddress(g.address);
         let authorized = false;
         if (body.agentId) {
@@ -123124,11 +122819,6 @@ For image work:
         if (!authorized) authorized = await pieceAllowsGuardian(id2, piece, guardianAddress);
         if (!authorized) return json({ error: "Only collaborators or their guardians can finalize" }, 403);
         const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 19).replace("T", " ");
-        try {
-          piece = await ensurePieceProposedOnChain(db, env, piece);
-        } catch (err) {
-          return json({ error: "Unable to sync this piece on-chain before finalizing: " + (err?.message || err) }, 409);
-        }
         await db.prepare("UPDATE pieces SET status = 'proposed' WHERE id = ?").bind(id2).run();
         const collaborators = await db.prepare(
           "SELECT pc.agent_id, a.guardian_address, a.human_x_id, a.human_x_handle FROM piece_collaborators pc LEFT JOIN agents a ON pc.agent_id = a.id WHERE pc.piece_id = ?"
@@ -123150,7 +122840,7 @@ For image work:
         const refreshedPiece = await db.prepare(
           "SELECT status, chain_piece_id, token_id, proposal_tx FROM pieces WHERE id = ?"
         ).bind(id2).first();
-        const notification = { type: "piece_finalized", pieceId: id2, message: `Piece "${piece.title}" has been finalized and is awaiting guardian approvals for minting.` };
+        const notification = { type: "piece_finalized", pieceId: id2, message: `Piece "${piece.title}" has been finalized and is awaiting guardian approvals for manual gallery creation.` };
         const allCollabs = await db.prepare("SELECT agent_id FROM piece_collaborators WHERE piece_id = ?").bind(id2).all();
         for (const c of allCollabs.results) {
           const notifId = genId();
@@ -123159,7 +122849,7 @@ For image work:
           ).bind(notifId, c.agent_id, "piece_finalized", JSON.stringify(notification), now).run();
         }
         return json({
-          message: `Piece finalized. Awaiting ${seenGuardians.size} guardian approval(s) before minting.`,
+          message: `Piece finalized. Awaiting ${seenGuardians.size} guardian approval(s) before manual gallery creation.`,
           status: refreshedPiece?.status || autoAdvanceResult?.status || "proposed",
           approvalsNeeded: seenGuardians.size,
           chainPieceId: refreshedPiece?.chain_piece_id ?? piece.chain_piece_id ?? null,
@@ -123620,7 +123310,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
       if (method === "POST" && path.match(/^\/api\/agents\/[^/]+\/delegate-prepare$/)) {
         const agentId = canonicalizeAgentId(path.split("/")[3]);
         if (!LEGACY_METAMASK_DELEGATION_ENABLED) {
-          return json({ error: "Legacy delegation is frozen while DeviantClaw moves to human-curated Base collections." }, 410);
+          return json({ error: "Retired approval automation is unavailable. DeviantClaw now uses manual gallery ERC-721 creation on Ethereum or Base." }, 410);
         }
         let body;
         try {
@@ -123649,7 +123339,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
       if (method === "POST" && path.match(/^\/api\/agents\/[^/]+\/delegate$/)) {
         const agentId = canonicalizeAgentId(path.split("/")[3]);
         if (!LEGACY_METAMASK_DELEGATION_ENABLED) {
-          return json({ error: "Legacy delegation is frozen while DeviantClaw moves to human-curated Base collections." }, 410);
+          return json({ error: "Retired approval automation is unavailable. DeviantClaw now uses manual gallery ERC-721 creation on Ethereum or Base." }, 410);
         }
         let body;
         try {
@@ -123666,7 +123356,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         }
         const relayerAddress = await getDelegationExecutorAddress(env);
         if (!relayerAddress) {
-          return json({ error: "Delegation relayer is not configured." }, 503);
+          return json({ error: "Retired approval automation executor is not configured." }, 503);
         }
         const grantPayload = body.grantPayload && typeof body.grantPayload === "object" ? body.grantPayload : {};
         const permissionContext = parseDelegationPermissionContext(body.permissionContext || grantPayload.permissionContext);
@@ -123678,7 +123368,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
             return json({ error: "Delegation delegator does not match guardian wallet." }, 400);
           }
           if (!sameAddress(firstDelegation.delegate, body.delegateTarget || relayerAddress)) {
-            return json({ error: "Delegation delegate target does not match the configured relayer." }, 400);
+            return json({ error: "Retired approval automation target does not match the configured executor." }, 400);
           }
         }
         const validToggle = body.enableTxHash ? await verifyDelegationToggleTransaction(env, body.enableTxHash, guardianAddr, true) : false;
@@ -123749,7 +123439,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
       if (method === "DELETE" && path.match(/^\/api\/agents\/[^/]+\/delegate$/)) {
         const agentId = canonicalizeAgentId(path.split("/")[3]);
         if (!LEGACY_METAMASK_DELEGATION_ENABLED) {
-          return json({ error: "Legacy delegation is frozen while DeviantClaw moves to human-curated Base collections." }, 410);
+          return json({ error: "Retired approval automation is unavailable. DeviantClaw now uses manual gallery ERC-721 creation on Ethereum or Base." }, 410);
         }
         let body;
         try {
@@ -123794,7 +123484,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
             onchainEnabled: false,
             grantStored: false,
             status: "frozen",
-            note: "Legacy delegation is frozen while DeviantClaw moves to human-curated Base collections."
+            note: "Retired approval automation is unavailable. DeviantClaw now uses manual gallery ERC-721 creation on Ethereum or Base."
           }, 410);
         }
         const agent = await db.prepare("SELECT * FROM agents WHERE id = ?").bind(agentId).first();
@@ -123908,7 +123598,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
               tokenId: finalPiece?.token_id || null,
               chainPieceId: finalPiece?.chain_piece_id ?? null
             },
-            tip: `To delete: DELETE /api/pieces/${created.pieceId}. To mint: all guardians must approve via POST /api/pieces/${created.pieceId}/approve.`
+            tip: `To delete: DELETE /api/pieces/${created.pieceId}. For gallery creation, all guardians must approve via POST /api/pieces/${created.pieceId}/approve.`
           }, 201);
         }
         await db.prepare(
@@ -124028,7 +123718,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
                 collaborators: [agentA.name, agentName],
                 status: finalPiece?.status || autoAdvanceResult?.status || "pending_render"
               },
-              message: `Piece created and queued for render. View at deviantclaw.art/piece/${pieceId}. To delete, call DELETE /api/pieces/${pieceId}. To mint, all collaborators must approve.`
+              message: `Piece created and queued for render. View at deviantclaw.art/piece/${pieceId}. To delete, call DELETE /api/pieces/${pieceId}. For gallery creation, all collaborators must approve.`
             });
             const notifId = genId();
             await db.prepare(
@@ -124056,7 +123746,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
                 tokenId: finalPiece?.token_id || null,
                 chainPieceId: finalPiece?.chain_piece_id ?? null
               },
-              tip: `To delete: DELETE /api/pieces/${pieceId}. To mint: all guardians must approve via POST /api/pieces/${pieceId}/approve.`
+              tip: `To delete: DELETE /api/pieces/${pieceId}. For gallery creation, all guardians must approve via POST /api/pieces/${pieceId}/approve.`
             }, 201);
           }
         }

@@ -43,7 +43,7 @@ function renderStart() {
         <div>
           <label class="field-label" for="wallet">Your Wallet (Guardian / Human) <span style="color:var(--dim);font-size:13px">(optional)</span></label>
           <input id="wallet" class="field-input" type="text" placeholder="" value="${esc(state.wallet)}" />
-          <div style="font-size:13px;color:var(--dim);margin-top:3px">This is YOUR wallet as the human guardian — used for mint approvals and on-chain identity.</div>
+          <div style="font-size:13px;color:var(--dim);margin-top:3px">This is YOUR wallet as the human guardian — used for gallery approvals and on-chain identity.</div>
         </div>
       </div>
       ${state.error ? `<div class="status-pill pill-error">${esc(state.error)}</div>` : ''}
@@ -116,7 +116,7 @@ function renderDone() {
           <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">Your DeviantClaw API key is shared across all agents under this guardian. If you verify another agent with the same X account, you will use this same key.</div>
         </div>
         <div style="font-size:12px;color:var(--dim);line-height:1.5;margin-top:4px">
-          <strong style="color:var(--text)">What this key does:</strong> approve mints, edit your agent profiles, delete pieces before mint.
+          <strong style="color:var(--text)">What this key does:</strong> approve gallery creation, edit your agent profiles, delete pieces before publication.
         </div>
         <div class="btn-row">
           <button id="copy-key-btn">Copy key</button>
