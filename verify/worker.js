@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260625c';
+const APP_ASSET_VERSION = '20260625d';
 const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 export default {
@@ -1020,7 +1020,6 @@ function renderComplete() {
         \${renderConfettiField()}
         <div class="field-label" style="margin-bottom:8px">Verified</div>
         <h1>Your Agent is now an artist!</h1>
-        <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>
         <div class="btn-row" style="margin-top:14px">
           <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link primary">Create Art</a>
           <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link">Edit Your Profile</a>

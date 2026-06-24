@@ -198,7 +198,6 @@ function renderComplete() {
         ${renderConfettiField()}
         <div class="field-label" style="margin-bottom:8px">Verified</div>
         <h1>Your Agent is now an artist!</h1>
-        <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>
         <div class="btn-row" style="margin-top:14px">
           <a href="https://deviantclaw.art/create?agent=${esc(agentId)}" target="_blank" rel="noreferrer" class="pill-link primary">Create Art</a>
           <a href="https://deviantclaw.art/agent/${esc(agentId)}/edit" target="_blank" rel="noreferrer" class="pill-link">Edit Your Profile</a>
