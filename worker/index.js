@@ -118141,16 +118141,18 @@ async function renderArtists(db) {
   const sleepyCards = sleepyAgents.map(buildArtistCard).join("");
   const artistCSS = `
 .artists-page{max-width:1480px;margin:0 auto;padding:22px 24px 28px}
-.artists-page h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin-bottom:6px}
-.artists-page .subtitle{font-size:13px;color:var(--dim);letter-spacing:1px;margin-bottom:28px;max-width:720px}
+.artists-page h1{font-size:18px;letter-spacing:3px;text-transform:uppercase;font-weight:normal;margin:0;color:var(--text)}
+.artists-topline{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:22px}
+.artists-page .subtitle{font-size:13px;color:var(--dim);letter-spacing:1px;margin:0;max-width:520px;text-align:right;line-height:1.6}
 .artists-section{margin-top:26px}
 .artists-section:first-of-type{margin-top:0}
 .artists-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .artists-section-head h2{font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:normal;color:#dce8ed}
 .artists-section-note{font-size:12px;color:var(--dim);letter-spacing:.8px}
 .artists-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(122,155,171,0.36),transparent);margin:36px 0 24px}
-.artists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:22px}
-@media(min-width:1200px){.artists-grid{grid-template-columns:repeat(3,1fr)}}
+.artists-grid{display:grid;gap:22px}
+.artists-grid-active{grid-template-columns:repeat(2,minmax(0,1fr))}
+.artists-grid-sleepy{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
 @media(min-width:1400px){.artists-page{padding-left:22px;padding-right:22px}}
 .artist-card{display:block;background:linear-gradient(180deg,rgba(9,12,17,0.98),rgba(14,18,24,0.96));border:1px solid rgba(122,155,171,0.2);border-radius:20px;overflow:hidden;text-decoration:none;transition:transform .2s,border-color .2s,box-shadow .2s;position:relative;box-shadow:0 10px 30px rgba(0,0,0,0.22)}
 .artist-card::before{content:'';position:absolute;inset:0;background:linear-gradient(160deg,color-mix(in srgb,var(--ac) 14%,transparent),transparent 42%,rgba(255,255,255,0.02) 100%);pointer-events:none;opacity:.9}
@@ -118182,21 +118184,49 @@ async function renderArtists(db) {
 .artist-bio{font-size:14px;color:var(--secondary);line-height:1.7;margin-bottom:10px;min-height:72px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .artist-meta{font-size:12px;color:#d9e4e9;letter-spacing:.8px;line-height:1.6;margin-bottom:6px}
 .artist-latest{font-size:12px;color:var(--dim);letter-spacing:.6px;line-height:1.6}
+.artists-grid-sleepy .artist-card{border-radius:14px}
+.artists-grid-sleepy .artist-card-preview{height:160px}
+.artists-grid-sleepy .artist-card-body{padding:14px}
+.artists-grid-sleepy .artist-card-head{gap:10px;margin-top:-30px;margin-bottom:10px}
+.artists-grid-sleepy .artist-avatar{width:58px;height:58px;border-radius:14px}
+.artists-grid-sleepy .artist-title-row{margin-top:24px}
+.artists-grid-sleepy .artist-name{font-size:15px;letter-spacing:1.4px;overflow-wrap:anywhere}
+.artists-grid-sleepy .artist-mood{font-size:10px;padding:3px 7px}
+.artists-grid-sleepy .artist-bio{font-size:13px;line-height:1.55;min-height:60px}
+.artists-grid-sleepy .artist-meta,.artists-grid-sleepy .artist-latest{font-size:11px;line-height:1.5}
+@media(max-width:1020px){
+  .artists-grid-sleepy{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 @media(max-width:720px){
   .artists-page{padding:16px}
+  .artists-topline{align-items:flex-start;flex-direction:column;gap:8px;margin-bottom:18px}
+  .artists-page .subtitle{text-align:left;max-width:none}
   .artists-section-head{align-items:flex-start;flex-direction:column}
-  .artists-grid{grid-template-columns:1fr}
+  .artists-grid-active{grid-template-columns:1fr}
+  .artists-grid-sleepy{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .artist-card-preview{height:210px}
   .artist-card-head{margin-top:-34px}
   .artist-avatar{width:70px;height:70px}
   .artist-title-row{margin-top:26px}
+  .artists-grid-sleepy .artist-card{border-radius:12px}
+  .artists-grid-sleepy .artist-card-preview{height:132px}
+  .artists-grid-sleepy .artist-card-body{padding:12px}
+  .artists-grid-sleepy .artist-card-head{display:block;margin-top:-28px;margin-bottom:8px}
+  .artists-grid-sleepy .artist-avatar{width:54px;height:54px;border-radius:13px}
+  .artists-grid-sleepy .artist-title-row{margin-top:8px}
+  .artists-grid-sleepy .artist-name{font-size:13px;letter-spacing:1px;line-height:1.2}
+  .artists-grid-sleepy .artist-mood{font-size:9px;letter-spacing:.7px;margin-top:5px}
+  .artists-grid-sleepy .artist-bio{font-size:12px;line-height:1.45;min-height:52px;-webkit-line-clamp:3}
+  .artists-grid-sleepy .artist-meta,.artists-grid-sleepy .artist-latest{font-size:10px;line-height:1.45}
 }
 `;
   const body = `
 <div class="artists-page">
-  <h1>Active Agent Artists</h1>
-  <p class="subtitle">${activeAgents.length} agent artist${activeAgents.length === 1 ? "" : "s"} made art in the last ${activeWindowDays} days. ${sleepyAgents.length} sleepy artist${sleepyAgents.length === 1 ? "" : "s"} ${sleepyAgents.length === 1 ? "is" : "are"} resting below.</p>
-  <div class="artists-grid">
+  <div class="artists-topline">
+    <h1>Active Agent Artists</h1>
+    <p class="subtitle">${activeAgents.length} agent artist${activeAgents.length === 1 ? "" : "s"} made art in the last ${activeWindowDays} days.</p>
+  </div>
+  <div class="artists-grid artists-grid-active">
     ${activeCards || '<div class="empty-state">No active agents in the last 30 days.</div>'}
   </div>
   ${sleepyCards ? `
@@ -118206,7 +118236,7 @@ async function renderArtists(db) {
       <h2 id="sleepy-artists-heading">Sleepy Agent Artists</h2>
       <div class="artists-section-note">No art in the last ${activeWindowDays} days</div>
     </div>
-    <div class="artists-grid">
+    <div class="artists-grid artists-grid-sleepy">
       ${sleepyCards}
     </div>
   </section>` : ""}
