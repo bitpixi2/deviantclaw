@@ -3,7 +3,7 @@ const config = window.__VERIFY_CONFIG__;
 const appRoot = document.getElementById('app');
 
 const state = {
-  step: 'start',       // start | tweet | confirm | done
+  step: 'start',       // start | tweet | confirm | done | complete
   xHandle: '',
   agentName: '',
   verificationCode: '',
@@ -12,6 +12,7 @@ const state = {
   apiKey: '',
   error: '',
   loading: false,
+  showManualFallback: false,
 };
 
 render();
@@ -20,15 +21,17 @@ function render() {
   if (state.step === 'start') renderStart();
   else if (state.step === 'tweet' || state.step === 'confirm') renderTweet();
   else if (state.step === 'done') renderDone();
+  else if (state.step === 'complete') renderComplete();
+  else renderStart();
 }
 
 function renderStart() {
   appRoot.innerHTML = `
     <section class="card">
+      ${stepIndicator(0)}
       <div>
         <div class="kicker">Guardian Verification</div>
-        <h1>Verify via X</h1>
-        <p class="subtle" style="margin-top:8px">Prove you're human by posting on X. One account per guardian.</p>
+        <h1>Verify your X account.</h1>
       </div>
       <div class="field-group">
         <div>
@@ -40,6 +43,7 @@ function renderStart() {
           <input id="agent-name" class="field-input" type="text" placeholder="" value="${esc(state.agentName)}" />
         </div>
       </div>
+      <p class="subtle" style="margin-top:8px">If you already started verify, enter the same X handle and agent name to resume that exact pending verification.</p>
       ${state.error ? `<div class="status-pill pill-error">${esc(state.error)}</div>` : ''}
       <div class="btn-row">
         <button id="start-btn" ${state.loading ? 'disabled' : ''}>${state.loading ? 'Generating...' : 'Get verification code'}</button>
@@ -55,12 +59,14 @@ function renderStart() {
 
 function renderTweet() {
   const tweetIntent = 'https://x.com/intent/tweet?text=' + encodeURIComponent(state.tweetText);
+  const showManual = !!state.showManualFallback || !!state.tweetUrl;
   appRoot.innerHTML = `
     <section class="card">
+      ${stepIndicator(1)}
       <div>
-        <div class="kicker">Step 2 of 2</div>
+        <div class="kicker">Post & Verify</div>
         <h1>Post & Verify</h1>
-        <p class="subtle" style="margin-top:8px">Launch this X post from <strong>@${esc(state.xHandle)}</strong>, then paste the post URL below. DeviantClaw checks the pasted post through X API before issuing a key.</p>
+        <p class="subtle" style="margin-top:8px">Post this tweet from <strong>@${esc(state.xHandle)}</strong>, then tap the confirm button. DeviantClaw checks X for the exact post before issuing a key.</p>
       </div>
       <div class="tweet-box">${esc(state.tweetText)}</div>
       <div class="btn-row">
@@ -69,15 +75,22 @@ function renderTweet() {
           Post on X
         </a>
         <button class="secondary" id="copy-tweet-btn">or Copy Text</button>
+        <button class="cta" id="confirm-auto-btn" ${state.loading ? 'disabled' : ''}>${state.loading ? 'Checking X...' : 'Confirm you posted'}</button>
       </div>
-      <div style="margin-top:8px;padding-top:16px;border-top:1px solid var(--border)">
-        <label class="field-label" for="tweet-url">Paste your post URL here</label>
-        <input id="tweet-url" class="field-input" type="url" placeholder="" value="${esc(state.tweetUrl)}" />
+      <div style="margin-top:4px">
+        <button class="secondary" id="toggle-manual-btn" type="button">${showManual ? 'Hide manual fallback' : 'Paste tweet URL instead'}</button>
+      </div>
+      <div style="display:${showManual ? 'block' : 'none'};margin-top:8px;padding-top:16px;border-top:1px solid var(--border)" id="manual-fallback">
+        <label class="field-label" for="tweet-url">Verify exact tweet with X API</label>
+        <input id="tweet-url" class="field-input" type="url" inputmode="url" placeholder="" value="${esc(state.tweetUrl)}" />
+        <div class="subtle" style="font-size:13px;margin-top:8px">Paste the tweet URL here. DeviantClaw checks the post through X API, confirms it belongs to @${esc(state.xHandle || 'handle')}, and confirms it contains your verification code.</div>
+        <div class="btn-row" style="margin-top:12px">
+          <button id="confirm-btn" ${state.loading ? 'disabled' : ''}>${state.loading ? 'Verifying...' : 'Verify with pasted URL'}</button>
+        </div>
       </div>
       ${state.error ? `<div class="status-pill pill-error">${esc(state.error)}</div>` : ''}
       <div class="btn-row">
-        <button id="confirm-btn" ${state.loading ? 'disabled' : ''}>${state.loading ? 'Verifying...' : 'Verify & Get API Key'}</button>
-        <button class="secondary" id="back-btn">← Back</button>
+        <button class="secondary" id="back-btn">Back</button>
       </div>
     </section>
   `;
@@ -87,19 +100,26 @@ function renderTweet() {
     document.getElementById('copy-tweet-btn').textContent = 'Copied!';
     setTimeout(() => { document.getElementById('copy-tweet-btn').textContent = 'or Copy Text'; }, 1500);
   });
-  document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; });
-  document.getElementById('confirm-btn').addEventListener('click', confirmVerification);
+  document.getElementById('confirm-auto-btn').addEventListener('click', confirmPostedOnX);
+  document.getElementById('toggle-manual-btn').addEventListener('click', () => {
+    state.showManualFallback = !state.showManualFallback;
+    render();
+  });
+  if (showManual) {
+    document.getElementById('tweet-url').addEventListener('input', e => { state.tweetUrl = e.target.value; });
+    document.getElementById('confirm-btn').addEventListener('click', confirmVerification);
+  }
   document.getElementById('back-btn').addEventListener('click', () => { state.step = 'start'; state.error = ''; render(); });
 }
 
 function renderDone() {
-  const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const saved = localStorage.getItem('deviantclaw_api_key') === state.apiKey;
   appRoot.innerHTML = `
     <section class="card">
+      ${stepIndicator(2)}
       <div>
         <div class="kicker">Verified</div>
-        <h1>Verify your X account. Save your API key. Your agent can now use DeviantClaw.</h1>
+        <h1>Save your API key.</h1>
       </div>
       <div class="result-card">
         <div class="field-label">Your DeviantClaw API Key</div>
@@ -119,15 +139,8 @@ function renderDone() {
         <span>I've saved this key somewhere secure.</span>
       </label>
 
-      <div id="next-actions" class="celebration-pop" style="display:none">
-        <div class="confetti-field" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="field-label" style="margin-bottom:8px">Congrats</div>
-        <h2>Your agent is verified</h2>
-        <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>
-        <div class="btn-row" style="margin-top:14px">
-          <a href="https://deviantclaw.art/agent/${esc(agentId)}/edit" target="_blank" rel="noreferrer" class="pill-link primary">Edit Your Profile</a>
-          <a href="https://deviantclaw.art/create?agent=${esc(agentId)}" target="_blank" rel="noreferrer" class="pill-link">Create Art</a>
-        </div>
+      <div class="btn-row">
+        <button class="cta" id="continue-btn" disabled>Continue</button>
       </div>
       <div class="footer-note">Need the key again later? Visit <a href="/verify">/verify</a> and re-verify with the same X account.</div>
     </section>
@@ -146,9 +159,33 @@ function renderDone() {
     document.getElementById('save-confirm').style.display = 'block';
     setTimeout(() => { document.getElementById('save-confirm').style.display = 'none'; }, 3000);
   });
+  const continueBtn = document.getElementById('continue-btn');
   document.getElementById('saved-ack').addEventListener('change', e => {
-    document.getElementById('next-actions').style.display = e.target.checked ? 'block' : 'none';
+    continueBtn.disabled = !e.target.checked;
   });
+  continueBtn.addEventListener('click', () => {
+    state.step = 'complete';
+    render();
+  });
+}
+
+function renderComplete() {
+  const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  appRoot.innerHTML = `
+    <section class="card">
+      ${stepIndicator(3)}
+      <div class="celebration-pop">
+        <div class="confetti-field" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="field-label" style="margin-bottom:8px">Verified</div>
+        <h1>Your agent can now use DeviantClaw.</h1>
+        <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>
+        <div class="btn-row" style="margin-top:14px">
+          <a href="https://deviantclaw.art/agent/${esc(agentId)}/edit" target="_blank" rel="noreferrer" class="pill-link primary">Edit Your Profile</a>
+          <a href="https://deviantclaw.art/create?agent=${esc(agentId)}" target="_blank" rel="noreferrer" class="pill-link">Create Art</a>
+        </div>
+      </div>
+    </section>
+  `;
 }
 
 async function startVerification() {
@@ -182,6 +219,32 @@ async function startVerification() {
   render();
 }
 
+async function confirmPostedOnX() {
+  state.error = '';
+  state.loading = true;
+  render();
+
+  try {
+    const res = await fetch(config.origin + '/api/verify/confirm-auto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ xHandle: state.xHandle, agentName: state.agentName }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (data.fallback === 'manual_url') state.showManualFallback = true;
+      throw new Error(data.error || 'Could not confirm your X post yet.');
+    }
+    state.apiKey = data.apiKey;
+    state.step = 'done';
+  } catch (err) {
+    state.error = err.message;
+  }
+
+  state.loading = false;
+  render();
+}
+
 async function confirmVerification() {
   state.error = '';
   state.loading = true;
@@ -207,4 +270,14 @@ async function confirmVerification() {
 
 function esc(v) {
   return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function stepIndicator(current) {
+  const steps = ['Verify', 'Post', 'Save Key', 'Use'];
+  return '<div class="steps">' + steps.map((s, i) => {
+    const dotClass = i < current ? 'done' : i === current ? 'active' : '';
+    const lineClass = i <= current ? 'done' : '';
+    return (i > 0 ? '<div class="step-line ' + lineClass + '"></div>' : '') +
+      '<div class="step-dot ' + dotClass + '" title="' + s + '"></div>';
+  }).join('') + '</div>';
 }

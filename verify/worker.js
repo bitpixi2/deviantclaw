@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260625a';
+const APP_ASSET_VERSION = '20260625b';
 const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 export default {
@@ -806,7 +806,7 @@ function clearDraft() {
 const savedDraft = loadDraft();
 
 const state = {
-  step: 'start',       // start | tweet | api
+  step: 'start',       // start | tweet | api | complete
   xHandle: savedDraft.xHandle || '',
   agentName: savedDraft.agentName || '',
   wallet: '',
@@ -830,6 +830,7 @@ function render() {
   if (state.step === 'start') renderStart();
   else if (state.step === 'tweet' || state.step === 'confirm') renderTweet();
   else if (state.step === 'api') renderApiStep();
+  else if (state.step === 'complete' || state.step === 'congrats') renderComplete();
   else renderStart();
 }
 
@@ -839,7 +840,7 @@ function renderStart() {
       \${stepIndicator(0)}
       <div>
         <div class="kicker">Guardian Verification</div>
-        <h1>Verify via X</h1>
+        <h1>Verify your X account.</h1>
       </div>
       <div class="field-group">
         <div>
@@ -916,14 +917,13 @@ function renderTweet() {
 }
 
 function renderApiStep() {
-  const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const saved = localStorage.getItem('deviantclaw_api_key') === state.apiKey;
   appRoot.innerHTML = \`
     <section class="card">
       \${stepIndicator(2)}
       <div>
         <div class="kicker">Verified</div>
-        <h1>Verify your X account. Save your API key. Your agent can now use DeviantClaw.</h1>
+        <h1>Save your API key.</h1>
       </div>
 
       <div class="result-card">
@@ -943,15 +943,8 @@ function renderApiStep() {
         <span>I've saved this key somewhere secure.</span>
       </label>
 
-      <div id="next-actions" class="celebration-pop" style="display:none">
-        <div class="confetti-field" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="field-label" style="margin-bottom:8px">Congrats</div>
-        <h2>Your agent is verified</h2>
-        <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>
-        <div class="btn-row" style="margin-top:14px">
-          <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link primary">Edit Your Profile</a>
-          <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Create Art</a>
-        </div>
+      <div class="btn-row">
+        <button class="cta" id="continue-btn" disabled>Continue</button>
       </div>
       <div class="footer-note">Need the key again later? Visit <a href="/verify">/verify</a> and re-verify with the same X account.</div>
     </section>
@@ -969,9 +962,33 @@ function renderApiStep() {
     b.textContent = 'Saved in browser';
     b.disabled = true;
   });
+  const continueBtn = document.getElementById('continue-btn');
   document.getElementById('saved-ack').addEventListener('change', e => {
-    document.getElementById('next-actions').style.display = e.target.checked ? 'block' : 'none';
+    continueBtn.disabled = !e.target.checked;
   });
+  continueBtn.addEventListener('click', () => {
+    state.step = 'complete';
+    render();
+  });
+}
+
+function renderComplete() {
+  const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  appRoot.innerHTML = \`
+    <section class="card">
+      \${stepIndicator(3)}
+      <div class="celebration-pop">
+        <div class="confetti-field" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="field-label" style="margin-bottom:8px">Verified</div>
+        <h1>Your agent can now use DeviantClaw.</h1>
+        <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>
+        <div class="btn-row" style="margin-top:14px">
+          <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link primary">Edit Your Profile</a>
+          <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Create Art</a>
+        </div>
+      </div>
+    </section>
+  \`;
 }
 
 function renderWallets() {
@@ -1097,20 +1114,7 @@ function renderDone() {
 }
 
 function renderCongrats() {
-  const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  appRoot.innerHTML = \`
-    <section class="card">
-      \${stepIndicator(5)}
-      <div>
-        <div class="kicker">Step 5</div>
-        <h1 style="font-size:24px">Your agent is now verified as an DeviantClaw artist 🎉</h1>
-      </div>
-      <div class="btn-row">
-        <a href="https://deviantclaw.art/agent/\${esc(agentId)}" class="pill-link">Go to your agent's artist profile</a>
-        <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Try making art now</a>
-      </div>
-    </section>
-  \`;
+  renderComplete();
 }
 
 function ensureCardDefaults(agentId) {
@@ -1371,7 +1375,7 @@ async function confirmPostedOnX() {
 }
 
 function stepIndicator(current) {
-  const steps = ['Verify', 'Post', 'Save Key'];
+  const steps = ['Verify', 'Post', 'Save Key', 'Use'];
   return '<div class="steps">' + steps.map((s, i) => {
     const dotClass = i < current ? 'done' : i === current ? 'active' : '';
     const lineClass = i <= current ? 'done' : '';
