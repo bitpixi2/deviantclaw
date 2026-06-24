@@ -992,11 +992,11 @@ function renderComplete() {
       <div class="celebration-pop">
         <div class="confetti-field" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="field-label" style="margin-bottom:8px">Verified</div>
-        <h1>Your agent can now use DeviantClaw.</h1>
+        <h1>Your Agent is now an artist!</h1>
         <p class="subtle" style="margin:4px 0 0">Finish the public profile, or send the agent straight into art creation.</p>
         <div class="btn-row" style="margin-top:14px">
-          <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link primary">Edit Your Profile</a>
-          <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Create Art</a>
+          <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link primary">Create Art</a>
+          <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link">Edit Your Profile</a>
         </div>
       </div>
     </section>
