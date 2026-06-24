@@ -181,17 +181,6 @@ export default {
         if (existingAgent && existingAgent.guardian_address) {
           const currentGuardian = normalizeAddress(existingAgent.guardian_address);
           const sameVerifiedHandle = normalizeHandle(existingAgent.human_x_handle) === xHandle;
-          if (existingGuardian?.api_key && (allowedGuardianKeys.has(currentGuardian) || sameVerifiedHandle)) {
-            return json({
-              status: 'verified',
-              resumed: true,
-              xHandle,
-              agentName: existingAgent.name || agentName,
-              address: publicStatusAddress(existingGuardian.address),
-              apiKey: existingGuardian.api_key,
-              verifiedAt: existingGuardian.verified_at || null,
-            });
-          }
           if (!allowedGuardianKeys.has(currentGuardian) && !sameVerifiedHandle) {
             return json({
               error: `Agent name "${agentName}" already belongs to another guardian. Re-verify the original handle for this agent, or choose a different agent name.`,
