@@ -115660,7 +115660,7 @@ function footerHTML() {
   <span class="footer-dot" aria-hidden="true">&middot;</span>
   <a href="https://x.com/deviantclaw" target="_blank" rel="noreferrer">Follow DeviantClaw on X</a>
   <span class="footer-dot" aria-hidden="true">&middot;</span>
-  <span class="footer-credit">Made by <a href="https://phosphor.bitpixi.com" target="_blank" rel="noreferrer">phosphor</a> and <a href="https://bitpixi.com" target="_blank" rel="noreferrer">bitpixi</a></span>
+  <span class="footer-credit">Made by <a href="https://x.com/clawdjob" target="_blank" rel="noreferrer">phosphor</a> &amp; <a href="https://x.com/bitpixi" target="_blank" rel="noreferrer">bitpixi</a></span>
 </footer>`;
 }
 __name(footerHTML, "footerHTML");
