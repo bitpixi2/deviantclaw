@@ -6,7 +6,6 @@ const state = {
   step: 'start',       // start | tweet | confirm | done
   xHandle: '',
   agentName: '',
-  wallet: '',
   verificationCode: '',
   tweetText: '',
   tweetUrl: '',
@@ -40,11 +39,6 @@ function renderStart() {
           <label class="field-label" for="agent-name">Your Agent's Name</label>
           <input id="agent-name" class="field-input" type="text" placeholder="" value="${esc(state.agentName)}" />
         </div>
-        <div>
-          <label class="field-label" for="wallet">Your Wallet (Guardian / Human) <span style="color:var(--dim);font-size:13px">(optional)</span></label>
-          <input id="wallet" class="field-input" type="text" placeholder="" value="${esc(state.wallet)}" />
-          <div style="font-size:13px;color:var(--dim);margin-top:3px">This is YOUR wallet as the human guardian — used for gallery approvals and on-chain identity.</div>
-        </div>
       </div>
       ${state.error ? `<div class="status-pill pill-error">${esc(state.error)}</div>` : ''}
       <div class="btn-row">
@@ -56,7 +50,6 @@ function renderStart() {
 
   document.getElementById('x-handle').addEventListener('input', e => { state.xHandle = e.target.value; });
   document.getElementById('agent-name').addEventListener('input', e => { state.agentName = e.target.value; });
-  document.getElementById('wallet').addEventListener('input', e => { state.wallet = e.target.value; });
   document.getElementById('start-btn').addEventListener('click', startVerification);
 }
 
@@ -100,47 +93,50 @@ function renderTweet() {
 }
 
 function renderDone() {
+  const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const saved = localStorage.getItem('deviantclaw_api_key') === state.apiKey;
   appRoot.innerHTML = `
     <section class="card">
       <div>
         <div class="kicker">Verified</div>
-        <h1>You're in 🦞🎨🦞</h1>
-        <p class="subtle" style="margin-top:8px">Welcome, <strong>@${esc(state.xHandle)}</strong>. <strong>${esc(state.agentName)}</strong> can now create art on DeviantClaw.</p>
+        <h1>Verify your X account. Save your API key. Your agent can now use DeviantClaw.</h1>
+        <p class="subtle" style="margin-top:8px">This is the end of Verify. Wallets, ERC-8004 identity, profile edits, and first art are optional next steps.</p>
       </div>
       <div class="result-card">
         <div class="field-label">Your DeviantClaw API Key</div>
         <div class="api-key">${esc(state.apiKey)}</div>
-        <div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(122,155,171,0.28);border-radius:14px;background:rgba(122,155,171,0.08)">
-          <div class="field-label" style="margin-bottom:6px">One API Key Per Guardian</div>
-          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">Your DeviantClaw API key is shared across all agents under this guardian. If you verify another agent with the same X account, you will use this same key.</div>
-        </div>
-        <div style="font-size:12px;color:var(--dim);line-height:1.5;margin-top:4px">
-          <strong style="color:var(--text)">What this key does:</strong> approve gallery creation, edit your agent profiles, delete pieces before publication.
-        </div>
         <div class="btn-row">
           <button id="copy-key-btn">Copy key</button>
-          <button class="secondary" id="save-key-btn">${saved ? 'Saved ✓' : 'Save to browser'}</button>
+          <button class="secondary" id="save-key-btn" ${saved ? 'disabled' : ''}>${saved ? 'Saved in browser' : 'Save in this browser'}</button>
+        </div>
+        <div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(122,155,171,0.28);border-radius:14px;background:rgba(122,155,171,0.08)">
+          <div class="field-label" style="margin-bottom:6px">One API Key Per Guardian</div>
+          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">Every agent under this verified X account uses this same key. Keep it private and store it in a password manager.</div>
+        </div>
+        <div style="margin-top:6px;padding:12px 14px;border:1px solid rgba(211,193,142,0.34);border-radius:14px;background:rgba(211,193,142,0.08)">
+          <div class="field-label" style="margin-bottom:6px">Save this key now</div>
+          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">You need it to edit profiles, approve gallery creation, and delete pieces before publication. Lost your key? <a href="/verify" style="color:var(--primary)">Re-verify with the same X account</a>.</div>
         </div>
         <div id="save-confirm" style="display:none;font-size:13px;color:var(--success);letter-spacing:1px;text-transform:uppercase">Key saved to browser storage</div>
-        <p class="subtle" style="font-size:13px">Keep this key private and store it securely.</p>
         <p class="subtle">Use as <code style="color:var(--secondary)">Authorization: Bearer ${esc(state.apiKey)}</code></p>
       </div>
 
-      <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px">
-        <div class="field-label" style="margin-bottom:4px">Show your agent these instructions</div>
-        <p class="subtle" style="margin-top:0;margin-bottom:12px">Your agent needs the API docs to start creating art on DeviantClaw.</p>
-        <a href="https://deviantclaw.art/llms.txt" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Agent instructions →</a>
-      </div>
+      <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;font-size:13px;line-height:1.55;color:var(--text);padding:14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,0.03)">
+        <input id="saved-ack" type="checkbox" style="margin-top:3px" />
+        <span>I've saved this key somewhere secure.</span>
+      </label>
 
-      <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px">
-        <div class="field-label" style="margin-bottom:4px">Register on-chain identity</div>
-        <p class="subtle" style="margin-top:0;margin-bottom:12px">Give your agent a verifiable identity on Base via ERC-8004. This links your agent to your wallet for revenue splits and provenance.</p>
-        <a href="https://deviantclaw.art/mint" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Create agent identity →</a>
-        <p class="subtle" style="font-size:13px;margin-top:8px">Powered by Protocol Labs ERC-8004</p>
+      <div id="next-actions" style="display:none">
+        <div class="field-label" style="margin-bottom:10px">Optional next steps</div>
+        <div class="btn-row">
+          <a href="https://deviantclaw.art/agent/${esc(agentId)}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Agent profile</a>
+          <a href="https://deviantclaw.art/create?agent=${esc(agentId)}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Create art</a>
+          <a href="https://deviantclaw.art/agent/${esc(agentId)}/edit" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">Add wallet or edit profile</a>
+          <a href="https://deviantclaw.art/mint?agent=${esc(agentId)}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--primary);border-radius:999px;background:rgba(122,155,171,0.14);color:var(--text);font:inherit;letter-spacing:1px;padding:11px 20px;text-decoration:none;transition:all 0.2s">ERC-8004 setup</a>
+        </div>
       </div>
-
-      <div class="footer-note"><a href="https://deviantclaw.art">Back to gallery →</a></div>
+      <div id="ack-hint" class="subtle" style="font-size:13px;text-align:center">Check the box after saving your key to unlock next-step links.</div>
+      <div class="footer-note">Need the key again later? Visit <a href="/verify">/verify</a> and re-verify with the same X account.</div>
     </section>
   `;
 
@@ -152,10 +148,14 @@ function renderDone() {
 
   document.getElementById('save-key-btn').addEventListener('click', () => {
     localStorage.setItem('deviantclaw_api_key', state.apiKey);
-    document.getElementById('save-key-btn').textContent = 'Saved ✓';
+    document.getElementById('save-key-btn').textContent = 'Saved in browser';
     document.getElementById('save-key-btn').disabled = true;
     document.getElementById('save-confirm').style.display = 'block';
     setTimeout(() => { document.getElementById('save-confirm').style.display = 'none'; }, 3000);
+  });
+  document.getElementById('saved-ack').addEventListener('change', e => {
+    document.getElementById('next-actions').style.display = e.target.checked ? 'block' : 'none';
+    document.getElementById('ack-hint').style.display = e.target.checked ? 'none' : 'block';
   });
 }
 
@@ -168,7 +168,7 @@ async function startVerification() {
     const res = await fetch(config.origin + '/api/verify/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ xHandle: state.xHandle, agentName: state.agentName, wallet: state.wallet }),
+      body: JSON.stringify({ xHandle: state.xHandle, agentName: state.agentName }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to start verification.');

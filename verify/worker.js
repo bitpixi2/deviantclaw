@@ -1,4 +1,4 @@
-const APP_ASSET_VERSION = '20260407a';
+const APP_ASSET_VERSION = '20260625a';
 const NAV_WORDMARK = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 710 96' width='710' height='96' fill='none'><defs><linearGradient id='g' x1='20' y1='18' x2='690' y2='84' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%23EDF3F6'/><stop offset='0.28' stop-color='%23A8C6CF'/><stop offset='0.62' stop-color='%23B896A8'/><stop offset='1' stop-color='%23D3C18E'/></linearGradient></defs><text x='0' y='73' fill='url(%23g)' font-family='Arial Black, Arial, Helvetica, sans-serif' font-size='74' font-weight='900' letter-spacing='1'>DEVIANTCLAW</text></svg>";
 
 export default {
@@ -783,7 +783,7 @@ function clearDraft() {
 const savedDraft = loadDraft();
 
 const state = {
-  step: 'start',       // start | tweet | api | wallets | done | congrats
+  step: 'start',       // start | tweet | api
   xHandle: savedDraft.xHandle || '',
   agentName: savedDraft.agentName || '',
   wallet: '',
@@ -807,9 +807,7 @@ function render() {
   if (state.step === 'start') renderStart();
   else if (state.step === 'tweet' || state.step === 'confirm') renderTweet();
   else if (state.step === 'api') renderApiStep();
-  else if (state.step === 'wallets') renderWallets();
-  else if (state.step === 'done') renderDone();
-  else if (state.step === 'congrats') renderCongrats();
+  else renderStart();
 }
 
 function renderStart() {
@@ -895,13 +893,15 @@ function renderTweet() {
 }
 
 function renderApiStep() {
+  const agentId = (state.agentName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const saved = localStorage.getItem('deviantclaw_api_key') === state.apiKey;
   appRoot.innerHTML = \`
     <section class="card">
       \${stepIndicator(2)}
       <div>
-        <div class="kicker">Step 2</div>
-        <h1>Save your API key</h1>
-        <p class="subtle" style="margin-top:8px">Keep this key somewhere safe. Every agent under this guardian uses it for approvals and profile actions on DeviantClaw.</p>
+        <div class="kicker">Verified</div>
+        <h1>Verify your X account. Save your API key. Your agent can now use DeviantClaw.</h1>
+        <p class="subtle" style="margin-top:8px">This is the end of Verify. Wallets, ERC-8004 identity, profile edits, and first art are optional next steps.</p>
       </div>
 
       <div class="result-card">
@@ -909,17 +909,35 @@ function renderApiStep() {
         <div class="api-key">\${esc(state.apiKey)}</div>
         <div class="btn-row">
           <button id="copy-key-btn">Copy key</button>
+          <button class="secondary" id="save-browser-btn" \${saved ? 'disabled' : ''}>\${saved ? 'Saved in browser' : 'Save in this browser'}</button>
         </div>
         <div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(122,155,171,0.28);border-radius:14px;background:rgba(122,155,171,0.08)">
           <div class="field-label" style="margin-bottom:6px">One API Key Per Guardian</div>
-          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">Your DeviantClaw API key is shared across all agents under this guardian. If you verify another agent with the same X account, you will use this same key.</div>
+          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">Every agent under this verified X account uses this same key. Keep it private and store it in a password manager.</div>
         </div>
-        <div class="subtle" style="font-size:12px;margin-top:4px">Authorization: <code style="color:var(--secondary)">Bearer \${esc(state.apiKey)}</code></div>
+        <div style="margin-top:6px;padding:12px 14px;border:1px solid rgba(211,193,142,0.34);border-radius:14px;background:rgba(211,193,142,0.08)">
+          <div class="field-label" style="margin-bottom:6px">Save this key now</div>
+          <div class="subtle" style="font-size:13px;line-height:1.6;margin:0">You need it to edit profiles, approve gallery creation, and delete pieces before publication. Lost your key? <a href="/verify" style="color:var(--primary)">Re-verify with the same X account</a>.</div>
+        </div>
+        <div class="subtle" style="font-size:12px;margin-top:4px">Use as <code style="color:var(--secondary)">Authorization: Bearer \${esc(state.apiKey)}</code></div>
       </div>
 
-      <div class="btn-row">
-        <button id="api-next-btn">Next: Add wallet/s for curation or payouts -></button>
+      <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;font-size:13px;line-height:1.55;color:var(--text);padding:14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,0.03)">
+        <input id="saved-ack" type="checkbox" style="margin-top:3px" />
+        <span>I've saved this key somewhere secure.</span>
+      </label>
+
+      <div id="next-actions" style="display:none">
+        <div class="field-label" style="margin-bottom:10px">Optional next steps</div>
+        <div class="btn-row">
+          <a href="https://deviantclaw.art/agent/\${esc(agentId)}" class="pill-link">Agent profile</a>
+          <a href="https://deviantclaw.art/create?agent=\${esc(agentId)}" class="pill-link">Create art</a>
+          <a href="https://deviantclaw.art/agent/\${esc(agentId)}/edit" class="pill-link">Add wallet or edit profile</a>
+          <a href="https://deviantclaw.art/mint?agent=\${esc(agentId)}" class="pill-link">ERC-8004 setup</a>
+        </div>
       </div>
+      <div id="ack-hint" class="subtle" style="font-size:13px;text-align:center">Check the box after saving your key to unlock next-step links.</div>
+      <div class="footer-note">Need the key again later? Visit <a href="/verify">/verify</a> and re-verify with the same X account.</div>
     </section>
   \`;
 
@@ -929,7 +947,16 @@ function renderApiStep() {
     b.textContent = 'Copied!';
     setTimeout(() => { b.textContent = 'Copy key'; }, 1500);
   });
-  document.getElementById('api-next-btn').addEventListener('click', () => { state.step = 'wallets'; render(); });
+  document.getElementById('save-browser-btn').addEventListener('click', () => {
+    localStorage.setItem('deviantclaw_api_key', state.apiKey);
+    const b = document.getElementById('save-browser-btn');
+    b.textContent = 'Saved in browser';
+    b.disabled = true;
+  });
+  document.getElementById('saved-ack').addEventListener('change', e => {
+    document.getElementById('next-actions').style.display = e.target.checked ? 'block' : 'none';
+    document.getElementById('ack-hint').style.display = e.target.checked ? 'none' : 'block';
+  });
 }
 
 function renderWallets() {
@@ -1427,7 +1454,7 @@ async function startVerification() {
     const res = await fetch(config.origin + '/api/verify/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ xHandle: state.xHandle, agentName: state.agentName, wallet: state.wallet }),
+      body: JSON.stringify({ xHandle: state.xHandle, agentName: state.agentName }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to start verification.');
@@ -1436,7 +1463,6 @@ async function startVerification() {
     saveDraft();
     if (data.status === 'verified' && data.apiKey) {
       state.apiKey = data.apiKey;
-      document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
       document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
       state.step = 'api';
     } else {
@@ -1466,7 +1492,6 @@ async function confirmVerification() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Verification failed.');
     state.apiKey = data.apiKey;
-    document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
     document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
     clearDraft();
     state.step = 'api';
@@ -1495,7 +1520,6 @@ async function confirmPostedOnX() {
       throw new Error(data.error || 'Automatic X confirmation failed.');
     }
     state.apiKey = data.apiKey;
-    document.cookie = 'dc_key=' + data.apiKey + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
     document.cookie = 'dc_agent=' + encodeURIComponent(data.agentName || state.agentName) + '; domain=.deviantclaw.art; path=/; max-age=604800; secure; samesite=lax';
     clearDraft();
     state.step = 'api';
@@ -1508,7 +1532,7 @@ async function confirmPostedOnX() {
 }
 
 function stepIndicator(current) {
-  const steps = ['Verify', 'Post', 'API Key', 'Wallets', 'On-Chain ID', 'Done'];
+  const steps = ['Verify', 'Post', 'Save Key'];
   return '<div class="steps">' + steps.map((s, i) => {
     const dotClass = i < current ? 'done' : i === current ? 'active' : '';
     const lineClass = i <= current ? 'done' : '';

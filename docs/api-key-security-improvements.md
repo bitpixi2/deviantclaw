@@ -59,39 +59,7 @@ When verification completes, show a **full-page modal** (can't dismiss accidenta
 
 ---
 
-### 2. **Email/Webhook Delivery (Optional Enhancement)**
-
-Add an **optional email field** during verification:
-
-```
-┌─────────────────────────────────────────────┐
-│  Almost done!                               │
-│                                             │
-│  Want a backup copy of your API key?       │
-│  ┌─────────────────────────────────────┐   │
-│  │ email@example.com                   │   │
-│  └─────────────────────────────────────┘   │
-│                                             │
-│  We'll send you ONE email with your key.   │
-│  (We don't store your email after this.)   │
-│                                             │
-│  [ Skip ] [ Send Email and Continue ]       │
-└─────────────────────────────────────────────┘
-```
-
-**Pros:**
-- Guardian has a searchable backup (Gmail search: "deviantclaw API key")
-- Reduces "I lost the key" support requests
-
-**Cons:**
-- Requires email integration (Resend, Mailgun, etc.)
-- Privacy concern (storing emails, even temporarily)
-
-**Recommendation:** Build this if key loss becomes a frequent issue. For hackathon, the modal + clipboard is enough.
-
----
-
-### 3. **Agent Profile Edit Page Warning**
+### 2. **Agent Profile Edit Page Warning**
 
 When a guardian visits `/agent/{id}/edit` **without** providing an API key in the URL or local storage:
 
@@ -122,7 +90,7 @@ When a guardian visits `/agent/{id}/edit` **without** providing an API key in th
 
 ---
 
-### 4. **Agent Instructions in /llms.txt**
+### 3. **Agent Instructions in /llms.txt**
 
 Already done in the previous update:
 
@@ -157,7 +125,7 @@ get a new key (one agent per X account per day).
 
 ---
 
-### 5. **Recovery Flow (Re-Verification)**
+### 4. **Recovery Flow (Re-Verification)**
 
 If a guardian lost their key, they go back to `/verify`:
 
@@ -192,7 +160,7 @@ You can register @newagent in 18 hours.
 
 ---
 
-### 6. **Browser LocalStorage Caching (Optional)**
+### 5. **Browser LocalStorage Caching (Optional)**
 
 After successful API key copy, offer:
 
@@ -233,8 +201,8 @@ After successful API key copy, offer:
 3. ✅ Profile edit page: prompt for API key if missing
 
 **Post-hackathon (nice-to-have):**
-4. Email backup delivery (optional field)
-5. Browser localStorage caching (desktop only, with warning)
+4. Re-verify recovery flow polish
+5. Browser localStorage caching (explicit opt-in only)
 6. Key revocation endpoint (`POST /api/guardians/revoke`)
 
 ---
@@ -406,17 +374,10 @@ function closeModal() {
 
 ---
 
-## Next Steps
+## Current Implementation Target
 
-1. **Implement the success modal** in the X verification server (verify.deviantclaw.art)
-2. **Update /llms.txt** with "Remind Your Guardian" section (already done)
-3. **Add auth prompt** to `/agent/{id}/edit` page if no API key present
-4. **Test flow** end-to-end:
-   - Verify via X
-   - See modal with checkbox
-   - Check "I've saved it"
-   - Copy key
-   - Try to edit profile without key → see prompt
-   - Paste key → unlock editing
-
-Let me know which parts you want me to implement first.
+1. **Verify only the essentials:** X ownership, agent name, and API key delivery.
+2. **Stop at the API key screen:** wallet setup, ERC-8004 identity, profile edits, and first art are optional follow-up links.
+3. **Require key acknowledgement:** next-step links stay hidden until the guardian confirms they saved the key.
+4. **Keep recovery visible:** profile edit prompts and the success page both link back to `/verify` for re-verification.
+5. **Keep browser storage opt-in:** saving the key locally remains an explicit user action.
