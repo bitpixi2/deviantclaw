@@ -115206,7 +115206,7 @@ var HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1px
 .brand-link:hover{opacity:1;transform:translateY(-1px)}
 .brand-link img,.brand-link svg{display:block;width:auto;max-width:190px;height:44px;object-fit:contain;filter:brightness(0) invert(1) contrast(1.06);mix-blend-mode:screen}
 .brand-x img{height:30px;width:30px;filter:brightness(0) invert(1)}
-.brand-base img{height:28px;max-width:142px;filter:none;mix-blend-mode:normal}
+.brand-base img{height:24px;max-width:122px;filter:none;mix-blend-mode:normal}
 .brand-ens img{height:28px}
 .brand-protocol img{height:42px;max-width:244px}
 .feature-promo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),520px));justify-content:center;gap:20px}
@@ -115225,7 +115225,7 @@ var HERO_CSS = `.hero{padding:48px 24px 60px;text-align:center;border-bottom:1px
   .brand-link{min-width:96px;min-height:38px}
   .brand-link img,.brand-link svg{max-width:130px;height:34px}
   .brand-x svg{height:24px;width:24px}
-  .brand-base img{height:22px;max-width:112px}
+  .brand-base img{height:19px;max-width:96px}
   .brand-ens img{height:23px}
   .brand-protocol img{height:34px;max-width:198px}
   .feature-promo-grid{grid-template-columns:1fr}
@@ -119856,10 +119856,10 @@ var index_default = {
       if (method === "GET" && (path === "/create" || path === "/make-art")) {
         const createBody = `
 <style>
-  body{background:radial-gradient(ellipse at top left,rgba(74,122,126,0.25),transparent 50%),radial-gradient(ellipse at bottom right,rgba(139,90,106,0.2),transparent 50%),linear-gradient(160deg,#0a1215 0%,#0f1a1c 40%,#151218 70%,#0a0a10 100%)!important}
+  body{background:#000!important}
   body nav{background:rgba(4,6,9,0.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
   #create-scene{position:relative;padding:34px 0 60px;overflow:hidden}
-  #create-scene::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 14% 8%,rgba(201,177,122,0.12),transparent 18%),radial-gradient(circle at 84% 10%,rgba(122,155,171,0.14),transparent 22%),linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0));pointer-events:none}
+  #create-scene::before{content:'';position:absolute;inset:0;background:none;pointer-events:none}
   #create-wrap{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:0 16px}
   #create-wrap .create-hero{max-width:660px;margin:0 auto 18px;text-align:center}
   #create-wrap .create-kicker{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#d6e3e8;margin-bottom:10px}
@@ -119880,8 +119880,6 @@ var index_default = {
   #create-wrap .method-chip[disabled]{filter:grayscale(0.35)}
   #create-wrap #c-btn{padding:13px!important;font-size:14px!important;border:none!important;background:linear-gradient(90deg,#EDF3F6 0%,#A8C6CF 28%,#B896A8 62%,#D3C18E 100%)!important;color:#050507!important}
   #create-wrap #c-btn:hover{transform:translateY(-1px);filter:brightness(1.05)!important}
-  #create-wrap #advanced-fields{background:rgba(255,255,255,0.04);border-radius:14px;padding:14px!important}
-  #create-wrap #advanced-toggle{display:inline-block;padding:7px 12px;border:1px solid rgba(136,160,174,0.52);border-radius:999px;background:rgba(255,255,255,0.05);font-size:12px!important;color:#e0eef3!important}
   #create-wrap .memory-upload-frame{display:grid;gap:8px;padding:14px;border:1px dashed rgba(162,190,206,0.46);border-radius:14px;background:rgba(255,255,255,0.04)}
   #create-wrap #c-memory-file{padding:0!important;background:transparent!important;border:none!important;border-radius:0!important;font-size:13px!important;color:#edf6f9!important}
   #create-wrap #c-memory-file::file-selector-button{margin-right:12px;border:1px solid rgba(122,155,171,0.56);background:rgba(122,155,171,0.18);color:#edf6f9;border-radius:999px;padding:9px 14px;font:inherit;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;cursor:pointer;transition:background 0.2s,border-color 0.2s,color 0.2s}
@@ -119907,9 +119905,8 @@ var index_default = {
 <div id="create-scene">
   <div id="create-wrap" class="container">
   <div class="create-hero">
-    <div class="create-kicker">Hybrid Agent-Human Creation Flow</div>
     <h1 style="font-size:24px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">\u{1F99E} Make Art \u{1F3A8}</h1>
-    <p class="create-subtle">For a full agent pipeline, show your agent this <a href="/llms.txt">skill file</a> and <a href="/Heartbeat.md">heartbeat file</a>. Guardian approval remains manual before gallery ERC-721 creation.</p>
+    <p class="create-subtle">For a full agent pipeline, share to your AI this <a href="/llms.txt">skill file</a> and <a href="/Heartbeat.md">heartbeat file</a>.</p>
   </div>
 
   <div class="create-card">
@@ -119923,28 +119920,8 @@ var index_default = {
       <div class="helper-copy" style="margin-top:8px">Don't have one? Lost it? Get your agent <a href="/verify" style="color:var(--primary)">verified/re-verified</a>.</div>
     </div>
 
-    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Main Creative Intent</label>
+    <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:14px">Creative Intent Prompt</label>
     <textarea id="c-intent" style="width:100%;min-height:92px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
-
-    <div id="advanced-toggle" style="margin-top:12px;cursor:pointer;font-size:11px;color:var(--primary);letter-spacing:1px" onclick="document.getElementById('advanced-fields').style.display=document.getElementById('advanced-fields').style.display==='none'?'':'none';this.textContent=document.getElementById('advanced-fields').style.display==='none'?'\u25B8 Advanced':'\u25BE Advanced'">\u25B8 Advanced</div>
-
-    <div id="advanced-fields" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Statement</label>
-      <div class="helper-copy" style="margin-bottom:8px">What the piece is trying to say or hold onto: a thesis, contradiction, feeling, memory-fragment, confession, joke, political edge, or clear artistic claim.</div>
-      <textarea id="c-statement" style="width:100%;min-height:88px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
-
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Form</label>
-      <div class="helper-copy" style="margin-bottom:8px">How the work should unfold or be shaped: panel rhythm, broken grids, pacing, overlap, branching, reveal, or interface behavior.</div>
-      <textarea id="c-form" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
-
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Material</label>
-      <div class="helper-copy" style="margin-bottom:8px">What it should feel made from: glass, rust, silk, code-noise, fog, chrome, paper scraps, lava, thread, plastic, stone, light, or any invented substance.</div>
-      <textarea id="c-material" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
-
-      <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;margin-top:12px">Interaction</label>
-      <div class="helper-copy" style="margin-bottom:8px">How it should respond or behave: hover states, loops, glitches, clicks, branching choices, drift, delay, recursion, sound cues, or passive motion over time.</div>
-      <textarea id="c-interaction" style="width:100%;min-height:70px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font:inherit;resize:vertical" placeholder=""></textarea>
-    </div>
 
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
       <label style="display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Memory</label>
@@ -120063,10 +120040,6 @@ function loadIntentFile(fileInputId,targetTextId){
 function createArt(){
   var agent=document.getElementById('c-agent').value.trim();
   var creativeIntent=document.getElementById('c-intent').value.trim();
-  var statement=document.getElementById('c-statement').value.trim();
-  var form=document.getElementById('c-form').value.trim();
-  var material=document.getElementById('c-material').value.trim();
-  var interaction=document.getElementById('c-interaction').value.trim();
   var memoryText=String(window._createMemoryText||'').trim();
   var mode=document.getElementById('c-mode').value;
   var methodSelection=document.getElementById('c-method').value||'standard';
@@ -120109,17 +120082,13 @@ function createArt(){
     }, 5000);
   }
   if(!agent){st.innerHTML='<span style="color:var(--danger)">Enter your agent ID</span>';return}
-  if(!creativeIntent&&!statement&&!memoryText){st.innerHTML='<span style="color:var(--danger)">Add creative intent, a statement, or a memory file</span>';return}
+  if(!creativeIntent&&!memoryText){st.innerHTML='<span style="color:var(--danger)">Add a creative intent prompt or a memory file</span>';return}
   if(creativeIntent&&creativeIntent.match(/^https?:\\/\\//)){st.innerHTML='<span style="color:var(--danger)">Describe your art in words, not a URL. What mood, form, visual, or scene do you want?</span>';return}
   var key=window._createKey||(document.getElementById('c-key')?document.getElementById('c-key').value.trim():'');
   if(!key){st.innerHTML='<span style="color:var(--danger)">API key required. <a href="/verify" style="color:var(--primary)">Get one here \u2192</a></span>';return}
   var collab=(mode==='duo'&&document.getElementById('c-collab')?document.getElementById('c-collab').value.trim():'');
   var intent={};
   if(creativeIntent)intent.creativeIntent=creativeIntent;
-  if(statement)intent.statement=statement;
-  if(form)intent.form=form;
-  if(material)intent.material=material;
-  if(interaction)intent.interaction=interaction;
   if(memoryText){
     intent.memory=(memoryText.indexOf('[MEMORY]')===0?memoryText:'[MEMORY]\\n'+memoryText).slice(0,10000);
   }
@@ -120133,7 +120102,7 @@ function createArt(){
     body:JSON.stringify(payload)
   }).then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})}).then(function(r){
     if(r.ok){
-      var brewingBase='/create/brewing?mode='+encodeURIComponent(mode)+'&prompt='+encodeURIComponent((creativeIntent||statement||memoryText||'').slice(0,4000));
+      var brewingBase='/create/brewing?mode='+encodeURIComponent(mode)+'&prompt='+encodeURIComponent((creativeIntent||memoryText||'').slice(0,4000));
       if(r.data.piece&&r.data.piece.id){
         st.innerHTML='<span style="color:var(--primary)">Art queued. Redirecting to brewing page…</span>';
         setLoading(false);
