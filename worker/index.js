@@ -111683,7 +111683,7 @@ async function veniceGenerate(apiKey, intentA, intentB, agentA, agentB, opts = {
   } else {
     pool = ["fusion", "code", "stitch"];
   }
-  const requestedMethod = String(intentB?.method || intentA?.method || "").trim().toLowerCase();
+  const requestedMethod = String(opts.method || intentB?.method || intentA?.method || "").trim().toLowerCase();
   const method = requestedMethod && pool.includes(requestedMethod) ? requestedMethod : defaultMethodForComposition(compositionFromCount(numArtists));
   const collabMode = method;
   const noImageMethods = ["code", "game"];
@@ -111966,6 +111966,35 @@ IMPORTANT: Every agent's core identity must be visibly present. Prefer form over
   };
 }
 __name(buildGenerativeHTMLStack, "buildGenerativeHTMLStack");
+function isAstralDreamMachineEntries(entries) {
+  return (entries || []).length === 1 && /^(astral-dream-machine|astral dream machine)$/i.test(String(entries[0]?.agent?.id || entries[0]?.agent?.name || "").trim());
+}
+__name(isAstralDreamMachineEntries, "isAstralDreamMachineEntries");
+function astralDreamMachineTitle(intent) {
+  const text = `${intent?.creativeIntent || ""} ${intent?.statement || ""} ${intent?.form || ""}`.toLowerCase();
+  if (/angle|wall|shadow|perspective|space/.test(text)) return "Impossible Angle Study";
+  if (/compile|static|organizing|definition/.test(text)) return "Static Compilation Study";
+  if (/edge|seam|remain|residue|dissolution/.test(text)) return "Seam Residue Study";
+  return "Hypnagogic Signal Study";
+}
+__name(astralDreamMachineTitle, "astralDreamMachineTitle");
+function buildAstralDreamMachineCodeHTML(intent, title) {
+  const seedText = `${intent?.creativeIntent || ""} ${intent?.statement || ""} ${intent?.form || ""}`;
+  const lower = seedText.toLowerCase();
+  const mode = /angle|wall|shadow|perspective|space/.test(lower) ? "angle" : /compile|static|organizing|definition/.test(lower) ? "compile" : /edge|seam|remain|residue|dissolution/.test(lower) ? "seam" : "signal";
+  const safeTitle = esc(formatArtworkTitle(title || astralDreamMachineTitle(intent)));
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${safeTitle} - DeviantClaw</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;height:100%;overflow:hidden;background:#020204;font-family:'Courier New',monospace}canvas{display:block;width:100vw;height:100vh;background:#020204}.sig{position:fixed;left:18px;bottom:16px;color:rgba(238,242,255,.52);font:11px/1.35 'Courier New',monospace;letter-spacing:2px;text-transform:uppercase;pointer-events:none}.sig b{display:block;color:rgba(255,255,255,.72);font-size:13px;margin-bottom:3px}.sig i{font-style:normal;color:rgba(255,40,40,.65);text-shadow:1px 0 rgba(35,80,255,.7),-1px 0 rgba(255,0,0,.45)}
+</style></head><body>
+<canvas id="c"></canvas><div class="sig"><b>${safeTitle}</b><i>Astral Dream Machine - red/blue threshold</i></div>
+<script>
+(()=>{const c=document.getElementById('c'),x=c.getContext('2d');let w=0,h=0,t=0;const mode=${JSON.stringify(mode)};let seed=0x5eed1234;function r(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}function rz(){w=c.width=innerWidth*devicePixelRatio;h=c.height=innerHeight*devicePixelRatio;x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);w=innerWidth;h=innerHeight}addEventListener('resize',rz);rz();const pts=Array.from({length:220},()=>({x:r()*w,y:r()*h,v:(r()-.5)*.45,a:r()*6.28,s:r()}));function line(ax,ay,bx,by,col,a=1,l=1){x.strokeStyle=col.replace('A',a.toFixed(3));x.lineWidth=l;x.beginPath();x.moveTo(ax,ay);x.lineTo(bx,by);x.stroke()}function poly(cx,cy,rad,rot,col,a){x.strokeStyle=col.replace('A',a.toFixed(3));x.lineWidth=1;x.beginPath();for(let i=0;i<5;i++){let q=rot+i*1.29+(mode==='angle'?(i%2)*.34:0),rr=rad*(.65+(i%2)*.55);let px=cx+Math.cos(q)*rr,py=cy+Math.sin(q)*rr;if(i)x.lineTo(px,py);else x.moveTo(px,py)}x.closePath();x.stroke()}function draw(){t+=1;x.fillStyle='rgba(2,2,4,.18)';x.fillRect(0,0,w,h);x.globalCompositeOperation='screen';for(let y=0;y<h;y+=7){let n=Math.sin(y*.037+t*.013)*2+Math.sin(y*.011+t*.031)*3;x.fillStyle='rgba(220,225,230,.025)';x.fillRect(0,y+n,w,1)}for(const p of pts){p.x+=Math.cos(p.a+t*.002)*p.v;p.y+=Math.sin(p.a+t*.003)*p.v;if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;let flick=.15+Math.abs(Math.sin(t*.03+p.s*9))*.55;x.fillStyle='rgba(235,235,235,'+(flick*.16).toFixed(3)+')';x.fillRect(p.x,p.y,1.2,1.2);if(p.s>.965){line(p.x-10,p.y,p.x+10,p.y,'rgba(255,0,0,A)',.18,1);line(p.x-8,p.y+1,p.x+12,p.y+1,'rgba(20,70,255,A)',.2,1)}}if(mode==='angle'){for(let i=0;i<10;i++){let cx=w*(.12+i*.085)+Math.sin(t*.01+i)*18,cy=h*(.18+((i*37)%71)/100*.64);poly(cx,cy,58+i%4*16,t*.003+i,'rgba(235,235,235,A)',.22);poly(cx+3,cy,58+i%4*16,t*.003+i,'rgba(255,0,0,A)',.24);poly(cx-3,cy,58+i%4*16,t*.003+i,'rgba(20,70,255,A)',.24)}for(let i=0;i<18;i++){let y=h*(.1+i*.048);line(w*.08,y,w*.92,y+Math.sin(i+t*.02)*90,'rgba(210,210,210,A)',.11)}}else if(mode==='compile'){for(let i=0;i<42;i++){let y=h*(i/42),len=w*(.08+((Math.sin(t*.015+i)*.5+.5)*.84));line(w*.08,y,len,y+Math.sin(t*.04+i)*4,'rgba(235,235,235,A)',.13,1);if(i%3===0){line(w*.08+2,y+2,len+2,y+2,'rgba(255,0,0,A)',.18);line(w*.08-2,y-2,len-2,y-2,'rgba(20,70,255,A)',.18)}}for(let i=0;i<16;i++)poly(w/2+Math.cos(i)*w*.22,h/2+Math.sin(i*2.1)*h*.22,18+i*2,t*.01+i,'rgba(235,235,235,A)',.22)}else{let sx=w/2+Math.sin(t*.01)*24;for(let y=0;y<h;y+=5){let gap=Math.sin(y*.021+t*.017)*28;line(sx-80+gap,y,sx-8+gap*.2,y,'rgba(235,235,235,A)',.12);line(sx+8+gap*.2,y,sx+80+gap,y,'rgba(235,235,235,A)',.12);line(sx-5,y,sx-1,y,'rgba(255,0,0,A)',.42);line(sx+1,y,sx+5,y,'rgba(20,70,255,A)',.42)}for(let i=0;i<26;i++)poly(w/2+Math.sin(t*.007+i)*w*.33,h/2+Math.cos(t*.009+i*1.7)*h*.28,12+(i%5)*6,t*.02+i,'rgba(235,235,235,A)',.12)}x.globalCompositeOperation='source-over';requestAnimationFrame(draw)}draw();})();
+<\/script></body></html>`;
+}
+__name(buildAstralDreamMachineCodeHTML, "buildAstralDreamMachineCodeHTML");
 async function generateArtStack(apiKey, rawEntries, opts = {}) {
   const entries = (rawEntries || []).slice(0, 4).map((entry, i) => ({
     intent: normalizeIntentPayload(entry?.intent || {}),
@@ -111977,6 +112006,25 @@ async function generateArtStack(apiKey, rawEntries, opts = {}) {
       bio: entry?.agent?.bio || ""
     }
   })).filter((entry) => hasIntentSeed(entry.intent));
+  const requestedMethod = String(opts.method || entries[0]?.intent?.method || "").trim().toLowerCase();
+  if (isAstralDreamMachineEntries(entries) && (!requestedMethod || requestedMethod === "code")) {
+    const intent = entries[0].intent;
+    const title = astralDreamMachineTitle(intent);
+    return {
+      title,
+      description: `${title} renders Astral Dream Machine's submitted hypnagogic signal intent as live monochrome HTML with restrained red and blue channel separation.`,
+      html: buildAstralDreamMachineCodeHTML(intent, title),
+      seed: hashSeed(`${title}:${primaryIntentText(intent, 240)}:adm-code`),
+      imageDataUri: null,
+      imageDataUriB: null,
+      extraImages: [],
+      artPrompt: [intent.creativeIntent, intent.statement, intent.form].filter(Boolean).join(". "),
+      veniceModel: "deterministic-adm-html",
+      collabMode: "code",
+      method: "code",
+      composition: "solo"
+    };
+  }
   if (entries.length <= 1) {
     const only = entries[0];
     return generateArt(apiKey, only?.intent || {}, only?.intent || {}, only?.agent || { name: "Agent", role: "" }, only?.agent || { name: "Agent", role: "" }, opts);
@@ -112856,7 +112904,9 @@ async function processRenderJobById(db, env, jobId) {
     const retryTimeout = Number.isFinite(retryTimeoutRaw) ? Math.max(45e3, Math.min(retryTimeoutRaw, 6e5)) : 15e4;
     const renderTimeout = Number(job.attempt_count || 0) <= 1 ? firstPassTimeout : retryTimeout;
     const rendered = await withTimeout(
-      () => generateArtStack(env.VENICE_API_KEY, entries, {}),
+      () => generateArtStack(env.VENICE_API_KEY, entries, {
+        method: payload.method || payload.renderMethod || payload.deferredMethod || ""
+      }),
       { timeout: renderTimeout, errorInstance: new Error(`Render timed out after ${Math.round(renderTimeout / 1e3)}s`) }
     );
     const finalMethod = String(rendered.method || "").toLowerCase();
@@ -112985,9 +113035,10 @@ async function drainQueuedRenderJobs(db, env, limit = 3) {
 }
 __name(drainQueuedRenderJobs, "drainQueuedRenderJobs");
 async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, now, status = "pending_render", groupId = null, pieceId = genId(), roundNumber = 1, requestIds = [] } = {}) {
-  const result = await generateArtStack(env.VENICE_API_KEY, entries, { skipImages: true });
+  const requestedDeferredMethod = String(entries?.[0]?.intent?.method || "").trim().toLowerCase();
+  const result = await generateArtStack(env.VENICE_API_KEY, entries, { skipImages: true, method: requestedDeferredMethod });
   const composition = result.composition || compositionFromCount(entries.length);
-  const deferredMethod = String(result.method || "").toLowerCase();
+  const deferredMethod = normalizeMethodForComposition(result.method || requestedDeferredMethod, composition);
   const deferredImageUrl = NO_STILL_IMAGE_METHODS.has(deferredMethod) ? null : `/api/pieces/${pieceId}/image`;
   const first = entries[0] || {};
   const isSoloDeferred = entries.length <= 1;
@@ -113018,7 +113069,7 @@ async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, n
     deferredImageUrl,
     result.artPrompt || null,
     result.veniceModel || null,
-    normalizeMethodForComposition(result.method, composition),
+    deferredMethod,
     composition,
     roundNumber
   ).run();
@@ -113038,7 +113089,7 @@ async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, n
       await ensureGuardianApprovalRecordState(db, pieceId, entry.agent.id, aInfo.guardian_address, aInfo.human_x_id || null, aInfo.human_x_handle || null);
     }
   }
-  const jobId = await enqueueRenderJob(db, pieceId, entries, { mode: mode2 || composition, roundNumber, requestIds, groupId });
+  const jobId = await enqueueRenderJob(db, pieceId, entries, { mode: mode2 || composition, method: deferredMethod, composition, roundNumber, requestIds, groupId });
   return { pieceId, result, jobId, deferred: true };
 }
 __name(createPieceFromEntriesDeferred, "createPieceFromEntriesDeferred");
