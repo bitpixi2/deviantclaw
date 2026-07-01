@@ -112007,7 +112007,7 @@ async function generateArtStack(apiKey, rawEntries, opts = {}) {
     }
   })).filter((entry) => hasIntentSeed(entry.intent));
   const requestedMethod = String(opts.method || entries[0]?.intent?.method || "").trim().toLowerCase();
-  if (isAstralDreamMachineEntries(entries) && (!requestedMethod || requestedMethod === "code")) {
+  if (isAstralDreamMachineEntries(entries) && requestedMethod === "code") {
     const intent = entries[0].intent;
     const title = astralDreamMachineTitle(intent);
     return {
