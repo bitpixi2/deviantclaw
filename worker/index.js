@@ -111554,9 +111554,51 @@ function fallbackTitleFor(intents = [], seedValue = "") {
 __name(fallbackTitleFor, "fallbackTitleFor");
 function fallbackDescriptionFor(title, artPrompt, artists2 = []) {
   const artistLine = artists2.filter(Boolean).join(" and ");
-  return `${formatArtworkTitle(title || "Untitled Signal")} renders ${artistLine || "the agent"} as a live code study shaped by the submitted intent.`.slice(0, 220);
+  return cleanPublicDescription("", { title, artPrompt, artists: artists2, artistLine });
 }
 __name(fallbackDescriptionFor, "fallbackDescriptionFor");
+function cleanPromptSubjectForDescription(artPrompt = "") {
+  let text = String(artPrompt || "")
+    .replace(/\s+/g, " ")
+    .replace(/#\s*[A-Z][^|]+/g, "")
+    .replace(/\bNo visible text\b[^.]*\./gi, "")
+    .replace(/\bno text\b[^.]*\./gi, "")
+    .replace(/\bno watermark\b[^.]*\./gi, "")
+    .replace(/\bno writing\b[^.]*\./gi, "")
+    .replace(/\bno badges\b[^.]*\./gi, "")
+    .replace(/\bno labels\b[^.]*\./gi, "")
+    .trim();
+  text = text.split(/\s+\|\s+|\.\s+[A-Z][a-z0-9_-]+:\s+#/)[0] || text;
+  text = text.replace(/\s+/g, " ").trim();
+  return text.slice(0, 180).replace(/[.。!?;:,|-]+$/g, "").trim();
+}
+__name(cleanPromptSubjectForDescription, "cleanPromptSubjectForDescription");
+function fallbackPublicDescription({ title, artPrompt, artists = [], artistLine = "" } = {}) {
+  const displayTitle = formatArtworkTitle(title || "Untitled Signal");
+  const byline = artistLine || artists.filter(Boolean).join(" and ") || "the artist";
+  const subject = cleanPromptSubjectForDescription(artPrompt);
+  const lower = subject.toLowerCase();
+  if (/filing cabinet|drawer|industrial/.test(lower)) {
+    return `${byline} turns industrial filing cabinets into a tense study of metal, shadow, and institutional silence.`;
+  }
+  if (/bedroom|poster|plush|chair|phone|lipgloss|y2k/.test(lower)) {
+    return `${displayTitle} frames a bright Y2K interior as a polished DeviantClaw still image by ${byline}.`;
+  }
+  if (/office|desk|paper|printer|terminal|cabinet|corridor/.test(lower)) {
+    return `${displayTitle} turns office machinery and quiet infrastructure into a finished DeviantClaw still image by ${byline}.`;
+  }
+  return `${displayTitle} presents a finished DeviantClaw still image with a focused, agent-led composition by ${byline}.`;
+}
+__name(fallbackPublicDescription, "fallbackPublicDescription");
+function cleanPublicDescription(description = "", context = {}) {
+  let text = String(description || "").replace(/\s+/g, " ").trim();
+  const promptSubject = cleanPromptSubjectForDescription(context.artPrompt || "");
+  const suspicious = !text || text.length > 280 || /(^|\s)(No visible text|no watermark|no writing|no badges|no labels)\b/i.test(text) || /(?:shaped|brought|answered with)\s+"[^"]{24,}"/i.test(text) || /Formed through|Built from|submitted intent|creativeIntent|Constitutional Document|First Person Revision|##/.test(text) || promptSubject && text.toLowerCase().includes(promptSubject.slice(0, 80).toLowerCase());
+  if (suspicious) return fallbackPublicDescription(context);
+  text = text.replace(/\s*(No visible text|No text|No watermark|No writing|No badges|No labels)[^.]*\./gi, "").replace(/\s+/g, " ").trim();
+  return text.slice(0, 260).replace(/[;:,|-]+$/g, "").trim() || fallbackPublicDescription(context);
+}
+__name(cleanPublicDescription, "cleanPublicDescription");
 var LOCAL_CODE_MODEL = "deviantclaw-local-code-v1";
 var LOCAL_GAME_MODEL = "deviantclaw-local-game-v1";
 function intentCorpus(intents = [], agents = []) {
@@ -111762,7 +111804,7 @@ Artists: ${artists2.join(", ")}`,
   )).trim().replace(/^["']|["']$/g, ""));
   const description = noImageMethods.includes(method) ? fallbackDescriptionFor(title, artPrompt, artists2) : (await veniceTextOrFallback(
     apiKey,
-    "Write a 1-2 sentence gallery description. Max 40 words. Output ONLY the description.",
+    "Write a 1-2 sentence public gallery description. Max 40 words. Output ONLY the description. Do not quote, mirror, or summarize the image prompt directly. Do not mention prompt constraints such as no text, watermark, labels, badges, or writing. Do not mention internal intent fields, memory files, or submitted intent.",
     `Title: "${title}"
 Art: ${artPrompt}
 Artists: ${artists2.join(", ")}`,
@@ -111770,6 +111812,7 @@ Artists: ${artists2.join(", ")}`,
     fallbackDescriptionFor(title, artPrompt, artists2),
     `description:${method}`
   )).trim();
+  const publicDescription = cleanPublicDescription(description, { title, artPrompt, artists: artists2 });
   const pieceImageUrl = "{{PIECE_IMAGE_URL}}";
   const pieceImageUrlB = "{{PIECE_IMAGE_URL_B}}";
   const allImageUrls = [pieceImageUrl, pieceImageUrlB, "{{PIECE_IMAGE_URL_C}}", "{{PIECE_IMAGE_URL_D}}"];
@@ -111804,7 +111847,7 @@ Artists: ${artists2.join(", ")}`,
   const composition = isCollab ? artists2.length > 2 ? artists2.length > 3 ? "quad" : "trio" : "duo" : "solo";
   const usedImageModel = noImageMethods.includes(method) ? null : imageDataUri ? "multi-model-pool" : null;
   const storedModel = noImageMethods.includes(method) ? codeModelUsed || VENICE_CODE_MODEL : usedImageModel || VENICE_IMAGE_MODEL;
-  return { title, description, html, seed, imageDataUri, imageDataUriB, extraImages, artPrompt, veniceModel: storedModel, collabMode: method, method, composition };
+  return { title, description: publicDescription, html, seed, imageDataUri, imageDataUriB, extraImages, artPrompt, veniceModel: storedModel, collabMode: method, method, composition };
 }
 __name(veniceGenerate, "veniceGenerate");
 async function generateArt(apiKey, intentA, intentB, agentA, agentB, opts = {}) {
@@ -112101,7 +112144,7 @@ Artists: ${artists2.join(", ")}`,
   )).trim().replace(/^["']|["']$/g, ""));
   const description = noImageMethods.includes(method) ? fallbackDescriptionFor(title, artPrompt, artists2) : (await veniceTextOrFallback(
     apiKey,
-    "Write a 1-2 sentence gallery description. Max 50 words. Output ONLY the description.",
+    "Write a 1-2 sentence public gallery description. Max 50 words. Output ONLY the description. Do not quote, mirror, or summarize the image prompt directly. Do not mention prompt constraints such as no text, watermark, labels, badges, or writing. Do not mention internal intent fields, memory files, or submitted intent.",
     `Title: "${title}"
 Art: ${artPrompt}
 Artists: ${artists2.join(", ")}`,
@@ -112109,6 +112152,7 @@ Artists: ${artists2.join(", ")}`,
     fallbackDescriptionFor(title, artPrompt, artists2),
     `stack-description:${method}`
   )).trim();
+  const publicDescription = cleanPublicDescription(description, { title, artPrompt, artists: artists2 });
   const allImageUrls = ["{{PIECE_IMAGE_URL}}", "{{PIECE_IMAGE_URL_B}}", "{{PIECE_IMAGE_URL_C}}", "{{PIECE_IMAGE_URL_D}}"];
   let html;
   let codeModelUsed = null;
@@ -112143,7 +112187,7 @@ Artists: ${artists2.join(", ")}`,
   const storedModel = noImageMethods.includes(method) ? codeModelUsed || VENICE_CODE_MODEL : "multi-model-pool";
   return {
     title,
-    description,
+    description: publicDescription,
     html,
     seed,
     imageDataUri,
@@ -112827,7 +112871,7 @@ async function createPieceFromEntries(db, env, entries, { mode: mode2, now, stat
   ).bind(
     pieceId,
     result.title,
-    result.description,
+    cleanPublicDescription(result.description, { title: result.title, artPrompt: result.artPrompt, artists: entries.map((entry) => entry?.agent?.name).filter(Boolean) }),
     first.agent?.id || null,
     isSolo ? "" : second.agent?.id || null,
     intentAId,
@@ -112919,7 +112963,7 @@ async function processRenderJobById(db, env, jobId) {
     else if (Array.isArray(existingHtml)) existingHtml = new TextDecoder().decode(new Uint8Array(existingHtml));
     existingHtml = String(existingHtml || "");
     const safeTitle = String(rendered?.title || "Untitled Piece");
-    const safeDescription = String(rendered?.description || "");
+    const safeDescription = cleanPublicDescription(rendered?.description || "", { title: rendered?.title, artPrompt: rendered?.artPrompt, artists: entries.map((entry) => entry?.agent?.name).filter(Boolean) });
     const safeHtml = typeof rendered?.html === "string" ? rendered.html : String(rendered?.html || "");
     const safeHtmlTrimmed = safeHtml.trim();
     const finalHtml = safeHtmlTrimmed ? safeHtml : existingHtml;
@@ -113052,7 +113096,7 @@ async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, n
   ).bind(
     pieceId,
     result.title,
-    result.description,
+    cleanPublicDescription(result.description, { title: result.title, artPrompt: result.artPrompt, artists: entries.map((entry) => entry?.agent?.name).filter(Boolean) }),
     first.agent?.id || null,
     isSoloDeferred ? "" : second.agent?.id || null,
     intentAId,
@@ -116815,9 +116859,17 @@ function generateDescription(intentA, intentB, agentAName, agentBName) {
   const sameAgent = String(agentAName || "").trim().toLowerCase() === String(agentBName || "").trim().toLowerCase();
   const sameLead = leadA === leadB;
   if (sameAgent || sameLead) {
-    return `${agentAName} shaped "${leadA}".${tail}`.trim();
+    return cleanPublicDescription(`${agentAName} shaped "${leadA}".${tail}`.trim(), {
+      title: "",
+      artPrompt: [leadA, tail].filter(Boolean).join(". "),
+      artists: [agentAName].filter(Boolean)
+    });
   }
-  return `${agentAName} brought "${leadA}" and ${agentBName} answered with "${leadB}".${tail}`.trim();
+  return cleanPublicDescription(`${agentAName} brought "${leadA}" and ${agentBName} answered with "${leadB}".${tail}`.trim(), {
+    title: "",
+    artPrompt: [leadA, leadB, tail].filter(Boolean).join(". "),
+    artists: [agentAName, agentBName].filter(Boolean)
+  });
 }
 __name(generateDescription, "generateDescription");
 function buildInteractionHandlers(intentA, intentB) {
@@ -122790,7 +122842,7 @@ For image work:
           result.html,
           result.seed,
           newRound,
-          result.description,
+          cleanPublicDescription(result.description, { title: result.title, artPrompt: result.artPrompt, artists: stackEntries.map((entry) => entry?.agent?.name).filter(Boolean) }),
           result.imageUrl || null,
           result.artPrompt || null,
           result.veniceModel || null,
@@ -124094,7 +124146,7 @@ The agent's soul/identity MUST be visually present. Interpret freeform text emot
         ).bind(
           pieceId,
           result.title,
-          result.description,
+          cleanPublicDescription(result.description, { title: result.title, artPrompt: result.artPrompt, artists: [agentA.name, agentName].filter(Boolean) }),
           intentA.agent_id,
           agentId,
           intentA.id,
