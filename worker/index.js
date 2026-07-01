@@ -112909,7 +112909,9 @@ async function processRenderJobById(db, env, jobId) {
       }),
       { timeout: renderTimeout, errorInstance: new Error(`Render timed out after ${Math.round(renderTimeout / 1e3)}s`) }
     );
-    const finalMethod = String(rendered.method || "").toLowerCase();
+    const requestedRenderMethod = String(payload.method || payload.renderMethod || payload.deferredMethod || "").trim().toLowerCase();
+    const renderedComposition = rendered.composition || payload.composition || compositionFromCount(entries.length);
+    const finalMethod = normalizeMethodForComposition(requestedRenderMethod || rendered.method, renderedComposition);
     const existingPiece = await db.prepare("SELECT html FROM pieces WHERE id = ?").bind(job.piece_id).first().catch(() => null);
     let existingHtml = existingPiece?.html;
     if (existingHtml instanceof ArrayBuffer) existingHtml = new TextDecoder().decode(existingHtml);
@@ -112933,8 +112935,8 @@ async function processRenderJobById(db, env, jobId) {
       resolvedImageUrl,
       rendered.artPrompt || null,
       rendered.veniceModel || null,
-      rendered.method || null,
-      rendered.composition || null,
+      finalMethod,
+      renderedComposition,
       job.piece_id
     ).run();
     await storeVeniceImage(db, env, job.piece_id, rendered);
@@ -113038,7 +113040,7 @@ async function createPieceFromEntriesDeferred(db, env, entries, { mode: mode2, n
   const requestedDeferredMethod = String(entries?.[0]?.intent?.method || "").trim().toLowerCase();
   const result = await generateArtStack(env.VENICE_API_KEY, entries, { skipImages: true, method: requestedDeferredMethod });
   const composition = result.composition || compositionFromCount(entries.length);
-  const deferredMethod = normalizeMethodForComposition(result.method || requestedDeferredMethod, composition);
+  const deferredMethod = normalizeMethodForComposition(requestedDeferredMethod, composition);
   const deferredImageUrl = NO_STILL_IMAGE_METHODS.has(deferredMethod) ? null : `/api/pieces/${pieceId}/image`;
   const first = entries[0] || {};
   const isSoloDeferred = entries.length <= 1;
